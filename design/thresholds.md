@@ -16,7 +16,7 @@
 - Enemy commander duel navigation: 0.85-second rear hold at 42% speed, then a 2.35-unit persistent flank at 78% speed until 2.40 seconds, followed by clearance-band engagement.
 - Enemy retreat: disabled; every surviving enemy remains committed.
   - Battle-line preparation: 1.65 seconds after swarm contact plus 0.45 seconds per soldier beyond four, capped at 6.85 seconds; soldiers form 0.55 units behind the commander axis with 1.72-unit lateral spacing, increasing by 0.035 per soldier beyond four and capped at 2.05. Ordinary follow leashes are suspended during this preparation so outer slots remain reachable.
-  - Tactical combat camera: while an encounter is active, living commanders and acknowledged duelists define a padded combat frame. The camera eases toward the frame centre and raises only enough to keep nearby separated fights visible, capped at 1.45 times the normal camera offset so units remain readable. Floor streaming follows this tactical centre with a four-tile radius so the world edge stays hidden.
+  - Tactical combat camera: while an encounter is active, every living commander and soldier defines a padded combat frame, including excess soldiers that have not yet paired. The camera eases toward the frame centre and raises only enough to keep nearby separated fights visible, capped at 1.58 times the normal camera offset so units remain readable. Floor streaming follows this tactical centre with a four-tile radius so the world edge stays hidden.
 - Primary duel ownership: mutually acknowledged soldier pairs share one fixed face-off centre.
 - Duel commitment: a living lock overrides commander retreat, follow awareness, formation movement, and leash correction until one participant falls.
 - Damage authority: both actors alive, opposing factions, valid cooldown, and actual current range (1.05 commander melee; 1.15 soldier duel; 1.40 commander assault) are required at the exact damage frame.
@@ -41,9 +41,9 @@
 - Commander death never collapses its soldiers; an encounter resolves only after all enemy commanders and soldiers are defeated.
 - Soldier damage widgets: 0.59-unit width, immediate main health, 0.24-second chip hold, and 1.60-second total visibility after damage.
 - Commander groups: the game begins with one player commander and one group. Groups never split automatically; a selected group gains a divide action only above 12 ordinary soldiers.
-- Group division: one soldier becomes a full player commander and half the remaining soldiers transfer to its new group. Recruitment can make any group eligible to divide again; there is no fixed group cap.
+- Group division: one soldier becomes a full player commander and half the remaining soldiers transfer to its new group. The promoted commander owns only that transferred company, ignores the original commander's movement state, and its soldiers follow its position. Recruitment can make any group eligible to divide again; there is no fixed group cap.
 - Travelling personal space grows by 0.024 units per soldier beyond six, capped at +0.58; the follow radius grows by 3.0 units per company up to the three-company cap.
-- Enemy commander path clearing: navigation remains fixed on the opposing commander, but a 2.40-unit forward corridor with 0.72 half-width permits melee attacks against obstructing soldiers; soldiers actively attacking the commander qualify within 1.25 units.
+- Commander path clearing: every commander keeps an independent opponent assignment and uses a 2.65-unit local forward probe with 0.58-unit clearance to route around occupied combat lanes. The primary player commander prefers its rival commander; promoted commanders spread onto available soldiers before sharing a target. A 2.40-unit attack corridor still permits melee against immediate blockers.
 - Streamed ground window: 7×7 recycled tiles, each 18 world units square (126×126 total coverage).
 - Opening strength: both sides begin with six ordinary soldiers.
 - Player commander: 1000 maximum health and 96 damage, exactly 2× the enemy commander's health and damage. Every player group commander uses this profile.

@@ -222,7 +222,13 @@ export function battleLineSpacing(count) {
   return 1.72 + Math.min(.33, Math.max(0, count - 4) * .035);
 }
 
-export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, padding = 2.8, maxScale = 1.45 } = {}) {
+export function activeCombatantPoints(actors) {
+  return actors
+    .filter(actor => (actor?.alive ?? actor?.userData?.alive) !== false && actor?.position)
+    .map(actor => ({ x: actor.position.x, z: actor.position.z }));
+}
+
+export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, padding = 2.8, maxScale = 1.58 } = {}) {
   const valid = points.filter(point => Number.isFinite(point?.x) && Number.isFinite(point?.z));
   if (!valid.length) return null;
   const xs = valid.map(point => point.x);
@@ -331,6 +337,10 @@ export function companyCommandState({ manualOrder, combat, enemyDetected, comman
   return "follow";
 }
 
+export function companyLeaderMotion({ ownCommanderMoving }) {
+  return Boolean(ownCommanderMoving);
+}
+
 export function battleApproachState({ distance, detectionRadius = 9.5, aggroRadius = 6.2 }) {
   if (distance <= aggroRadius) return "combat";
   if (distance <= detectionRadius) return "deploy";
@@ -405,6 +415,26 @@ export function chooseCommanderBlockerIndex({ commander, target, soldiers, lookA
     const immediateThreat = soldier.threatening && distance <= threatRadius;
     if (!obstructing && !immediateThreat) continue;
     const score = immediateThreat ? distance - .5 : projection + lateral * .35;
+    if (score < bestScore) {
+      bestScore = score;
+      best = index;
+    }
+  }
+  return best;
+}
+
+export function chooseCommanderTargetIndex({ commander, opponents, targetLoads = [], preferCommander = true }) {
+  let best = -1;
+  let bestScore = Infinity;
+  for (let index = 0; index < opponents.length; index++) {
+    const opponent = opponents[index];
+    if (opponent?.alive === false) continue;
+    const load = targetLoads[index] ?? 0;
+    const commanderPriority = preferCommander
+      ? (opponent.isCommander ? -8 : 0)
+      : (opponent.isCommander ? 2.5 : 0);
+    const distance = Math.hypot(opponent.x - commander.x, opponent.z - commander.z);
+    const score = load * 12 + distance + commanderPriority;
     if (score < bestScore) {
       bestScore = score;
       best = index;

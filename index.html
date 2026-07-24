@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#adc4c7">
+  <link rel="icon" href="./assets/favicon.png">
+  <title>Crownwake</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <canvas id="game" aria-label="Crownwake 3D game"></canvas>
+  <div id="vignette"></div>
+  <section id="title-screen" class="screen">
+    <div class="title-mark"><span></span><i></i><span></span></div>
+    <p class="kicker">A TINY TALE OF CONQUEST</p>
+    <h1 id="title"></h1>
+    <p id="subtitle" class="subtitle"></p>
+    <button id="begin" class="primary"></button>
+    <p id="how-to" class="hint"></p>
+  </section>
+  <section id="hud" class="hidden">
+    <div class="topbar">
+      <div class="brand">CROWNWAKE</div>
+      <div class="stats">
+        <div><small id="army-label"></small><strong id="army-count">5</strong></div>
+        <div><small id="territory-label"></small><strong id="territory-count">1/7</strong></div>
+      </div>
+      <div class="actions">
+        <button id="pause" class="quiet pause-button"></button>
+        <button id="sound" class="quiet"></button>
+        <button id="motion" class="quiet"></button>
+        <button id="companies" class="army-button" aria-label="View my companies"><i class="soldier-cube"></i><strong>× <span id="army-button-count">4</span></strong></button>
+        <button id="map" class="map-button"></button>
+      </div>
+    </div>
+    <div id="commander-vitals">
+      <div id="hearts" aria-label="Commander lives"></div>
+    </div>
+    <button id="divide-company" class="divide-company hidden"></button>
+    <div id="pause-state" class="hidden" aria-live="polite"></div>
+    <div id="objective"></div>
+    <div id="toast" aria-live="polite"></div>
+    <div id="mobile-command"></div>
+    <div id="map-panel" class="hidden">
+      <p id="map-hint"></p>
+      <div class="map-legend">
+        <span><i class="dot yours"></i>Your wake</span>
+        <span><i class="dot frontier"></i>Frontier</span>
+        <span><i class="dot mist"></i>Unknown</span>
+      </div>
+      <button id="fortify" disabled></button>
+      <button id="return" class="primary small"></button>
+    </div>
+    <div id="companies-panel" class="hidden">
+      <div class="companies-card">
+        <p class="kicker" id="companies-kicker"></p>
+        <h2 id="companies-title"></h2>
+        <p id="companies-hint"></p>
+        <div id="companies-list"></div>
+        <button id="companies-close" class="primary small"></button>
+      </div>
+    </div>
+  </section>
+  <div id="tap-marker" aria-hidden="true"></div>
+  <section id="end-screen" class="screen hidden">
+    <p class="kicker">THE LAST BANNER FALLS</p>
+    <h2 id="end-title"></h2>
+    <button id="retry" class="primary"></button>
+  </section>
+  <div id="dev"></div>
+  <script type="importmap">
+    {"imports":{"three":"./vendor/three.module.js"}}
+  </script>
+  <script type="module" src="./game.js"></script>
+</body>
+</html>

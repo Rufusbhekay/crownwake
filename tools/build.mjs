@@ -1,0 +1,10 @@
+import { copyFile, mkdir } from "node:fs/promises";
+await mkdir("vendor", { recursive: true });
+await mkdir("vendor/loaders", { recursive: true });
+await mkdir("vendor/utils", { recursive: true });
+await copyFile("node_modules/three/build/three.module.js", "vendor/three.module.js");
+await copyFile("node_modules/three/build/three.core.js", "vendor/three.core.js");
+await copyFile("node_modules/three/examples/jsm/loaders/GLTFLoader.js", "vendor/loaders/GLTFLoader.js");
+await copyFile("node_modules/three/examples/jsm/utils/BufferGeometryUtils.js", "vendor/utils/BufferGeometryUtils.js");
+await copyFile("src/sim.js", "sim-runtime-20260724d.js");
+console.log("Vendored Three.js and generated the immutable simulation runtime.");

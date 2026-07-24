@@ -1,0 +1,69 @@
+# Crownwake — Runtime Thresholds
+
+- Fixed simulation step: 60 Hz.
+- Target render rate: 60 fps; stable frame pacing takes priority over effects density.
+- Device-pixel ratio cap: 1.5.
+- Servant population cap: 120; servants render through instancing, not one draw call each.
+- Worst-case draw-call target: 28 or fewer.
+- Maximum active combat particles: 180. Hit particles are pooled and reused; expired variable-size shatter fragments are removed and their GPU resources disposed. Movement dust is disabled.
+- Master movement speed: 5.2 world units/second.
+- Servant follow speed: 5.8 world units/second.
+- General arrival dead zone: 0.06 world units with proportional braking inside 0.70 units.
+- Pawn formation-detection radius: 9.5 world units; any living pawn sighting alerts its entire swarm and starts horizontal deployment. Combat contact begins at 6.2 units.
+- Soldier personal-space threshold: 1.12 world units out of combat and 0.82 in battle, with soft steering rather than blocking collision.
+- Commander melee stand-off: 0.94 world units with a ±0.10-unit settled band; pursuit does not recompute while inside the band.
+- Commander target promotion: surviving soldiers acquire the opposing commander in the same simulation frame that the last opposing soldier falls.
+- Enemy commander duel navigation: 0.85-second rear hold at 42% speed, then a 2.35-unit persistent flank at 78% speed until 2.40 seconds, followed by clearance-band engagement.
+- Enemy retreat: disabled; every surviving enemy remains committed.
+  - Battle-line preparation: 1.65 seconds after swarm contact plus 0.45 seconds per soldier beyond four, capped at 6.85 seconds; soldiers form 0.55 units behind the commander axis with 1.72-unit lateral spacing, increasing by 0.035 per soldier beyond four and capped at 2.05. Ordinary follow leashes are suspended during this preparation so outer slots remain reachable.
+  - Tactical combat camera: while an encounter is active, living commanders and acknowledged duelists define a padded combat frame. The camera eases toward the frame centre and raises only enough to keep separated fights visible, capped at 2.35 times the normal camera offset.
+- Primary duel ownership: mutually acknowledged soldier pairs share one fixed face-off centre.
+- Duel commitment: a living lock overrides commander retreat, follow awareness, formation movement, and leash correction until one participant falls.
+- Damage authority: both actors alive, opposing factions, valid cooldown, and actual current range (1.05 commander melee; 1.15 soldier duel; 1.40 commander assault) are required at the exact damage frame.
+- Locked-path avoidance: 1.65-unit forward probe, 0.48-unit clearance around living actors, deterministic side preference, and open-side route scoring.
+- Commander golden clearance: same-faction soldiers evacuate a 1.20-unit radial field and a 2.25 × 2.56-unit forward travel corridor, amplified 1.78× during steering; enemy soldiers evaluate every living allied commander, not only their original leader.
+- Stale duel recovery: 0.72-second progress windows, 0.07-unit minimum progress, and reciprocal lock release after three failed windows before nearest-target reacquisition.
+- Numerical advantage: soldier duels remain strictly one-to-one; surplus soldiers assault the opposing commander and return to soldier priority whenever an opponent becomes unoccupied.
+- Primary face-off radius: 0.78 world units per duelist; commander-assault support radius: 1.38 world units.
+- Lunge begins within 0.16 world units of the assigned face-off position.
+- Duel strike: 0.24-second committed lunge followed by a 0.72-second retreat to a 1.85-unit recovery gap.
+- Duel accuracy: base strikes land, but every fourth anticipated strike may be dodged into an open left, right, or rear lane; alternating successful dodge windows permit a close-range counterattack.
+- Character ground height: 0.015 world units above the streamed floor, with no idle vertical bob.
+- Floor terrain: procedural 1024-square matte grey-green surface with a thin charcoal 10×10 square grid repeated once per streamed tile; roughness 0.96, metalness 0, and no overlapping line geometry.
+- Streamed floor joins: zero geometric overscan; neighboring planes meet edge-to-edge without coplanar overlap or z-fighting.
+- Environment grade: exposure 0.78, hemisphere intensity 1.55, directional intensity 1.85.
+- Player soldier defeat: immediate disappearance into 8–12 compact cube fragments lasting 0.7–1.05 seconds.
+- Recruitment revival: 2.0 seconds motionless and black, then 3.6–4.2 seconds of fast hover and six synchronized blinks spanning emissive intensity 0.12–8 before grounding.
+- Commander health widgets: every commander carries a compact world-space health bar at 1.52 world units above its origin; main health drops immediately, chip damage holds 0.24 seconds, then catches up at 45 health/second. No commander health bar is drawn in the screen HUD.
+- Replacement-wave safety range: at least 27 world units and fully outside the camera frustum.
+- Adaptive encounter budget: living player soldiers, their average health, and commander health define present strength; challenge trends +5.5% per wave up to +72%, with a bounded 0.86–1.14 fluctuation.
+- Dual-swarm pressure occurs on every third rising encounter from wave 3 onward; two independent commanders enter from angles separated by 140.4 degrees and divide the encounter soldier budget evenly.
+- Commander death never collapses its soldiers; an encounter resolves only after all enemy commanders and soldiers are defeated.
+- Soldier damage widgets: 0.59-unit width, immediate main health, 0.24-second chip hold, and 1.60-second total visibility after damage.
+- Commander groups: the game begins with one player commander and one group. Groups never split automatically; a selected group gains a divide action only above 12 ordinary soldiers.
+- Group division: one soldier becomes a full player commander and half the remaining soldiers transfer to its new group. Recruitment can make any group eligible to divide again; there is no fixed group cap.
+- Travelling personal space grows by 0.024 units per soldier beyond six, capped at +0.58; the follow radius grows by 3.0 units per company up to the three-company cap.
+- Enemy commander path clearing: navigation remains fixed on the opposing commander, but a 2.40-unit forward corridor with 0.72 half-width permits melee attacks against obstructing soldiers; soldiers actively attacking the commander qualify within 1.25 units.
+- Streamed ground window: 7×7 recycled tiles, each 18 world units square (126×126 total coverage).
+- Opening strength: both sides begin with six ordinary soldiers.
+- Player commander: 1000 maximum health and 96 damage, exactly 2× the enemy commander's health and damage. Every player group commander uses this profile.
+- Enemy commander: 500 maximum health and 48 damage, enough to defeat any player soldier—including a Unit Commander—in one strike.
+- Player commander regeneration: 4.5-second post-damage delay, then 5 health/second.
+- Enemy commander regeneration: 4.5-second post-damage delay, then 2.6 health/second.
+- Player defeat penalty: the primary commander revives with exactly six ordinary soldiers; accumulated recruits and divided commands are lost.
+- Respawn-victory race: if the final enemy falls while the player commander is awaiting revival, the defeat reset completes first and the defeated enemy soldiers then enter normal recruitment revival instead of being skipped.
+- Shatter physics: soldier fragments are 0.07–0.14 world units and commander fragments are 0.10–0.22; gravity is 8.5 units/second² with at most two visible bounces, horizontal damping on contact, and a 3.2–5.0-second lifetime that includes a grounded settle.
+- Tactical command mode: clicking a living soldier selects its commander group; clicking a player commander selects only that commander. Selection applies a bright material lift plus an obvious 11% enlarged charcoal back-face ink contour and restrained ground halo, exposes a 7×7 destination grid, and slows simulation to 0.25× until a destination is issued or selection is cancelled. No bounding-box helper is used.
+- Tactical command tiles: each tile is 3.6 world units square, centered at a 1.8-unit offset, and fits exactly over a 2×2 block of the underlying 1.8-unit floor squares. A tile is red only when a non-selected living actor snaps into that exact command cell; nearby actors in adjacent cells do not block it. Clicking red exits tactical selection and immediately restores 1× time without rewriting any existing movement or duel.
+- Player movement is pointer/touch command only. WASD, arrow movement, and analogue-stick movement are disabled; Space and gamepad action may still open or close the strategic map.
+- A group order moves its commander to the front of the chosen anchor and places up to six soldiers per row behind it at 1.42-unit spacing. Outside enemy sensing range, every soldier continuously reforms behind its own commander with individual awareness delay. Inside sensing range, those rows open into the wide horizontal battle line before duel pairing.
+- A commander-only order moves that commander independently. Outside battle its company follows behind; during battle existing soldier duels remain committed while soldiers without a live lock may escort the commander.
+- Pause freezes simulation and music but still permits group selection, grid hover, move placement, and red-cell order cancellation. Issued orders begin when play resumes. Three 32-pixel commander hearts sit beneath the top-right controls; mobile uses 25-pixel hearts and hides the health bar.
+- Commander lives: each enemy wave begins with three hearts; a player-commander defeat removes one heart immediately. Hearts refill only when the next wave begins.
+- Victory progression waits until every converted soldier has completed its revival before scheduling the next wave.
+- Commander and soldier geometry share the same 1.22-unit visual height and the same 0.215 × 0.195 collision half-extents; commander identity is communicated by colour and health bar rather than scale.
+- Attack animation: successful melee begins at a full 0.42-unit visual lunge, closing the commander stand-off gap before compressing local depth to 80% and widening 8%, then eases back without changing the actor's logical collision position. The primary player commander uses the same stand-off pursuit and lunge path as every other commander when it has no manual order.
+- Damage animation: impact applies physical knockback away from the attacker plus an 8% vertical rebound and 12% lateral squash pulse on the visual mesh.
+- Mobile command input: discrete ground taps only; gameplay HUD keeps compact safe-area-aware Pause, Companies, and Frontier buttons plus commander hearts, with full panels shown only while paused.
+- Camera shake is capped at 0.16 world units and can be disabled.
+- Flashes are short, low-area, and can be disabled.

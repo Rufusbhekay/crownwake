@@ -1,0 +1,9 @@
+* text=auto eol=lf
+
+*.blend binary
+*.blend1 binary
+*.glb binary
+*.m4a binary
+*.mp3 binary
+*.png binary
+*.zip binary

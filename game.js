@@ -144,20 +144,6 @@ const MODEL_SPECS = {
 };
 const modelTemplates = {};
 const gltfLoader = new GLTFLoader();
-const frontMarkerMaterial=new THREE.MeshBasicMaterial({color:0x263338,side:THREE.DoubleSide,toneMapped:false});
-const frontPanelGeometry=new THREE.PlaneGeometry(.15,.34);
-const frontArrowShape=new THREE.Shape();
-frontArrowShape.moveTo(0,.11);frontArrowShape.lineTo(-.085,-.075);frontArrowShape.lineTo(.085,-.075);frontArrowShape.closePath();
-const frontArrowGeometry=new THREE.ShapeGeometry(frontArrowShape);
-function ensureFrontMarker(character){
-  if(character.children.some(child=>child.userData.frontMarker))return;
-  const marker=new THREE.Group();marker.userData.frontMarker=true;
-  const panel=new THREE.Mesh(frontPanelGeometry,frontMarkerMaterial);
-  panel.position.set(0,.72,.205);panel.renderOrder=8;
-  const arrow=new THREE.Mesh(frontArrowGeometry,frontMarkerMaterial);
-  arrow.rotation.x=Math.PI/2;arrow.position.set(0,1.255,.015);arrow.renderOrder=8;
-  marker.add(panel,arrow);character.add(marker);
-}
 function loadCharacterModel([url, targetHeight]) {
   return gltfLoader.loadAsync(url).then(({ scene: model }) => {
     const bounds = new THREE.Box3().setFromObject(model), size = bounds.getSize(new THREE.Vector3());
@@ -190,7 +176,6 @@ function setCharacterVisual(character, key, fallback) {
   visual.userData.basePosition=visual.position.clone();
   visual.userData.baseScale=visual.scale.clone();
   character.add(visual);
-  ensureFrontMarker(character);
 }
 const fallenMaterial=new THREE.MeshStandardMaterial({color:0x34383a,roughness:1,metalness:0,flatShading:true});
 function setFallenAppearance(character, fallen) {

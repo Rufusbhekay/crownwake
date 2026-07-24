@@ -25,7 +25,7 @@
 - Stale duel recovery: 0.72-second progress windows, 0.07-unit minimum progress, and reciprocal lock release after three failed windows before nearest-target reacquisition.
 - Numerical advantage: soldier duels remain strictly one-to-one; surplus soldiers assault the opposing commander and return to soldier priority whenever an opponent becomes unoccupied.
 - Primary face-off radius: 0.58 world units per duelist; commander-assault support radius: 1.38 world units.
-- Lunge begins within 0.16 world units of the assigned face-off position.
+- Duel readiness, lunge start, and path-stall recovery share one 0.20-unit face-off tolerance so collision settling cannot leave an actor in a non-attacking dead zone.
 - Duel strike: paired opponents hold about 1.16 units apart, wait an independent 0.12–0.84-second opening beat, then use a compact 0.24-unit visual lunge followed by up to 0.34 seconds of committed movement, landing once the attacker enters its real damage range, then a 0.72-second recovery. A blocked lunge times out and retries instead of consuming the attack turn.
 - Duel sequence: each paired face-off randomly chooses its first attacker and opening delay, so the horizontal battle line breaks into independently timed fights. Paired fighters then alternate guaranteed strikes while continuously facing one another. The active fighter lunges, the receiver plays an impact scale-bounce and short recoil, then the receiver answers after recovery. Dodges and counter branches are disabled so duels stay readable.
 - Character ground height: 0.015 world units above the streamed floor, with no idle vertical bob.

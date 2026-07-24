@@ -613,6 +613,15 @@ test("duel openings use bounded independent delays", () => {
   assert.equal(duelPairReady({distance:.1,foeDistance:9,mutual:false}),true);
 });
 
+test("collision settling near a face-off point cannot strand a duel", () => {
+  assert.equal(duelPairReady({distance:.17,foeDistance:.17,mutual:true}),true);
+  assert.deepEqual(advanceDuelState({
+    phase:DUEL_PHASE.APPROACH,timer:0,distance:.17,dt:.1
+  }),{
+    phase:DUEL_PHASE.LUNGE,timer:.48,strike:false
+  });
+});
+
 test("a stale done flag cannot block victory after the commander revives", () => {
   assert.equal(encounterResolutionState({
     hasEncounter:true,encounterDone:true,playerAlive:true,enemyRosterCount:5,livingEnemyCount:0

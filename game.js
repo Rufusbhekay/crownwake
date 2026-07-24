@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, anticipatedDodgeCounter, anticipatedDodgeIntent, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, particleBudgetAllows, playerThreatScore, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260724d.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260724e.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -286,10 +286,12 @@ function roundedBox(w, h, d, material, bevel = .12) {
   const mesh = new THREE.Mesh(geo,material); mesh.castShadow = true; mesh.receiveShadow = true; return mesh;
 }
 
-const TILE_SIZE=18,TILE_RADIUS=3,floorGeometry=new THREE.PlaneGeometry(TILE_SIZE+ENVIRONMENT.tileOverscan,TILE_SIZE+ENVIRONMENT.tileOverscan),floorTiles=new Map(),floorPool=[];
+const TILE_SIZE=18,TILE_RADIUS=4,floorGeometry=new THREE.PlaneGeometry(TILE_SIZE+ENVIRONMENT.tileOverscan,TILE_SIZE+ENVIRONMENT.tileOverscan),floorTiles=new Map(),floorPool=[];
 floorGeometry.rotateX(-Math.PI/2);
 function updateFloorTiles(){
-  const needed=new Set(floorTileKeys(master.position,TILE_SIZE,TILE_RADIUS));
+  const combatFrame=activeCombatCameraFrame();
+  const floorCenter=combatFrame?{x:combatFrame.x,z:combatFrame.z}:master.position;
+  const needed=new Set(floorTileKeys(floorCenter,TILE_SIZE,TILE_RADIUS));
   for(const [key,tile] of floorTiles)if(!needed.has(key)){battle.remove(tile);floorTiles.delete(key);floorPool.push(tile)}
   for(const key of needed){
     if(floorTiles.has(key))continue;
@@ -581,7 +583,7 @@ function observedLeader(unit,leader,leaderForward,dt,urgent=false){
 function nearestAlive(from,list){const origin=from.position??from;let best=null,bd=Infinity;for(const u of list){if(!u.userData.alive)continue;const d=origin.distanceToSquared(u.position);if(d<bd){bd=d;best=u}}return best}
 function resetDuel(unit){
   unit.userData.lockedTarget=null;unit.userData.duelRole=null;unit.userData.faceoffCenter=null;unit.userData.faceoffAxis=null;unit.userData.faceoffHold=null;
-  unit.userData.lastTargetPosition=null;
+  unit.userData.lastTargetPosition=null;unit.userData.duelTurnId=null;
   unit.userData.duelPhase=DUEL_PHASE.APPROACH;unit.userData.duelTimer=0;unit.userData.pathPreviousDistance=Infinity;unit.userData.pathStallTimer=0;unit.userData.pathFailures=0;unit.scale.set(1,1,1);
 }
 function releaseStaleDuel(unit){
@@ -627,6 +629,8 @@ function assignEngagements(sideA,sideB){
     }
     const center=bestA.position.clone().add(bestB.position).multiplyScalar(.5);
     lockDuel(bestA,bestB,"primary",0,center);lockDuel(bestB,bestA,"primary",0,center);
+    const firstAttacker=((bestA.id+bestB.id)&1)===0?bestA:bestB;
+    bestA.userData.duelTurnId=firstAttacker.id;bestB.userData.duelTurnId=firstAttacker.id;
     aMap.set(bestA,bestB);bMap.set(bestB,bestA);
   }
   return {aMap,bMap};
@@ -718,46 +722,8 @@ function hit(attacker,victim,dt){
   const dist=attacker.position.distanceTo(victim.position);
   if(!canApplyAttackDamage({attackerAlive:attacker.userData.alive,victimAlive:victim.userData.alive,opposingFactions:attacker.userData.faction!==victim.userData.faction,cooldown:attacker.userData.cool,distance:dist,range:1.05}))return;
   attacker.userData.cool=.62+rand()*.18;
-  const sequence=attacker.userData.attackSequence??0;attacker.userData.attackSequence=sequence+1;
   attacker.userData.attackAnim=1;
-  if(!tryAnticipatedDodge(attacker,victim,sequence))dealDamage(attacker,victim);
-}
-function dodgeDirections(attacker,victim){
-  const away=victim.position.clone().sub(attacker.position).setY(0);
-  if(away.lengthSq()<.001)away.set(1,0,0);away.normalize();
-  return{
-    left:new THREE.Vector3(-away.z,0,away.x),
-    right:new THREE.Vector3(away.z,0,-away.x),
-    back:away
-  };
-}
-function dodgeSpaceAvailable(victim,direction){
-  const destination=victim.position.clone().addScaledVector(direction,.82);
-  const ownRadius=Math.max(victim.userData.collisionHalf?.x??.2,victim.userData.collisionHalf?.z??.2);
-  return![master,...followers,...enemyUnits].some(actor=>{
-    if(actor===victim||!actor.visible||actor.userData.alive===false)return false;
-    const actorRadius=Math.max(actor.userData.collisionHalf?.x??.2,actor.userData.collisionHalf?.z??.2);
-    const dx=destination.x-actor.position.x,dz=destination.z-actor.position.z;
-    return dx*dx+dz*dz<(ownRadius+actorRadius+.16)**2;
-  });
-}
-function tryAnticipatedDodge(attacker,victim,sequence){
-  const directions=dodgeDirections(attacker,victim);
-  const intent=anticipatedDodgeIntent(sequence,{
-    left:dodgeSpaceAvailable(victim,directions.left),
-    right:dodgeSpaceAvailable(victim,directions.right),
-    back:dodgeSpaceAvailable(victim,directions.back)
-  });
-  if(!intent)return false;
-  const direction=directions[intent];
-  victim.userData.velocity.addScaledVector(direction,victim.userData.isMaster?1.8:2.35);
-  victim.userData.hitPulse=Math.max(victim.userData.hitPulse??0,.35);
-  victim.userData.damageAnim=Math.max(victim.userData.damageAnim??0,.28);
-  synthTone(290,.07,"sine",.012);
-  if(anticipatedDodgeCounter(sequence)&&attacker.userData.alive&&victim.userData.alive&&victim.position.distanceTo(attacker.position)<=1.35){
-    victim.userData.attackAnim=1;dealDamage(victim,attacker);
-  }
-  return true;
+  dealDamage(attacker,victim);
 }
 function updateDuel(unit,foe,dt){
   const data=unit.userData;
@@ -768,7 +734,15 @@ function updateDuel(unit,foe,dt){
   }
   const hold=data.faceoffHold??foe.position;
   const distance=unit.position.distanceTo(hold);
-  const next=advanceDuelState({phase:data.duelPhase,timer:data.duelTimer,distance,dt});
+  const mutual=foe.userData.lockedTarget===unit;
+  if(mutual&&data.duelTurnId==null){
+    const firstAttacker=Math.min(unit.id,foe.id);
+    data.duelTurnId=firstAttacker;foe.userData.duelTurnId=firstAttacker;
+  }
+  const mayAttack=!mutual||data.duelTurnId===unit.id;
+  const next=mayAttack
+    ?advanceDuelState({phase:data.duelPhase,timer:data.duelTimer,distance,dt})
+    :{phase:DUEL_PHASE.APPROACH,timer:0,strike:false};
   data.duelPhase=next.phase;data.duelTimer=next.timer;
   const away=data.faceoffAxis??unit.position.clone().sub(foe.position).setY(0).normalize();
   let desired=hold.clone(),speed=2.15,acceleration=5.4;
@@ -784,7 +758,12 @@ function updateDuel(unit,foe,dt){
     const sequence=data.attackSequence++,landed=duelAttackHits(sequence);
     const range=foe.userData.isMaster?1.4:1.15,distance=unit.position.distanceTo(foe.position);
     const valid=canApplyAttackDamage({attackerAlive:data.alive,victimAlive:foe.userData.alive,opposingFactions:data.faction!==foe.userData.faction,cooldown:0,distance,range});
-    if(valid&&!tryAnticipatedDodge(unit,foe,sequence)&&landed)dealDamage(unit,foe);
+    const strikeLanded=valid&&landed&&dealDamage(unit,foe);
+    if(mutual&&strikeLanded&&foe.userData.alive){
+      const turnId=nextDuelTurn({attackerId:unit.id,defenderId:foe.id,strikeLanded:true});
+      data.duelTurnId=turnId;foe.userData.duelTurnId=turnId;
+      foe.userData.duelPhase=DUEL_PHASE.APPROACH;foe.userData.duelTimer=0;
+    }
   }
   const facing=foe.position.clone().sub(unit.position);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),14,dt);
   return {desired,speed,acceleration};

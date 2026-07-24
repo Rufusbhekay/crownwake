@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, anticipatedDodgeCounter, anticipatedDodgeIntent, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, particleBudgetAllows, playerThreatScore, postRespawnResolution, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -206,7 +206,7 @@ test("tactical camera centers separated combatants and zooms only as much as nee
 
 test("tactical camera safely handles empty and extreme combat frames", () => {
   assert.equal(tacticalCameraFrame([]),null);
-  assert.equal(tacticalCameraFrame([{x:0,z:0},{x:200,z:200}]).scale,2.35);
+  assert.equal(tacticalCameraFrame([{x:0,z:0},{x:200,z:200}]).scale,1.45);
 });
 
 test("battle preparation derives safely from the current living armies", () => {
@@ -284,14 +284,10 @@ test("manual commander orders override pursuit without releasing soldier duels",
   assert.equal(commanderControlState({combat:false,manualOrder:false}),"hold");
 });
 
-test("anticipated attacks can sidestep, retreat, and occasionally counter", () => {
-  assert.equal(anticipatedDodgeIntent(0,{left:true,right:true,back:true}),null);
-  assert.equal(anticipatedDodgeIntent(3,{left:true,right:true,back:true}),"left");
-  assert.equal(anticipatedDodgeIntent(7,{left:true,right:true,back:true}),"right");
-  assert.equal(anticipatedDodgeIntent(11,{left:false,right:false,back:true}),"back");
-  assert.equal(anticipatedDodgeIntent(3,{left:false,right:false,back:false}),null);
-  assert.equal(anticipatedDodgeCounter(3),false);
-  assert.equal(anticipatedDodgeCounter(7),true);
+test("duel attacks alternate only after a successful strike", () => {
+  assert.equal(nextDuelTurn({attackerId:4,defenderId:9,strikeLanded:false}),4);
+  assert.equal(nextDuelTurn({attackerId:4,defenderId:9,strikeLanded:true}),9);
+  assert.equal(nextDuelTurn({attackerId:9,defenderId:4,strikeLanded:true}),4);
 });
 
 test("issued destinations override combat and become hold after arrival", () => {
@@ -525,7 +521,7 @@ test("replacement waves choose an off-camera candidate beyond the safety range",
   assert.equal(chooseHiddenSpawn(center, candidates, 20, () => true), null);
 });
 
-test("base duel accuracy stays guaranteed before an anticipation dodge", () => {
+test("duel strikes always land", () => {
   for(let sequence=0;sequence<12;sequence++)assert.equal(duelAttackHits(sequence),true);
 });
 

@@ -222,7 +222,7 @@ export function battleLineSpacing(count) {
   return 1.72 + Math.min(.33, Math.max(0, count - 4) * .035);
 }
 
-export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 11, padding = 3.2, maxScale = 2.35 } = {}) {
+export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, padding = 2.8, maxScale = 1.45 } = {}) {
   const valid = points.filter(point => Number.isFinite(point?.x) && Number.isFinite(point?.z));
   if (!valid.length) return null;
   const xs = valid.map(point => point.x);
@@ -318,23 +318,6 @@ export function commanderControlState({ combat, manualOrder }) {
   return combat ? "engage" : "hold";
 }
 
-export function anticipatedDodgeIntent(sequence, availability = {}) {
-  const safeSequence = Math.max(0, Math.floor(sequence));
-  if (safeSequence % 4 !== 3) return null;
-  const available = {
-    left: availability.left !== false,
-    right: availability.right !== false,
-    back: availability.back !== false
-  };
-  const preferred = ["left", "right", "back"][Math.floor(safeSequence / 4) % 3];
-  return [preferred, "left", "right", "back"].find(direction => available[direction]) ?? null;
-}
-
-export function anticipatedDodgeCounter(sequence) {
-  const safeSequence = Math.max(0, Math.floor(sequence));
-  return safeSequence % 4 === 3 && Math.floor(safeSequence / 4) % 2 === 1;
-}
-
 export function tacticalOrderState({ combat, hasDestination, arrived }) {
   if (hasDestination && !arrived) return "move";
   if (combat) return "combat";
@@ -391,11 +374,11 @@ export function combatVisualPose({ attack = 0, damage = 0, reducedMotion = false
   const attackPulse = Math.sin(Math.PI * .5 * Math.max(0, Math.min(1, attack)));
   const damagePulse = Math.sin(Math.PI * .5 * Math.max(0, Math.min(1, damage)));
   return {
-    scaleX: 1 + attackPulse * .08 + damagePulse * .12,
-    scaleY: 1 + attackPulse * .05 - damagePulse * .08,
-    scaleZ: 1 - attackPulse * .2 + damagePulse * .08,
+    scaleX: 1 + attackPulse * .08 + damagePulse * .16,
+    scaleY: 1 + attackPulse * .05 - damagePulse * .12,
+    scaleZ: 1 - attackPulse * .2 + damagePulse * .14,
     forward: attackPulse * .42,
-    lift: damagePulse * .08
+    lift: damagePulse * .1
   };
 }
 
@@ -438,6 +421,10 @@ export function prioritizedOpponents(soldiers, commander) {
 
 export function duelAttackHits(sequence) {
   return true;
+}
+
+export function nextDuelTurn({ attackerId, defenderId, strikeLanded }) {
+  return strikeLanded ? defenderId : attackerId;
 }
 
 export function advanceDuelState({ phase, timer, distance, dt }) {

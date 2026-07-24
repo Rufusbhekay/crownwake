@@ -16,7 +16,7 @@
 - Enemy commander duel navigation: 0.85-second rear hold at 42% speed, then a 2.35-unit persistent flank at 78% speed until 2.40 seconds, followed by clearance-band engagement.
 - Enemy retreat: disabled; every surviving enemy remains committed.
   - Battle-line preparation: 1.65 seconds after swarm contact plus 0.45 seconds per soldier beyond four, capped at 6.85 seconds; soldiers form 0.55 units behind the commander axis with 1.72-unit lateral spacing, increasing by 0.035 per soldier beyond four and capped at 2.05. Ordinary follow leashes are suspended during this preparation so outer slots remain reachable.
-  - Tactical combat camera: while an encounter is active, living commanders and acknowledged duelists define a padded combat frame. The camera eases toward the frame centre and raises only enough to keep separated fights visible, capped at 2.35 times the normal camera offset.
+  - Tactical combat camera: while an encounter is active, living commanders and acknowledged duelists define a padded combat frame. The camera eases toward the frame centre and raises only enough to keep nearby separated fights visible, capped at 1.45 times the normal camera offset so units remain readable. Floor streaming follows this tactical centre with a four-tile radius so the world edge stays hidden.
 - Primary duel ownership: mutually acknowledged soldier pairs share one fixed face-off centre.
 - Duel commitment: a living lock overrides commander retreat, follow awareness, formation movement, and leash correction until one participant falls.
 - Damage authority: both actors alive, opposing factions, valid cooldown, and actual current range (1.05 commander melee; 1.15 soldier duel; 1.40 commander assault) are required at the exact damage frame.
@@ -27,7 +27,7 @@
 - Primary face-off radius: 0.78 world units per duelist; commander-assault support radius: 1.38 world units.
 - Lunge begins within 0.16 world units of the assigned face-off position.
 - Duel strike: 0.24-second committed lunge followed by a 0.72-second retreat to a 1.85-unit recovery gap.
-- Duel accuracy: base strikes land, but every fourth anticipated strike may be dodged into an open left, right, or rear lane; alternating successful dodge windows permit a close-range counterattack.
+- Duel sequence: paired fighters alternate guaranteed strikes. The active fighter lunges, the receiver plays an impact scale-bounce and short recoil, then the receiver answers after recovery. Dodges and counter branches are disabled so duels stay readable.
 - Character ground height: 0.015 world units above the streamed floor, with no idle vertical bob.
 - Floor terrain: procedural 1024-square matte grey-green surface with a thin charcoal 10×10 square grid repeated once per streamed tile; roughness 0.96, metalness 0, and no overlapping line geometry.
 - Streamed floor joins: zero geometric overscan; neighboring planes meet edge-to-edge without coplanar overlap or z-fighting.

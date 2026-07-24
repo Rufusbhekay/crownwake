@@ -255,6 +255,7 @@ function updateSoldierDamageEffects(dt) {
 function updateActorCombatAnimations(dt){
   for(const actor of [master,...followers,...enemyUnits]){
     const visual=actor.children.find(child=>child.userData.characterVisual);
+    const outline=actor.children.find(child=>child.userData.frontOutline);
     if(!visual)continue;
     actor.userData.attackAnim=Math.max(0,(actor.userData.attackAnim??0)-dt*3.8);
     actor.userData.damageAnim=Math.max(0,(actor.userData.damageAnim??0)-dt*3.2);
@@ -262,6 +263,10 @@ function updateActorCombatAnimations(dt){
     const basePosition=visual.userData.basePosition??new THREE.Vector3(),baseScale=visual.userData.baseScale??new THREE.Vector3(1,1,1);
     visual.position.copy(basePosition);visual.position.z+=pose.forward;visual.position.y+=pose.lift;
     visual.scale.set(baseScale.x*pose.scaleX,baseScale.y*pose.scaleY,baseScale.z*pose.scaleZ);
+    if(outline){
+      outline.position.set(0,pose.lift,pose.forward);
+      outline.scale.set(pose.scaleX,pose.scaleY,pose.scaleZ);
+    }
   }
 }
 function updateRecruitRevival(unit,dt) {
@@ -407,14 +412,15 @@ function rebuildSelectionVisuals(){
     const materials=(actor.userData.damageMaterials??[]).map(({material})=>({
       material,color:material.color?.clone(),emissive:material.emissive?.clone(),emissiveIntensity:material.emissiveIntensity
     }));
-    selectionVisuals.push({actor,shell,shellMaterials,ring,materials});
+    selectionVisuals.push({actor,visual,shell,shellMaterials,ring,materials});
   }
 }
 const selectionColorLift=new THREE.Color(0xffffff),selectionEmissiveLift=new THREE.Color(0xf8fff3);
 function updateSelectionVisuals(){
   const pulse=.5+.5*Math.sin(totalTime*4.5);
-  for(const {actor,shell,shellMaterials,ring,materials} of selectionVisuals){
+  for(const {actor,visual,shell,shellMaterials,ring,materials} of selectionVisuals){
     if(!actor?.userData.alive){shell.visible=false;ring.visible=false;continue}
+    shell.position.copy(visual.position);shell.quaternion.copy(visual.quaternion);shell.scale.copy(visual.scale).multiplyScalar(1.11);
     shell.visible=true;ring.visible=true;ring.position.copy(actor.position);ring.position.y=GROUND_Y+.028;ring.material.opacity=.24+pulse*.14;
     for(const material of shellMaterials)material.opacity=.88+pulse*.1;
     for(const {material,color,emissive} of materials){

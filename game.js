@@ -1,7 +1,8 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, DUEL_READY_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelOpening, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatReferenceIsCurrent, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, difficultyEncounter, duelAttackHits, duelOpeningDelay, duelPairReady, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260724j.js";
+import { COMMANDER_MELEE_RANGE } from "./sim-runtime-20260725a.js";
+import { DUEL_PHASE, DUEL_READY_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelOpening, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatReferenceIsCurrent, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderEngagementTarget, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, difficultyEncounter, duelAttackHits, duelOpeningDelay, duelPairReady, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260725a.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -647,6 +648,17 @@ function resetDuel(unit){
   unit.userData.lastTargetPosition=null;unit.userData.duelTurnId=null;
   unit.userData.duelPhase=DUEL_PHASE.APPROACH;unit.userData.duelTimer=0;unit.userData.duelOpeningDelay=0;unit.userData.pathPreviousDistance=Infinity;unit.userData.pathStallTimer=0;unit.userData.pathFailures=0;unit.scale.set(1,1,1);
 }
+function commitCommanderEngagement(commander,assignedTarget,blocker,currentOpponents){
+  const lockedTarget=combatReferenceIsCurrent(commander.userData.lockedTarget,currentOpponents)
+    ?commander.userData.lockedTarget
+    :null;
+  const foe=commanderEngagementTarget({lockedTarget,assignedTarget,blocker});
+  if(commander.userData.lockedTarget!==foe){
+    resetDuel(commander);
+    commander.userData.lockedTarget=foe;
+  }
+  return foe;
+}
 function releaseStaleDuel(unit){
   const foe=unit.userData.lockedTarget;
   resetDuel(unit);unit.userData.seekingTarget=true;
@@ -790,10 +802,10 @@ function dealDamage(attacker,victim){
   }
   return true;
 }
-function hit(attacker,victim,dt){
+function hit(attacker,victim,dt,range=COMMANDER_MELEE_RANGE){
   attacker.userData.cool-=dt;
   const dist=attacker.position.distanceTo(victim.position);
-  if(!canApplyAttackDamage({attackerAlive:attacker.userData.alive,victimAlive:victim.userData.alive,opposingFactions:attacker.userData.faction!==victim.userData.faction,cooldown:attacker.userData.cool,distance:dist,range:1.05}))return;
+  if(!canApplyAttackDamage({attackerAlive:attacker.userData.alive,victimAlive:victim.userData.alive,opposingFactions:attacker.userData.faction!==victim.userData.faction,cooldown:attacker.userData.cool,distance:dist,range}))return;
   attacker.userData.cool=.62+rand()*.18;
   attacker.userData.attackAnim=1;
   dealDamage(attacker,victim);
@@ -1005,14 +1017,16 @@ function updatePlayerGroupCommander(commander,company,{combat,livingRivals,livin
   if(control==="move"){
     desired.copy(commanderOrder?(commander.userData.manualTarget??commander.position):(anchor.commanderTarget??formationPoint(anchor,commanderFormationOffset(1.42))));speed=2.15;acceleration=6.4;
   }else if(control==="engage"&&(livingRivals.length||livingEnemySoldiers.length)){
-    foe=commanderTargets.get(commander)??nearestAlive(commander,livingEnemySoldiers)??nearestAlive(commander,livingRivals);
+    const assignedFoe=commanderTargets.get(commander)??nearestAlive(commander,livingEnemySoldiers)??nearestAlive(commander,livingRivals);
+    const blockerIndex=assignedFoe?chooseCommanderBlockerIndex({
+        commander:commander.position,target:assignedFoe.position,
+        soldiers:livingEnemySoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:true,threatening:soldier.userData.lockedTarget===commander}))
+      }):-1;
+    const blocker=blockerIndex>=0?livingEnemySoldiers[blockerIndex]:null;
+    foe=commitCommanderEngagement(commander,assignedFoe,blocker,[...livingEnemySoldiers,...livingRivals]);
     if(foe){
       desired.copy(commanderRoute(commander,foe,routeActors));speed=1.55;acceleration=4.4;
-      const blockerIndex=chooseCommanderBlockerIndex({
-        commander:commander.position,target:foe.position,
-        soldiers:livingEnemySoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:true,threatening:soldier.userData.lockedTarget===commander}))
-      });
-      hit(commander,blockerIndex>=0?livingEnemySoldiers[blockerIndex]:foe,dt);
+      hit(commander,foe,dt);
     }
   }else{
     desired.copy(commander.position);speed=0;
@@ -1122,18 +1136,20 @@ function updateBattle(dt){
     livingRivals,[...livingPlayerSoldiers,...livingPlayerCommanders],
     ()=>true
   );
-  const masterFoe=combat?(playerCommanderTargets.get(master)??rival??nearestAlive(master,livingEnemies)):null;
+  const assignedMasterFoe=combat?(playerCommanderTargets.get(master)??rival??nearestAlive(master,livingEnemies)):null;
+  const masterBlockerIndex=assignedMasterFoe?chooseCommanderBlockerIndex({
+    commander:master.position,target:assignedMasterFoe.position,
+    soldiers:livingEnemySoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:true,threatening:soldier.userData.lockedTarget===master}))
+  }):-1;
+  const masterBlocker=masterBlockerIndex>=0?livingEnemySoldiers[masterBlockerIndex]:null;
+  const masterFoe=combat?commitCommanderEngagement(master,assignedMasterFoe,masterBlocker,livingEnemies):null;
   if(masterFoe){
     if(commanderControlState({combat,manualOrder:!!master.userData.manualMoving||ensureCompanyAnchor(0).moving})==="engage"){
       const facingOpponent=commanderFacesOpponent(master,masterFoe);
       steerTowards(master,commanderRoute(master,masterFoe,routeActors),1.55,4.4,dt,!facingOpponent);
       if(facingOpponent)facePoint(master,masterFoe.position,dt,4.8);
     }
-    const blockerIndex=chooseCommanderBlockerIndex({
-      commander:master.position,target:masterFoe.position,
-      soldiers:livingEnemySoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:true,threatening:soldier.userData.lockedTarget===master}))
-    });
-    hit(master,blockerIndex>=0?livingEnemySoldiers[blockerIndex]:masterFoe,dt);
+    hit(master,masterFoe,dt);
   }else if(!masterManualOrder)steerTowards(master,master.position,0,5.2,dt);
   followers.forEach((u,i)=>{
     if(updateRecruitRevival(u,dt))return;
@@ -1221,7 +1237,17 @@ function updateBattle(dt){
     if(u.userData.isMaster){
       u.userData.sinceDamage+=dt;
       u.userData.hp=commanderRegenHealth(u.userData.hp,u.userData.maxHp,u.userData.sinceDamage,dt,u.userData.regenDelay,u.userData.regenPerSecond);
-      const targetCommander=enemyCommanderTargets.get(u)??nearestAlive(u,livingPlayerCommanders)??master;
+      const assignedTargetCommander=enemyCommanderTargets.get(u)??nearestAlive(u,livingPlayerCommanders)??master;
+      const blockerIndex=chooseCommanderBlockerIndex({
+        commander:u.position,
+        target:assignedTargetCommander.position,
+        soldiers:livingPlayerSoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:soldier.userData.alive,threatening:soldier.userData.lockedTarget===u}))
+      });
+      const blocker=blockerIndex>=0?livingPlayerSoldiers[blockerIndex]:null;
+      const targetCommander=commitCommanderEngagement(u,assignedTargetCommander,blocker,[...livingPlayerSoldiers,...livingPlayerCommanders]);
+      if(!targetCommander){
+        steerTowards(u,u.position,0,3.4,dt);u.position.y=GROUND_Y;return;
+      }
       let desired,speedScale=1,tacticalEngage=true;
       if(activeSoldierDuels&&livingEnemySoldiers.length&&livingPlayerSoldiers.length){
         const battleCenter=livingEnemySoldiers.reduce((sum,soldier)=>({x:sum.x+soldier.position.x/livingEnemySoldiers.length,z:sum.z+soldier.position.z/livingEnemySoldiers.length}),{x:0,z:0});
@@ -1238,13 +1264,7 @@ function updateBattle(dt){
       if(facingOpponent)facePoint(u,targetCommander.position,dt,4.6);
       u.position.y=GROUND_Y;
       if(combat){
-        const blockerIndex=chooseCommanderBlockerIndex({
-          commander:u.position,
-          target:targetCommander.position,
-          soldiers:livingPlayerSoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:soldier.userData.alive,threatening:soldier.userData.lockedTarget===u}))
-        });
-        const blocker=blockerIndex>=0?livingPlayerSoldiers[blockerIndex]:null;
-        hit(u,blocker??targetCommander,dt);
+        hit(u,targetCommander,dt);
       }
       return;
     }

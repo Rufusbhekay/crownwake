@@ -42,6 +42,7 @@
 - Soldier damage widgets: 0.59-unit width, immediate main health, 0.24-second chip hold, and 1.60-second total visibility after damage.
 - Commander groups: the game begins with one player commander and one group. Groups never split automatically; a selected group gains a divide action only above 12 ordinary soldiers.
 - Group division: one soldier becomes a full player commander and half the remaining soldiers transfer to its new group. The promoted commander owns only that transferred company, ignores the original commander's movement state, and its soldiers follow its position. Recruitment can make any group eligible to divide again; there is no fixed group cap.
+- Post-battle company sectors: the primary company holds the player command point while every promoted company automatically reforms at a unique outward-facing sector at least 5.4 world units away. Three companies place the promoted groups on opposite sides, preventing the army from collapsing into one post-battle knot.
 - Travelling personal space grows by 0.024 units per soldier beyond six, capped at +0.58; the follow radius grows by 3.0 units per company up to the three-company cap.
 - Commander path clearing: every commander keeps an independent opponent assignment and uses a 2.65-unit local forward probe with 0.58-unit clearance to route around occupied combat lanes. The primary player commander prefers its rival commander; promoted commanders spread onto available soldiers before sharing a target. A 2.40-unit attack corridor still permits melee against immediate blockers.
 - Streamed ground window: 7×7 recycled tiles, each 18 world units square (126×126 total coverage).
@@ -64,6 +65,7 @@
 - Commander and soldier geometry share the same 1.22-unit visual height and the same 0.215 × 0.195 collision half-extents; commander identity is communicated by colour and health bar rather than scale.
 - Attack animation: successful melee begins at a full 0.42-unit visual lunge, closing the commander stand-off gap before compressing local depth to 80% and widening 8%, then eases back without changing the actor's logical collision position. The primary player commander uses the same stand-off pursuit and lunge path as every other commander when it has no manual order.
 - Damage animation: impact applies physical knockback away from the attacker plus an 8% vertical rebound and 12% lateral squash pulse on the visual mesh.
+- Character facing: every actor carries a charcoal front panel and top arrow aligned to local forward. Travel and commander flanking use movement-facing at 3.6 radians/second; committed soldier duels and commanders within 2.2 units of their opponent use opponent-facing at 4.6–5.2 radians/second. Corrections below 0.055 radians are ignored, and only one rotation source owns an actor per frame.
 - Mobile command input: discrete ground taps only; gameplay HUD keeps compact safe-area-aware Pause, Companies, and Frontier buttons plus commander hearts, with full panels shown only while paused.
 - Camera shake is capped at 0.16 world units and can be disabled.
 - Flashes are short, low-area, and can be disabled.

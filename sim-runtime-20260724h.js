@@ -341,6 +341,14 @@ export function companyLeaderMotion({ ownCommanderMoving }) {
   return Boolean(ownCommanderMoving);
 }
 
+export function postBattleCompanyOffset(index, count, baseRadius = 5.4) {
+  if (index <= 0 || count <= 1) return { x: 0, z: 0 };
+  const promotedCount = Math.max(1, count - 1);
+  const radius = baseRadius + Math.min(1.8, Math.max(0, count - 2) * .45);
+  const angle = (index - 1) * Math.PI * 2 / promotedCount;
+  return { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius };
+}
+
 export function battleApproachState({ distance, detectionRadius = 9.5, aggroRadius = 6.2 }) {
   if (distance <= aggroRadius) return "combat";
   if (distance <= detectionRadius) return "deploy";
@@ -652,6 +660,13 @@ export function chooseLocalDetour({ start, goal, obstacles, clearance = .5, look
 export function smoothAngle(current, target, response, dt) {
   const difference = Math.atan2(Math.sin(target - current), Math.cos(target - current));
   return current + difference * (1 - Math.exp(-response * dt));
+}
+
+export function limitedFacingAngle({ current, target, dt, deadZone = .055, maxTurnRate = 4.2 }) {
+  const difference = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  if (Math.abs(difference) <= deadZone) return current;
+  const step = Math.min(Math.abs(difference), Math.max(0, maxTurnRate * dt));
+  return current + Math.sign(difference) * step;
 }
 
 export function waveSizeFromRoll(roll) {

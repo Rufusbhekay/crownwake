@@ -144,6 +144,22 @@ const MODEL_SPECS = {
 };
 const modelTemplates = {};
 const gltfLoader = new GLTFLoader();
+const frontOutlineMaterial=new THREE.MeshBasicMaterial({color:0x151a1c,toneMapped:false});
+const frontOutlineVerticalGeometry=new THREE.BoxGeometry(.035,1.2,.026);
+const frontOutlineHorizontalGeometry=new THREE.BoxGeometry(.42,.035,.026);
+function ensureFrontOutline(character){
+  if(character.children.some(child=>child.userData.frontOutline))return;
+  const outline=new THREE.Group();outline.userData.frontOutline=true;
+  for(const x of [-.21,.21]){
+    const edge=new THREE.Mesh(frontOutlineVerticalGeometry,frontOutlineMaterial);
+    edge.position.set(x,.64,.205);outline.add(edge);
+  }
+  for(const y of [.04,1.24]){
+    const edge=new THREE.Mesh(frontOutlineHorizontalGeometry,frontOutlineMaterial);
+    edge.position.set(0,y,.205);outline.add(edge);
+  }
+  character.add(outline);
+}
 function loadCharacterModel([url, targetHeight]) {
   return gltfLoader.loadAsync(url).then(({ scene: model }) => {
     const bounds = new THREE.Box3().setFromObject(model), size = bounds.getSize(new THREE.Vector3());
@@ -176,6 +192,7 @@ function setCharacterVisual(character, key, fallback) {
   visual.userData.basePosition=visual.position.clone();
   visual.userData.baseScale=visual.scale.clone();
   character.add(visual);
+  ensureFrontOutline(character);
 }
 const fallenMaterial=new THREE.MeshStandardMaterial({color:0x34383a,roughness:1,metalness:0,flatShading:true});
 function setFallenAppearance(character, fallen) {

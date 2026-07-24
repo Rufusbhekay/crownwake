@@ -427,16 +427,21 @@ export function nextDuelTurn({ attackerId, defenderId, strikeLanded }) {
   return strikeLanded ? defenderId : attackerId;
 }
 
-export function advanceDuelState({ phase, timer, distance, dt }) {
+export function advanceDuelState({ phase, timer, distance, strikeDistance = Infinity, strikeRange = 1.15, dt }) {
   if (phase === DUEL_PHASE.APPROACH) {
     return distance <= .16
-      ? { phase: DUEL_PHASE.LUNGE, timer: .24, strike: false }
+      ? { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false }
       : { phase, timer: 0, strike: false };
   }
   if (phase === DUEL_PHASE.LUNGE) {
-    return timer - dt <= 0
-      ? { phase: DUEL_PHASE.RECOVER, timer: .72, strike: true }
-      : { phase, timer: timer - dt, strike: false };
+    const strikeArmed = timer <= .34;
+    if (strikeArmed && strikeDistance <= strikeRange) {
+      return { phase: DUEL_PHASE.RECOVER, timer: .72, strike: true };
+    }
+    const remaining = timer - dt;
+    return remaining <= 0
+      ? { phase: DUEL_PHASE.APPROACH, timer: 0, strike: false }
+      : { phase, timer: remaining, strike: false };
   }
   return timer - dt <= 0
     ? { phase: DUEL_PHASE.APPROACH, timer: 0, strike: false }

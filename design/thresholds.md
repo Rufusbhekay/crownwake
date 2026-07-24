@@ -24,9 +24,9 @@
 - Commander golden clearance: same-faction soldiers evacuate a 1.20-unit radial field and a 2.25 × 2.56-unit forward travel corridor, amplified 1.78× during steering; enemy soldiers evaluate every living allied commander, not only their original leader.
 - Stale duel recovery: 0.72-second progress windows, 0.07-unit minimum progress, and reciprocal lock release after three failed windows before nearest-target reacquisition.
 - Numerical advantage: soldier duels remain strictly one-to-one; surplus soldiers assault the opposing commander and return to soldier priority whenever an opponent becomes unoccupied.
-- Primary face-off radius: 0.78 world units per duelist; commander-assault support radius: 1.38 world units.
+- Primary face-off radius: 0.68 world units per duelist; commander-assault support radius: 1.38 world units.
 - Lunge begins within 0.16 world units of the assigned face-off position.
-- Duel strike: 0.24-second committed lunge followed by a 0.72-second retreat to a 1.85-unit recovery gap.
+- Duel strike: 0.14 seconds of visible wind-up followed by up to 0.34 seconds of committed lunge, landing once the attacker enters its real damage range, then a 0.72-second recovery. A blocked lunge times out and retries instead of consuming the attack turn.
 - Duel sequence: paired fighters alternate guaranteed strikes. The active fighter lunges, the receiver plays an impact scale-bounce and short recoil, then the receiver answers after recovery. Dodges and counter branches are disabled so duels stay readable.
 - Character ground height: 0.015 world units above the streamed floor, with no idle vertical bob.
 - Floor terrain: procedural 1024-square matte grey-green surface with a thin charcoal 10×10 square grid repeated once per streamed tile; roughness 0.96, metalness 0, and no overlapping line geometry.

@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260724e.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260724f.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -614,7 +614,7 @@ function lockDuel(unit,foe,role="primary",supportIndex=0,sharedCenter=null){
   unit.userData.lockedTarget=foe;unit.userData.duelRole=role;unit.userData.faceoffCenter=center;unit.userData.faceoffAxis=axis;
   unit.userData.lastTargetPosition=foe.position.clone();
   unit.userData.seekingTarget=false;
-  unit.userData.faceoffHold=center.clone().addScaledVector(axis,role==="primary"?.78:1.38);
+  unit.userData.faceoffHold=center.clone().addScaledVector(axis,role==="primary"?.68:1.38);
   unit.userData.duelPhase=DUEL_PHASE.APPROACH;unit.userData.duelTimer=0;
 }
 function assignEngagements(sideA,sideB){
@@ -734,6 +734,8 @@ function updateDuel(unit,foe,dt){
   }
   const hold=data.faceoffHold??foe.position;
   const distance=unit.position.distanceTo(hold);
+  const strikeRange=foe.userData.isMaster?1.4:1.15;
+  const strikeDistance=unit.position.distanceTo(foe.position);
   const mutual=foe.userData.lockedTarget===unit;
   if(mutual&&data.duelTurnId==null){
     const firstAttacker=Math.min(unit.id,foe.id);
@@ -741,7 +743,7 @@ function updateDuel(unit,foe,dt){
   }
   const mayAttack=!mutual||data.duelTurnId===unit.id;
   const next=mayAttack
-    ?advanceDuelState({phase:data.duelPhase,timer:data.duelTimer,distance,dt})
+    ?advanceDuelState({phase:data.duelPhase,timer:data.duelTimer,distance,strikeDistance,strikeRange,dt})
     :{phase:DUEL_PHASE.APPROACH,timer:0,strike:false};
   data.duelPhase=next.phase;data.duelTimer=next.timer;
   const away=data.faceoffAxis??unit.position.clone().sub(foe.position).setY(0).normalize();
@@ -749,15 +751,18 @@ function updateDuel(unit,foe,dt){
   if(next.phase===DUEL_PHASE.APPROACH){
     desired=hold.clone();speed=2.1;acceleration=5.2;
   }else if(next.phase===DUEL_PHASE.LUNGE){
-    desired=hold.clone().addScaledVector(away,-.58);speed=4.15;acceleration=12.5;
+    const lungeStandOff=foe.userData.isMaster?.88:.72;
+    const lungeAxis=unit.position.clone().sub(foe.position).setY(0);
+    if(lungeAxis.lengthSq()<.001)lungeAxis.copy(away);else lungeAxis.normalize();
+    desired=foe.position.clone().addScaledVector(lungeAxis,lungeStandOff);speed=4.7;acceleration=18;
   }else{
     desired=hold.clone().addScaledVector(away,.32);speed=2.75;acceleration=8.2;
   }
   if(next.strike&&foe.userData.alive){
     unit.userData.attackAnim=1;
     const sequence=data.attackSequence++,landed=duelAttackHits(sequence);
-    const range=foe.userData.isMaster?1.4:1.15,distance=unit.position.distanceTo(foe.position);
-    const valid=canApplyAttackDamage({attackerAlive:data.alive,victimAlive:foe.userData.alive,opposingFactions:data.faction!==foe.userData.faction,cooldown:0,distance,range});
+    const distance=unit.position.distanceTo(foe.position);
+    const valid=canApplyAttackDamage({attackerAlive:data.alive,victimAlive:foe.userData.alive,opposingFactions:data.faction!==foe.userData.faction,cooldown:0,distance,range:strikeRange});
     const strikeLanded=valid&&landed&&dealDamage(unit,foe);
     if(mutual&&strikeLanded&&foe.userData.alive){
       const turnId=nextDuelTurn({attackerId:unit.id,defenderId:foe.id,strikeLanded:true});
@@ -1398,7 +1403,7 @@ function loop(now){
     focus=new THREE.Vector3(0,0,-1);desired=new THREE.Vector3(10,31,26);
   }else{
     const focusTarget=combatFrame?new THREE.Vector3(combatFrame.x,0,combatFrame.z):master.position;
-    const focusEase=1-Math.pow(.006,frame),zoomEase=1-Math.pow(.018,frame);
+    const focusEase=1-Math.pow(.006,frame),zoomEase=1-Math.pow(.35,frame);
     gameplayCameraFocus.lerp(focusTarget,focusEase);
     gameplayCameraScale+=((combatFrame?.scale??1)-gameplayCameraScale)*zoomEase;
     focus=gameplayCameraFocus;

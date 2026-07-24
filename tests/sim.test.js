@@ -602,10 +602,19 @@ test("a group can divide only above twelve soldiers and stays balanced", () => {
 
 test("duel state visibly approaches, lunges, and recovers", () => {
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .12, dt: .1 }), {
-    phase: DUEL_PHASE.LUNGE, timer: .24, strike: false
+    phase: DUEL_PHASE.LUNGE, timer: .48, strike: false
   });
-  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .1, distance: .7, dt: .11 }), {
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .3, distance: .7, strikeDistance: 1.2, strikeRange: 1.15, dt: .11 }), {
+    phase: DUEL_PHASE.LUNGE, timer: .19, strike: false
+  });
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .45, distance: .7, strikeDistance: 1.1, strikeRange: 1.15, dt: .01 }), {
+    phase: DUEL_PHASE.LUNGE, timer: .44, strike: false
+  });
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .3, distance: .7, strikeDistance: 1.1, strikeRange: 1.15, dt: .01 }), {
     phase: DUEL_PHASE.RECOVER, timer: .72, strike: true
+  });
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .04, distance: .7, strikeDistance: 1.3, strikeRange: 1.15, dt: .05 }), {
+    phase: DUEL_PHASE.APPROACH, timer: 0, strike: false
   });
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.RECOVER, timer: .05, distance: 1.7, dt: .06 }), {
     phase: DUEL_PHASE.APPROACH, timer: 0, strike: false

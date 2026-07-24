@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 const root = resolve(".");
 const required = [
   "index.html", "logic.js", "game.js", "strings.js", "styles.css", "tools/serve.mjs", "tools/smoke-local.mjs",
-  "vendor/three.module.js", "vendor/three.core.js", "vendor/loaders/GLTFLoader.js", "vendor/utils/BufferGeometryUtils.js", "src/sim.js", "sim-runtime-20260724h.js", "design/plan.md", "design/gameplay-glossary.md",
+  "vendor/three.module.js", "vendor/three.core.js", "vendor/loaders/GLTFLoader.js", "vendor/utils/BufferGeometryUtils.js", "src/sim.js", "sim-runtime-20260724i.js", "design/plan.md", "design/gameplay-glossary.md",
   "design/assets.csv", "design/thresholds.md",
   "assets/battle_music.m4a", "assets/move_confirm.mp3", "assets/conversion_rise.mp3",
   "Models/CH_Mastert.glb", "Models/CH_Servant.glb", "Models/Enemy_master.glb", "Models/Enemy_Servant.glb"
@@ -15,11 +15,11 @@ for (const file of required) await access(resolve(root, file));
 const sources = await Promise.all(["index.html", "game.js", "styles.css"].map(async file => [file, await readFile(resolve(root, file), "utf8")]));
 const gameSource = sources.find(([file]) => file === "game.js")[1];
 const simulationSource = await readFile(resolve(root, "src/sim.js"), "utf8");
-const runtimeSimulationSource = await readFile(resolve(root, "sim-runtime-20260724h.js"), "utf8");
+const runtimeSimulationSource = await readFile(resolve(root, "sim-runtime-20260724i.js"), "utf8");
 if (runtimeSimulationSource !== simulationSource) {
   throw new Error("Deployed simulation runtime differs from the tested source module");
 }
-if (!gameSource.includes('from "./sim-runtime-20260724h.js"')) {
+if (!gameSource.includes('from "./sim-runtime-20260724i.js"')) {
   throw new Error("Game must import the immutable root simulation runtime");
 }
 if (/\bwater\.material\b/.test(gameSource)) {

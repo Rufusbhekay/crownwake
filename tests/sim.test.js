@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, postRespawnResolution, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelOpening, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatReferenceIsCurrent, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, duelOpeningDelay, duelPairReady, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, postRespawnResolution, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -595,6 +595,24 @@ test("post-respawn resolution still converts enemies defeated during the respawn
   assert.equal(postRespawnResolution(false),"resolve-victory");
 });
 
+test("post-respawn combat rejects living targets removed from the rebuilt roster", () => {
+  const removedButAlive={userData:{alive:true}},respawned={userData:{alive:true}};
+  assert.equal(combatReferenceIsCurrent(removedButAlive,[respawned]),false);
+  assert.equal(combatReferenceIsCurrent(respawned,[respawned]),true);
+  respawned.userData.alive=false;
+  assert.equal(combatReferenceIsCurrent(respawned,[respawned]),false);
+});
+
+test("duel openings use bounded independent delays", () => {
+  assert.equal(duelOpeningDelay(0),.12);
+  assert.equal(duelOpeningDelay(1),.84);
+  assert.ok(Math.abs(advanceDuelOpening(.6,.2)-.4)<1e-9);
+  assert.equal(advanceDuelOpening(.1,.2),0);
+  assert.equal(duelPairReady({distance:.1,foeDistance:.1,mutual:true}),true);
+  assert.equal(duelPairReady({distance:.1,foeDistance:.3,mutual:true}),false);
+  assert.equal(duelPairReady({distance:.1,foeDistance:9,mutual:false}),true);
+});
+
 test("a stale done flag cannot block victory after the commander revives", () => {
   assert.equal(encounterResolutionState({
     hasEncounter:true,encounterDone:true,playerAlive:true,enemyRosterCount:5,livingEnemyCount:0
@@ -667,7 +685,7 @@ test("duel state visibly approaches, lunges, and recovers", () => {
 test("combat animation squashes into attacks and rebounds from damage", () => {
   const attack=combatVisualPose({attack:1,damage:0});
   assert.ok(attack.scaleZ<1);
-  assert.ok(attack.forward>=.4);
+  assert.ok(attack.forward>=.2&&attack.forward<=.3);
   const damage=combatVisualPose({attack:0,damage:1});
   assert.ok(damage.scaleX>1);
   assert.ok(damage.lift>0);

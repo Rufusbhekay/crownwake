@@ -6,5 +6,5 @@ await copyFile("node_modules/three/build/three.module.js", "vendor/three.module.
 await copyFile("node_modules/three/build/three.core.js", "vendor/three.core.js");
 await copyFile("node_modules/three/examples/jsm/loaders/GLTFLoader.js", "vendor/loaders/GLTFLoader.js");
 await copyFile("node_modules/three/examples/jsm/utils/BufferGeometryUtils.js", "vendor/utils/BufferGeometryUtils.js");
-await copyFile("src/sim.js", "sim-runtime-20260724h.js");
+await copyFile("src/sim.js", "sim-runtime-20260724i.js");
 console.log("Vendored Three.js and generated the immutable simulation runtime.");

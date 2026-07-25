@@ -22,8 +22,9 @@ renderer.toneMappingExposure = ENVIRONMENT.exposure;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(ENVIRONMENT.background);
 scene.fog = new THREE.FogExp2(ENVIRONMENT.background, 0.013);
+const GAMEPLAY_CAMERA_OFFSET = new THREE.Vector3(11.75, 19.25, 19.25);
 const camera = new THREE.PerspectiveCamera(37, innerWidth / innerHeight, 0.1, 160);
-camera.position.set(12, 18, 18);
+camera.position.copy(GAMEPLAY_CAMERA_OFFSET);
 const gameplayCameraFocus = new THREE.Vector3();
 let gameplayCameraScale = 1;
 
@@ -1557,7 +1558,7 @@ function loop(now){
     gameplayCameraFocus.lerp(focusTarget,focusEase);
     gameplayCameraScale+=((combatFrame?.scale??1)-gameplayCameraScale)*zoomEase;
     focus=gameplayCameraFocus;
-    desired=focus.clone().add(new THREE.Vector3(11,18,18).multiplyScalar(gameplayCameraScale));
+    desired=focus.clone().addScaledVector(GAMEPLAY_CAMERA_OFFSET,gameplayCameraScale);
   }
   camera.position.lerp(desired,1-Math.pow(.001,frame));const look=focus.clone();look.y=mapMode?0:.4;camera.lookAt(look);
   if(!mapMode){sun.position.set(focus.x-8,18,focus.z+7);sun.target.position.set(focus.x,0,focus.z);sun.target.updateMatrixWorld()}

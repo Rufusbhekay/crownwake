@@ -258,6 +258,43 @@ export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, pa
   };
 }
 
+export function playerArmyCameraFrame(points, {
+  aspect = 16 / 9,
+  baseSpan = 15,
+  padding = 2.4,
+  maxScale = 1.5,
+  focusPoint = null,
+  recenterThreshold = 2.4
+} = {}) {
+  const frame = tacticalCameraFrame(points, { aspect, baseSpan, padding, maxScale });
+  if (!frame) return null;
+  const fallbackFocus = points.find(point => Number.isFinite(point?.x) && Number.isFinite(point?.z));
+  const focus = Number.isFinite(focusPoint?.x) && Number.isFinite(focusPoint?.z) ? focusPoint : fallbackFocus;
+  const centerShift = focus ? Math.hypot(frame.x - focus.x, frame.z - focus.z) : 0;
+  return frame.scale > 1.001 || centerShift > recenterThreshold ? frame : null;
+}
+
+export function composeGameplayCameraFrame({
+  playerFrame = null,
+  combatFrame = null,
+  awarenessScale = 1,
+  focusPoint = null
+} = {}) {
+  if (combatFrame) {
+    return {
+      ...combatFrame,
+      scale: Math.max(combatFrame.scale ?? 1, playerFrame?.scale ?? 1, awarenessScale)
+    };
+  }
+  if (playerFrame) {
+    return { ...playerFrame, scale: Math.max(playerFrame.scale ?? 1, awarenessScale) };
+  }
+  if (awarenessScale > 1 && Number.isFinite(focusPoint?.x) && Number.isFinite(focusPoint?.z)) {
+    return { x: focusPoint.x, z: focusPoint.z, scale: awarenessScale };
+  }
+  return null;
+}
+
 export function proximityCameraScale(distance, {
   startDistance = 11,
   fullDistance = 6.2,

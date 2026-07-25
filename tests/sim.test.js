@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ATTACK_TIMING, DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, attackPhaseProgress, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canAdvanceDuelAttack, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, prioritizedOpponents, proximityCameraScale, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { ATTACK_TIMING, DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, attackPhaseProgress, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canAdvanceDuelAttack, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, composeGameplayCameraFrame, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerArmyCameraFrame, playerThreatScore, postRespawnResolution, prioritizedOpponents, proximityCameraScale, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -216,6 +216,59 @@ test("nearby enemies gently widen awareness without exposing the world edge", ()
   assert.equal(proximityCameraScale(0),1.12);
   const warning=proximityCameraScale(8);
   assert.ok(warning>1.07&&warning<1.1);
+});
+
+test("separated player companies widen and recenter the camera without shrinking compact armies", () => {
+  assert.equal(playerArmyCameraFrame([{x:-2,z:1},{x:2,z:-1}],{aspect:16/9}),null);
+
+  const oneSided=playerArmyCameraFrame(
+    [{x:0,z:0},{x:20,z:0}],
+    {aspect:16/9,focusPoint:{x:0,z:0}}
+  );
+  assert.deepEqual(oneSided,{x:10,z:0,scale:1});
+  assert.equal(
+    playerArmyCameraFrame([{x:0,z:0},{x:4.8,z:0}],{focusPoint:{x:0,z:0}}),
+    null
+  );
+
+  const separated=playerArmyCameraFrame([
+    {x:-18,z:-5},
+    {x:-6,z:3},
+    {x:6,z:-2},
+    {x:18,z:6}
+  ],{aspect:16/9});
+  assert.equal(separated.x,0);
+  assert.equal(separated.z,.5);
+  assert.equal(separated.scale,1.5);
+
+  const portrait=playerArmyCameraFrame([{x:0,z:0},{x:20,z:0}],{aspect:9/16});
+  assert.equal(portrait.scale,1.5);
+});
+
+test("gameplay camera preserves player recentering until combat framing takes control", () => {
+  const playerFrame={x:10,z:0,scale:1};
+  assert.deepEqual(
+    composeGameplayCameraFrame({awarenessScale:1.12,focusPoint:{x:0,z:0}}),
+    {x:0,z:0,scale:1.12}
+  );
+  assert.equal(composeGameplayCameraFrame({awarenessScale:1.12}),null);
+  assert.deepEqual(
+    composeGameplayCameraFrame({playerFrame,focusPoint:{x:0,z:0}}),
+    playerFrame
+  );
+  assert.deepEqual(
+    composeGameplayCameraFrame({playerFrame,focusPoint:{x:0,z:0},awarenessScale:1.12}),
+    {x:10,z:0,scale:1.12}
+  );
+  assert.deepEqual(
+    composeGameplayCameraFrame({
+      playerFrame,
+      focusPoint:{x:0,z:0},
+      awarenessScale:1.12,
+      combatFrame:{x:4,z:3,scale:1.3}
+    }),
+    {x:4,z:3,scale:1.3}
+  );
 });
 
 test("battle preparation derives safely from the current living armies", () => {

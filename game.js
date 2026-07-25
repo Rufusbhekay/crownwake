@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { ATTACK_TIMING, DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, attackPhaseProgress, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canAdvanceDuelAttack, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, prioritizedOpponents, proximityCameraScale, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260725c.js";
+import { ATTACK_TIMING, DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, attackPhaseProgress, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canAdvanceDuelAttack, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, composeGameplayCameraFrame, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerArmyCameraFrame, playerThreatScore, prioritizedOpponents, proximityCameraScale, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260725c.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -300,8 +300,8 @@ function roundedBox(w, h, d, material, bevel = .12) {
 const TILE_SIZE=18,TILE_RADIUS=4,floorGeometry=new THREE.PlaneGeometry(TILE_SIZE+ENVIRONMENT.tileOverscan,TILE_SIZE+ENVIRONMENT.tileOverscan),floorTiles=new Map(),floorPool=[];
 floorGeometry.rotateX(-Math.PI/2);
 function updateFloorTiles(){
-  const combatFrame=activeCombatCameraFrame();
-  const floorCenter=combatFrame?{x:combatFrame.x,z:combatFrame.z}:master.position;
+  const gameplayFrame=activeGameplayCameraFrame();
+  const floorCenter=gameplayFrame?{x:gameplayFrame.x,z:gameplayFrame.z}:master.position;
   const needed=new Set(floorTileKeys(floorCenter,TILE_SIZE,TILE_RADIUS));
   for(const [key,tile] of floorTiles)if(!needed.has(key)){battle.remove(tile);floorTiles.delete(key);floorPool.push(tile)}
   for(const key of needed){
@@ -1520,17 +1520,22 @@ function win(){mode="end";$("end-title").textContent=STR.victory;$("end-screen")
 function start(){mode="playing";$("title-screen").classList.add("hidden");$("hud").classList.remove("hidden");$("pause").textContent=STR.pause;$("pause").setAttribute("aria-label",STR.pause);$("sound").textContent=STR.audioOn;$("motion").textContent=reducedMotion?STR.reducedMotion:STR.fullMotion;$("mobile-command").textContent=STR.tapToMove;updateStats();updateHearts();sounds.music.play().catch(()=>{});showToast(STR.objective)}
 $("begin").onclick=start;$("retry").onclick=()=>location.reload();
 
-function activeCombatCameraFrame(){
-  if(!master||!activeEncounter||activeEncounter.done)return null;
+function activeGameplayCameraFrame(){
+  if(!master)return null;
+  const playerFrame=playerArmyCameraFrame(activeCombatantPoints([master,...followers]),{
+    aspect:camera.aspect,
+    focusPoint:master.position
+  });
+  const focusPoint={x:master.position.x,z:master.position.z};
+  if(!activeEncounter||activeEncounter.done)return composeGameplayCameraFrame({playerFrame,focusPoint});
   const actors=[master,...followers,...enemyUnits];
   const duelists=actors.filter(actor=>actor?.userData.alive&&actor.userData.lockedTarget?.userData.alive);
   const awarenessScale=proximityCameraScale(activeEncounter.approachDistance);
   if(!activeEncounter.aggro&&!duelists.length){
-    return awarenessScale>1?{x:master.position.x,z:master.position.z,scale:awarenessScale}:null;
+    return composeGameplayCameraFrame({playerFrame,awarenessScale,focusPoint});
   }
-  const frame=tacticalCameraFrame(activeCombatantPoints(actors),{aspect:camera.aspect});
-  if(frame)frame.scale=Math.max(frame.scale,awarenessScale);
-  return frame;
+  const combatFrame=tacticalCameraFrame(activeCombatantPoints(actors),{aspect:camera.aspect});
+  return composeGameplayCameraFrame({playerFrame,combatFrame,awarenessScale,focusPoint});
 }
 
 function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
@@ -1542,7 +1547,7 @@ function loop(now){
   const gp0=navigator.getGamepads?.()[0], padDown=!!gp0?.buttons?.[0]?.pressed;
   if(padDown&&!padPrev.has(0)){mode==="map"?closeMap():mode==="playing"&&openMap()} padDown?padPrev.add(0):padPrev.delete(0);
   while(acc>=STEP){if(mode==="playing")updateBattle(STEP*tacticalCommandScale(selectedCompanyId!==null));acc-=STEP}
-  const mapMode=mode==="map",combatFrame=mapMode?null:activeCombatCameraFrame();
+  const mapMode=mode==="map",combatFrame=mapMode?null:activeGameplayCameraFrame();
   let focus,desired;
   if(mapMode){
     focus=new THREE.Vector3(0,0,-1);desired=new THREE.Vector3(10,31,26);

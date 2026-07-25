@@ -1,8 +1,8 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { COMMANDER_MELEE_RANGE } from "./sim-runtime-20260725a.js";
-import { DUEL_PHASE, DUEL_READY_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelOpening, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatReferenceIsCurrent, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderEngagementTarget, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, difficultyEncounter, duelAttackHits, duelOpeningDelay, duelPairReady, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260725a.js";
+import { COMMANDER_MELEE_RANGE, OPENING_SOLDIERS, canTakeDuelTurn, exclusiveNearestPairs } from "./sim-runtime-20260725b.js";
+import { DUEL_PHASE, DUEL_READY_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelOpening, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseHiddenSpawn, chooseLocalDetour, combatReferenceIsCurrent, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderEngagementTarget, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, difficultyEncounter, duelAttackHits, duelOpeningDelay, duelPairReady, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260725b.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -46,7 +46,7 @@ const flags = [];
 let rngState = 0xC0FFEE;
 function rand() { rngState = (Math.imul(rngState, 1664525) + 1013904223) >>> 0; return rngState / 4294967296; }
 let campaign = makeCampaign(), mode = "title", target = new THREE.Vector3(), activeEncounter = null;
-const PLAYER_COMMANDER=commanderCombatProfile("player"),ENEMY_COMMANDER=commanderCombatProfile("enemy"),STARTING_SOLDIERS=6;
+const PLAYER_COMMANDER=commanderCombatProfile("player"),ENEMY_COMMANDER=commanderCombatProfile("enemy"),STARTING_SOLDIERS=OPENING_SOLDIERS;
 let master, masterHealth = PLAYER_COMMANDER.maxHealth, sinceDamage = 99, followers = [], enemyUnits = [], particles = [], tombstones = [];
 const MAX_ACTIVE_PARTICLES=180;
 let totalTime = 0, shake = 0, reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches, audioOn = true;
@@ -614,23 +614,6 @@ function observedLeader(unit,leader,leaderForward,dt,urgent=false){
   return {position:data.followAnchor,forward:data.followForward};
 }
 function nearestAlive(from,list){const origin=from.position??from;let best=null,bd=Infinity;for(const u of list){if(!u.userData.alive)continue;const d=origin.distanceToSquared(u.position);if(d<bd){bd=d;best=u}}return best}
-function assignCommanderTargets(commanders,opponents,preferCommander){
-  const targets=new Map(),loads=opponents.map(()=>0);
-  for(const commander of commanders){
-    const currentIndex=opponents.indexOf(commander.userData.commanderTarget);
-    let index=currentIndex>=0&&loads[currentIndex]===0?currentIndex:-1;
-    if(index<0)index=chooseCommanderTargetIndex({
-      commander:commander.position,
-      opponents:opponents.map(opponent=>({x:opponent.position.x,z:opponent.position.z,alive:opponent.userData.alive,isCommander:!!opponent.userData.isMaster})),
-      targetLoads:loads,
-      preferCommander:preferCommander(commander)
-    });
-    const targetActor=index>=0?opponents[index]:null;
-    commander.userData.commanderTarget=targetActor;
-    if(targetActor){targets.set(commander,targetActor);loads[index]++}
-  }
-  return targets;
-}
 function commanderRoute(attacker,targetActor,actors){
   const pursuit=standOffPursuitPoint(attacker.position,targetActor.position,.94,.1);
   const goal={x:pursuit.x,z:pursuit.z};
@@ -648,11 +631,11 @@ function resetDuel(unit){
   unit.userData.lastTargetPosition=null;unit.userData.duelTurnId=null;
   unit.userData.duelPhase=DUEL_PHASE.APPROACH;unit.userData.duelTimer=0;unit.userData.duelOpeningDelay=0;unit.userData.pathPreviousDistance=Infinity;unit.userData.pathStallTimer=0;unit.userData.pathFailures=0;unit.scale.set(1,1,1);
 }
-function commitCommanderEngagement(commander,assignedTarget,blocker,currentOpponents){
+function commitCommanderEngagement(commander,assignedTarget,currentOpponents){
   const lockedTarget=combatReferenceIsCurrent(commander.userData.lockedTarget,currentOpponents)
     ?commander.userData.lockedTarget
     :null;
-  const foe=commanderEngagementTarget({lockedTarget,assignedTarget,blocker});
+  const foe=commanderEngagementTarget({lockedTarget,assignedTarget,blocker:null});
   if(commander.userData.lockedTarget!==foe){
     resetDuel(commander);
     commander.userData.lockedTarget=foe;
@@ -692,14 +675,31 @@ function lockDuel(unit,foe,role="primary",supportIndex=0,sharedCenter=null,openi
 }
 function assignEngagements(sideA,sideB){
   const a=sideA.filter(u=>u.userData.alive),b=sideB.filter(u=>u.userData.alive),aMap=new Map(),bMap=new Map();
-  for(const unit of a)if(b.includes(unit.userData.lockedTarget))aMap.set(unit,unit.userData.lockedTarget);
-  for(const unit of b)if(a.includes(unit.userData.lockedTarget))bMap.set(unit,unit.userData.lockedTarget);
-  while(a.some(u=>!aMap.has(u))&&b.some(u=>!bMap.has(u))){
-    let bestA=null,bestB=null,bestDistance=Infinity;
-    for(const left of a)if(!aMap.has(left))for(const right of b)if(!bMap.has(right)){
-      const distance=left.position.distanceToSquared(right.position);
-      if(distance<bestDistance){bestDistance=distance;bestA=left;bestB=right}
+  const existingPairs=[];
+  for(let leftIndex=0;leftIndex<a.length;leftIndex++){
+    const rightIndex=b.indexOf(a[leftIndex].userData.lockedTarget);
+    if(rightIndex>=0&&b[rightIndex].userData.lockedTarget===a[leftIndex])existingPairs.push({leftIndex,rightIndex});
+  }
+  const pairs=exclusiveNearestPairs(
+    a.map(unit=>({x:unit.position.x,z:unit.position.z})),
+    b.map(unit=>({x:unit.position.x,z:unit.position.z})),
+    existingPairs
+  );
+  const pairedA=new Set(pairs.map(pair=>pair.leftIndex)),pairedB=new Set(pairs.map(pair=>pair.rightIndex));
+  for(let index=0;index<a.length;index++)if(!pairedA.has(index)){
+    if(a[index].userData.lockedTarget)resetDuel(a[index]);
+    a[index].userData.seekingTarget=true;
+  }
+  for(let index=0;index<b.length;index++)if(!pairedB.has(index)){
+    if(b[index].userData.lockedTarget)resetDuel(b[index]);
+    b[index].userData.seekingTarget=true;
+  }
+  for(const {leftIndex,rightIndex} of pairs){
+    const bestA=a[leftIndex],bestB=b[rightIndex];
+    if(bestA.userData.lockedTarget===bestB&&bestB.userData.lockedTarget===bestA){
+      aMap.set(bestA,bestB);bMap.set(bestB,bestA);continue;
     }
+    resetDuel(bestA);resetDuel(bestB);
     const center=bestA.position.clone().add(bestB.position).multiplyScalar(.5);
     const openingDelay=duelOpeningDelay(rand());
     lockDuel(bestA,bestB,"primary",0,center,openingDelay);lockDuel(bestB,bestA,"primary",0,center,openingDelay);
@@ -720,20 +720,6 @@ function releasePlayerCombatCommitment(){
     if(!unit.userData.lockedTarget&&!unit.userData.seekingTarget&&unit.userData.mode===SERVANT_MODE.FOLLOW)continue;
     resetDuel(unit);unit.userData.seekingTarget=false;unit.userData.mode=SERVANT_MODE.FOLLOW;
     unit.userData.followAnchor=null;unit.userData.followState=FOLLOW_AWARENESS.HOLDING;unit.userData.followTimer=0;
-  }
-}
-function reinforceCommander(units,commander,map){
-  if(!commander?.userData.alive)return;
-  let slot=0;
-  for(const unit of units)if(unit.userData.alive&&!map.has(unit)){
-    lockDuel(unit,commander,slot===0?"primary":"support",slot++);map.set(unit,commander);
-  }
-}
-function reinforceCommanders(units,commanders,map){
-  for(const unit of units){
-    if(!unit.userData.alive||map.has(unit))continue;
-    const commander=nearestAlive(unit,commanders);if(!commander)continue;
-    lockDuel(unit,commander,"support",0);map.set(unit,commander);
   }
 }
 function faceDirection(unit,x,z,dt,maxTurnRate=4.2){
@@ -804,11 +790,18 @@ function dealDamage(attacker,victim){
 }
 function hit(attacker,victim,dt,range=COMMANDER_MELEE_RANGE){
   attacker.userData.cool-=dt;
+  const mutual=victim.userData.lockedTarget===attacker;
+  if(!canTakeDuelTurn({mutual,turnId:attacker.userData.duelTurnId,attackerId:attacker.id}))return;
   const dist=attacker.position.distanceTo(victim.position);
   if(!canApplyAttackDamage({attackerAlive:attacker.userData.alive,victimAlive:victim.userData.alive,opposingFactions:attacker.userData.faction!==victim.userData.faction,cooldown:attacker.userData.cool,distance:dist,range}))return;
   attacker.userData.cool=.62+rand()*.18;
   attacker.userData.attackAnim=1;
-  dealDamage(attacker,victim);
+  const landed=dealDamage(attacker,victim);
+  if(mutual&&landed&&victim.userData.alive){
+    const turnId=nextDuelTurn({attackerId:attacker.id,defenderId:victim.id,strikeLanded:true});
+    attacker.userData.duelTurnId=turnId;victim.userData.duelTurnId=turnId;
+    victim.userData.duelPhase=DUEL_PHASE.APPROACH;victim.userData.duelTimer=0;
+  }
 }
 function updateDuel(unit,foe,dt){
   const data=unit.userData;
@@ -1017,13 +1010,8 @@ function updatePlayerGroupCommander(commander,company,{combat,livingRivals,livin
   if(control==="move"){
     desired.copy(commanderOrder?(commander.userData.manualTarget??commander.position):(anchor.commanderTarget??formationPoint(anchor,commanderFormationOffset(1.42))));speed=2.15;acceleration=6.4;
   }else if(control==="engage"&&(livingRivals.length||livingEnemySoldiers.length)){
-    const assignedFoe=commanderTargets.get(commander)??nearestAlive(commander,livingEnemySoldiers)??nearestAlive(commander,livingRivals);
-    const blockerIndex=assignedFoe?chooseCommanderBlockerIndex({
-        commander:commander.position,target:assignedFoe.position,
-        soldiers:livingEnemySoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:true,threatening:soldier.userData.lockedTarget===commander}))
-      }):-1;
-    const blocker=blockerIndex>=0?livingEnemySoldiers[blockerIndex]:null;
-    foe=commitCommanderEngagement(commander,assignedFoe,blocker,[...livingEnemySoldiers,...livingRivals]);
+    const assignedFoe=commanderTargets.get(commander)??null;
+    foe=commitCommanderEngagement(commander,assignedFoe,[...livingEnemySoldiers,...livingRivals]);
     if(foe){
       desired.copy(commanderRoute(commander,foe,routeActors));speed=1.55;acceleration=4.4;
       hit(commander,foe,dt);
@@ -1065,9 +1053,7 @@ function updateBattle(dt){
   if(activeEncounter&&!activeEncounter.done&&!activeEncounter.aggro&&approachState==="combat")activeEncounter.aggro=true;
   const combat=activeEncounter?.aggro&&enemyUnits.some(u=>u.userData.alive);
   const preparingForContact=!!activeEncounter&&!activeEncounter.done&&!combat&&approachState==="deploy";
-  if(combat&&!wasCombat){
-    for(const anchor of companyAnchors.values())if(!anchor.moving)anchor.deployTimer=Math.max(anchor.deployTimer??0,.65);
-  }else if(!combat&&wasCombat)settleCompanyAnchors();
+  if(!combat&&wasCombat)settleCompanyAnchors();
   wasCombat=combat;
   if(combat||preparingForContact)activeEncounter.formationTime=(activeEncounter.formationTime??0)+dt;
   const forward=master.userData.velocity.lengthSq()>.03?master.userData.velocity.clone().normalize():new THREE.Vector3(0,0,-1);
@@ -1102,7 +1088,6 @@ function updateBattle(dt){
       }
     }
   }
-  const {formingBattleLine}=battlePreparationState({combat:combat||preparingForContact,formationTime:activeEncounter?.formationTime??0,livingFollowerCount:livingPlayerSoldiers.length,livingEnemySoldierCount:livingEnemySoldiers.length});
   clearInvalidDuels(followers,livingEnemies);
   clearInvalidDuels(enemyUnits,[...livingPlayerCommanders,...livingPlayerSoldiers]);
   if(shouldReleaseCombatCommitment(combat,livingEnemies.length))releasePlayerCombatCommitment();
@@ -1111,38 +1096,18 @@ function updateBattle(dt){
     const company=companies[unit.userData.companyId??0]??companies[0];
     const locked=!!unit.userData.lockedTarget?.userData.alive;
     const commanderMovingIndependently=!!company?.commander?.userData.manualMoving;
-    return !anchor.moving&&(anchor.deployTimer??0)<=0&&(!commanderMovingIndependently||locked);
+    return !anchor.moving&&(!commanderMovingIndependently||locked);
   });
-  const playerOpponents=prioritizedOpponents(livingEnemySoldiers,rival);
-  const enemyOpponents=prioritizedOpponents(commandableFollowers,nearestAlive(rival??master,livingPlayerCommanders));
-  const soldierVersusSoldier=playerOpponents[0]&&!playerOpponents[0].userData.isMaster&&enemyOpponents[0]&&!enemyOpponents[0].userData.isMaster;
-  const engagements=combat&&!formingBattleLine&&soldierVersusSoldier?assignEngagements(commandableFollowers,livingEnemySoldiers):{aMap:new Map(),bMap:new Map()};
-  if(combat){
-    const playerAllocation=engagementAllocation(commandableFollowers.length,livingEnemySoldiers.length);
-    const enemyAllocation=engagementAllocation(livingEnemySoldiers.length,commandableFollowers.length);
-    if(livingRivals.length&&(livingEnemySoldiers.length===0||(!formingBattleLine&&playerAllocation.commanderAssaults>0)))reinforceCommanders(commandableFollowers,livingRivals,engagements.aMap);
-    if(livingPlayerCommanders.length&&(livingPlayerSoldiers.length===0||(!formingBattleLine&&enemyAllocation.commanderAssaults>0)))reinforceCommanders(livingEnemySoldiers,livingPlayerCommanders,engagements.bMap);
-  }
+  const engagements=combat
+    ?assignEngagements([...livingPlayerCommanders,...commandableFollowers],[...livingRivals,...livingEnemySoldiers])
+    :{aMap:new Map(),bMap:new Map()};
   const playerAssignments=engagements.aMap,enemyAssignments=engagements.bMap;
   const activeSoldierDuels=livingPlayerSoldiers.some(u=>livingEnemySoldiers.includes(u.userData.lockedTarget));
   if(activeSoldierDuels)activeEncounter.commanderDuelTime=(activeEncounter.commanderDuelTime??0)+dt;
   else activeEncounter.commanderDuelTime=0;
   const routeActors=[master,...livingFollowers,...livingEnemies];
-  const playerCommanderTargets=assignCommanderTargets(
-    livingPlayerCommanders,[...livingEnemySoldiers,...livingRivals],
-    commander=>commander===master
-  );
-  const enemyCommanderTargets=assignCommanderTargets(
-    livingRivals,[...livingPlayerSoldiers,...livingPlayerCommanders],
-    ()=>true
-  );
-  const assignedMasterFoe=combat?(playerCommanderTargets.get(master)??rival??nearestAlive(master,livingEnemies)):null;
-  const masterBlockerIndex=assignedMasterFoe?chooseCommanderBlockerIndex({
-    commander:master.position,target:assignedMasterFoe.position,
-    soldiers:livingEnemySoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:true,threatening:soldier.userData.lockedTarget===master}))
-  }):-1;
-  const masterBlocker=masterBlockerIndex>=0?livingEnemySoldiers[masterBlockerIndex]:null;
-  const masterFoe=combat?commitCommanderEngagement(master,assignedMasterFoe,masterBlocker,livingEnemies):null;
+  const assignedMasterFoe=combat?(playerAssignments.get(master)??null):null;
+  const masterFoe=combat?commitCommanderEngagement(master,assignedMasterFoe,livingEnemies):null;
   if(masterFoe){
     if(commanderControlState({combat,manualOrder:!!master.userData.manualMoving||ensureCompanyAnchor(0).moving})==="engage"){
       const facingOpponent=commanderFacesOpponent(master,masterFoe);
@@ -1156,18 +1121,18 @@ function updateBattle(dt){
     if(!u.userData.alive)return;
     const company=companies[u.userData.companyId]??companies[0];
     if(u.userData.unitCommander){
-      updatePlayerGroupCommander(u,company,{combat,livingRivals,livingEnemySoldiers,commanderTargets:playerCommanderTargets,routeActors,dt});
+      updatePlayerGroupCommander(u,company,{combat,livingRivals,livingEnemySoldiers,commanderTargets:playerAssignments,routeActors,dt});
       return;
     }
     const leader=company.commander?.userData.alive?company.commander:master;
     const leaderForward=leader.userData.velocity.lengthSq()>.03?leader.userData.velocity.clone().normalize():forward;
     const distanceToMaster=u.position.distanceTo(leader.position);
     const localIndex=Math.max(0,company.soldiers.indexOf(u));
-    const anchor=ensureCompanyAnchor(company.groupIndex),manualOrder=anchor.moving,companyDeploying=!manualOrder&&(anchor.deployTimer??0)>0;
+    const anchor=ensureCompanyAnchor(company.groupIndex),manualOrder=anchor.moving;
     if(manualOrder&&(u.userData.lockedTarget||u.userData.seekingTarget))resetDuel(u);
-    const committed=!manualOrder&&!companyDeploying&&(!!u.userData.lockedTarget?.userData.alive||u.userData.seekingTarget);
-    u.userData.mode=chooseServantMode({combat,masterRetreating,distanceToMaster,attackLeash:4.5,locked:committed});
-    let foe=!manualOrder&&!companyDeploying&&u.userData.mode===SERVANT_MODE.ATTACK?playerAssignments.get(u):null;
+    const committed=!manualOrder&&!!u.userData.lockedTarget?.userData.alive;
+    u.userData.mode=committed?SERVANT_MODE.ATTACK:SERVANT_MODE.FOLLOW;
+    let foe=!manualOrder&&u.userData.mode===SERVANT_MODE.ATTACK?playerAssignments.get(u):null;
     const emergencyFollow=!committed&&(masterRetreating||distanceToMaster>5.1);
     const observed=observedLeader(u,leader,leaderForward,dt,emergencyFollow);
     let reposition=!committed&&shouldRepositionFollower({combat,urgent:emergencyFollow,leaderSpeed:leader.userData.velocity.length(),distanceToMaster,leash:4.2});
@@ -1175,7 +1140,7 @@ function updateBattle(dt){
     let desired=reposition?travelFormationSlot(Math.max(0,travelIndex),livingFollowers.length,observed.position,observed.forward):u.position.clone(),duelMotion=null;
     if(reposition){desired.x+=Math.sin(totalTime*.72+u.userData.phase)*.12;desired.z+=Math.cos(totalTime*.61+u.userData.phase)*.12}
     const ownCommanderLeading=companyLeaderMoving.get(company.groupIndex);
-    const commandState=companyCommandState({manualOrder,combat,enemyDetected:companyDeploying||preparingForContact,commanderMoving:ownCommanderLeading||anchor.followingCommander});
+    const commandState=companyCommandState({manualOrder,combat,enemyDetected:preparingForContact,commanderMoving:ownCommanderLeading||anchor.followingCommander});
     if(manualOrder){
       const offset=companyFormationOffset(localIndex,company.soldiers.length,1.42);
       desired.copy(formationPoint(anchor,offset));
@@ -1191,14 +1156,6 @@ function updateBattle(dt){
         anchor.followingCommander=ownCommanderLeading||!arrived;
         reposition=!arrived;
       }
-    }
-    if((formingBattleLine||companyDeploying)&&livingRivals.length&&!manualOrder){
-      const lineOrigin=companyDeploying?anchor.position:leader.position;
-      const formationRival=nearestAlive(lineOrigin,livingRivals);
-      const advance=formationRival.position.clone().sub(lineOrigin).setY(0).normalize(),lateral=new THREE.Vector3(-advance.z,0,advance.x);
-      const lineIndex=localIndex,lineCount=company.soldiers.length;
-      desired=lineOrigin.clone().addScaledVector(advance,-.35).addScaledVector(lateral,battleLineOffset(Math.max(0,lineIndex),lineCount,battleLineSpacing(lineCount)));
-      reposition=true;foe=null;
     }
     if(foe?.userData.alive){
       duelMotion=updateDuel(u,foe,dt);
@@ -1216,7 +1173,7 @@ function updateBattle(dt){
       const clearance=commanderClearanceVector({soldier:u.position,commander:allyCommander.position,forward:commanderForward,preferRight:(u.id&1)===0});
       desired.x+=clearance.x*1.78;desired.z+=clearance.z*1.78;
     }
-    if(combat&&!formingBattleLine&&!manualOrder&&!companyDeploying&&!duelMotion&&reposition)leashTarget(desired,leader,swarmTravelRadius(company.soldiers.length));
+    if(combat&&!manualOrder&&!duelMotion&&reposition)leashTarget(desired,leader,swarmTravelRadius(company.soldiers.length));
     const catchup=Math.min(1.45,Math.max(0,distanceToMaster-2.2)*.65);
     const speed=duelMotion?.speed??(u.userData.mode===SERVANT_MODE.ATTACK?2.45:2.65+catchup);
     const acceleration=duelMotion?.acceleration??(u.userData.mode===SERVANT_MODE.ATTACK?5.7:reposition?7.2:4.2);
@@ -1237,14 +1194,8 @@ function updateBattle(dt){
     if(u.userData.isMaster){
       u.userData.sinceDamage+=dt;
       u.userData.hp=commanderRegenHealth(u.userData.hp,u.userData.maxHp,u.userData.sinceDamage,dt,u.userData.regenDelay,u.userData.regenPerSecond);
-      const assignedTargetCommander=enemyCommanderTargets.get(u)??nearestAlive(u,livingPlayerCommanders)??master;
-      const blockerIndex=chooseCommanderBlockerIndex({
-        commander:u.position,
-        target:assignedTargetCommander.position,
-        soldiers:livingPlayerSoldiers.map(soldier=>({x:soldier.position.x,z:soldier.position.z,alive:soldier.userData.alive,threatening:soldier.userData.lockedTarget===u}))
-      });
-      const blocker=blockerIndex>=0?livingPlayerSoldiers[blockerIndex]:null;
-      const targetCommander=commitCommanderEngagement(u,assignedTargetCommander,blocker,[...livingPlayerSoldiers,...livingPlayerCommanders]);
+      const assignedTargetCommander=enemyAssignments.get(u)??null;
+      const targetCommander=commitCommanderEngagement(u,assignedTargetCommander,[...livingPlayerSoldiers,...livingPlayerCommanders]);
       if(!targetCommander){
         steerTowards(u,u.position,0,3.4,dt);u.position.y=GROUND_Y;return;
       }
@@ -1272,19 +1223,13 @@ function updateBattle(dt){
     const ownLeader=u.userData.leader;
     const leader=ownLeader?.userData.alive?ownLeader:nearestAlive(u,livingRivals);
     const distanceToLeader=leader?u.position.distanceTo(leader.position):0;
-    const committed=!!u.userData.lockedTarget?.userData.alive||u.userData.seekingTarget;
-    u.userData.mode=chooseServantMode({combat,masterRetreating:enemyMasterRetreating,distanceToMaster:distanceToLeader,attackLeash:4.4,locked:committed});
+    const committed=!!u.userData.lockedTarget?.userData.alive;
+    u.userData.mode=committed?SERVANT_MODE.ATTACK:SERVANT_MODE.FOLLOW;
     const enemyForward=leader?master.position.clone().sub(leader.position).setY(0).normalize():new THREE.Vector3(0,0,1);
     const enemyObserved=leader?observedLeader(u,leader,enemyForward,dt,enemyMasterRetreating||distanceToLeader>5):null;
     const leaderSoldiers=leader?enemyUnits.filter(v=>!v.userData.isMaster&&v.userData.alive&&v.userData.leader===leader):[];
     const leaderIndex=leaderSoldiers.indexOf(u);
     let desired=leader?travelFormationSlot(Math.max(0,leaderIndex),Math.max(1,leaderSoldiers.length),enemyObserved.position,enemyObserved.forward):u.position.clone(),duelMotion=null;
-    if(formingBattleLine&&leader){
-      const advance=master.position.clone().sub(leader.position).setY(0).normalize(),lateral=new THREE.Vector3(-advance.z,0,advance.x);
-      const swarmSoldiers=livingEnemySoldiers.filter(soldier=>soldier.userData.leader===ownLeader);
-      const soldierIndex=swarmSoldiers.indexOf(u);
-      desired=leader.position.clone().addScaledVector(advance,-.55).addScaledVector(lateral,battleLineOffset(Math.max(0,soldierIndex),swarmSoldiers.length,battleLineSpacing(swarmSoldiers.length)));
-    }
     if(foe&&u.userData.mode===SERVANT_MODE.ATTACK){
       duelMotion=updateDuel(u,foe,dt);
       if(!u.userData.alive)return;
@@ -1300,7 +1245,7 @@ function updateBattle(dt){
       const clearance=commanderClearanceVector({soldier:u.position,commander:allyCommander.position,forward:rivalForward,preferRight:(u.id&1)===0});
       desired.x+=clearance.x*1.78;desired.z+=clearance.z*1.78;
     }
-    if(!formingBattleLine&&!duelMotion&&leader)leashTarget(desired,leader,swarmTravelRadius(leaderSoldiers.length));
+    if(!duelMotion&&leader)leashTarget(desired,leader,swarmTravelRadius(leaderSoldiers.length));
     const catchup=Math.min(1.2,Math.max(0,distanceToLeader-2.1)*.6);
     const speed=duelMotion?.speed??(u.userData.mode===SERVANT_MODE.ATTACK?1.8:2.15+catchup);
     const acceleration=duelMotion?.acceleration??(u.userData.mode===SERVANT_MODE.ATTACK?4.4:6.2);

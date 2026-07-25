@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { COMMANDER_MELEE_RANGE } from "../src/sim.js";
+import { COMMANDER_MELEE_RANGE, OPENING_SOLDIERS } from "../src/sim.js";
+import { exclusiveNearestPairs } from "../src/sim.js";
+import { canTakeDuelTurn } from "../src/sim.js";
 import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelOpening, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatReferenceIsCurrent, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderEngagementTarget, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, duelOpeningDelay, duelPairReady, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, postRespawnResolution, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
@@ -128,6 +130,20 @@ test("combat assignments reserve each opponent for only one soldier", () => {
 test("combat assignments refuse targets that are already locked", () => {
   assert.equal(chooseBalancedTargetIndex([3, 1, 2], [1, 1, 1]), -1);
   assert.equal(chooseBalancedTargetIndex([], []), -1);
+});
+
+test("exclusive nearest locks leave surplus soldiers waiting for an available opponent", () => {
+  assert.equal(OPENING_SOLDIERS,2);
+  const left=[{x:0,z:0},{x:5,z:0},{x:10,z:0}];
+  const right=[{x:1,z:0},{x:9,z:0}];
+  assert.deepEqual(exclusiveNearestPairs(left,right),[
+    {leftIndex:0,rightIndex:0},
+    {leftIndex:2,rightIndex:1}
+  ]);
+  assert.deepEqual(exclusiveNearestPairs(left,right,[{leftIndex:1,rightIndex:0}]),[
+    {leftIndex:1,rightIndex:0},
+    {leftIndex:2,rightIndex:1}
+  ]);
 });
 
 test("approaching soldiers fan into a centered battle line", () => {
@@ -286,6 +302,9 @@ test("manual commander orders override pursuit without releasing soldier duels",
 });
 
 test("duel attacks alternate only after a successful strike", () => {
+  assert.equal(canTakeDuelTurn({mutual:true,turnId:4,attackerId:4}),true);
+  assert.equal(canTakeDuelTurn({mutual:true,turnId:9,attackerId:4}),false);
+  assert.equal(canTakeDuelTurn({mutual:false,turnId:9,attackerId:4}),true);
   assert.equal(nextDuelTurn({attackerId:4,defenderId:9,strikeLanded:false}),4);
   assert.equal(nextDuelTurn({attackerId:4,defenderId:9,strikeLanded:true}),9);
   assert.equal(nextDuelTurn({attackerId:9,defenderId:4,strikeLanded:true}),4);
@@ -597,10 +616,10 @@ test("commander regeneration is delayed and uses a slow flat rate", () => {
   assert.equal(commanderRegenHealth(499,500,enemy.regenDelay,1,enemy.regenDelay,enemy.regenPerSecond),500);
 });
 
-test("commander defeat resets army growth to the six-soldier opening strength", () => {
-  assert.deepEqual(defeatRosterPlan(14),{keep:6,remove:8,spawn:0});
-  assert.deepEqual(defeatRosterPlan(3),{keep:3,remove:0,spawn:3});
-  assert.deepEqual(defeatRosterPlan(6),{keep:6,remove:0,spawn:0});
+test("commander defeat resets army growth to the two-soldier opening strength", () => {
+  assert.deepEqual(defeatRosterPlan(14),{keep:2,remove:12,spawn:0});
+  assert.deepEqual(defeatRosterPlan(3),{keep:2,remove:1,spawn:0});
+  assert.deepEqual(defeatRosterPlan(1),{keep:1,remove:0,spawn:1});
 });
 
 test("post-respawn resolution still converts enemies defeated during the respawn pause", () => {

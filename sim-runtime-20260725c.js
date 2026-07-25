@@ -258,6 +258,18 @@ export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, pa
   };
 }
 
+export function proximityCameraScale(distance, {
+  startDistance = 11,
+  fullDistance = 6.2,
+  maxScale = 1.12
+} = {}) {
+  if (!Number.isFinite(distance) || distance >= startDistance) return 1;
+  const range = Math.max(.001, startDistance - fullDistance);
+  const progress = Math.max(0, Math.min(1, (startDistance - distance) / range));
+  const eased = progress * progress * (3 - 2 * progress);
+  return 1 + (maxScale - 1) * eased;
+}
+
 export function battleLineFormationDuration(count) {
   return 1.65 + Math.min(5.2, Math.max(0, count - 4) * .45);
 }

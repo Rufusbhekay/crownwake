@@ -2,9 +2,6 @@ export const FACTION = { PLAYER: "player", CORAL: "coral", AMBER: "amber" };
 export const SERVANT_MODE = { FOLLOW: "follow", ATTACK: "attack" };
 export const FOLLOW_AWARENESS = { HOLDING: "holding", RESPONDING: "responding", TRACKING: "tracking" };
 export const DUEL_PHASE = { APPROACH: "approach", LUNGE: "lunge", RECOVER: "recover" };
-export const DUEL_READY_DISTANCE = .2;
-export const COMMANDER_MELEE_RANGE = 1.15;
-export const OPENING_SOLDIERS = 2;
 
 export function environmentGrade() {
   return {
@@ -90,7 +87,7 @@ export function commanderRegenHealth(health, maxHealth, sinceDamage, dt, delay, 
   return sinceDamage < delay ? health : Math.min(maxHealth, health + perSecond * dt);
 }
 
-export function defeatRosterPlan(currentCount, startingCount = OPENING_SOLDIERS) {
+export function defeatRosterPlan(currentCount, startingCount = 6) {
   return {
     keep: Math.min(currentCount, startingCount),
     remove: Math.max(0, currentCount - startingCount),
@@ -344,14 +341,6 @@ export function companyLeaderMotion({ ownCommanderMoving }) {
   return Boolean(ownCommanderMoving);
 }
 
-export function postBattleCompanyOffset(index, count, baseRadius = 5.4) {
-  if (index <= 0 || count <= 1) return { x: 0, z: 0 };
-  const promotedCount = Math.max(1, count - 1);
-  const radius = baseRadius + Math.min(1.8, Math.max(0, count - 2) * .45);
-  const angle = (index - 1) * Math.PI * 2 / promotedCount;
-  return { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius };
-}
-
 export function battleApproachState({ distance, detectionRadius = 9.5, aggroRadius = 6.2 }) {
   if (distance <= aggroRadius) return "combat";
   if (distance <= detectionRadius) return "deploy";
@@ -398,27 +387,9 @@ export function combatVisualPose({ attack = 0, damage = 0, reducedMotion = false
     scaleX: 1 + attackPulse * .08 + damagePulse * .16,
     scaleY: 1 + attackPulse * .05 - damagePulse * .12,
     scaleZ: 1 - attackPulse * .2 + damagePulse * .14,
-    forward: attackPulse * .24,
+    forward: attackPulse * .42,
     lift: damagePulse * .1
   };
-}
-
-export function combatReferenceIsCurrent(target, currentOpponents) {
-  return !!target
-    && (target.userData?.alive ?? target.alive) !== false
-    && currentOpponents.includes(target);
-}
-
-export function duelOpeningDelay(roll) {
-  return .12 + Math.max(0, Math.min(1, roll)) * .72;
-}
-
-export function advanceDuelOpening(delay, dt) {
-  return Math.max(0, delay - dt);
-}
-
-export function duelPairReady({ distance, foeDistance, mutual, threshold = DUEL_READY_DISTANCE }) {
-  return distance <= threshold && (!mutual || foeDistance <= threshold);
 }
 
 export function chooseCommanderBlockerIndex({ commander, target, soldiers, lookAhead = 2.4, corridorHalfWidth = .72, threatRadius = 1.25 }) {
@@ -472,13 +443,6 @@ export function chooseCommanderTargetIndex({ commander, opponents, targetLoads =
   return best;
 }
 
-export function commanderEngagementTarget({ lockedTarget, assignedTarget, blocker }) {
-  const alive = target => target && (target.userData?.alive ?? target.alive) !== false;
-  if (alive(lockedTarget)) return lockedTarget;
-  if (alive(blocker)) return blocker;
-  return alive(assignedTarget) ? assignedTarget : null;
-}
-
 export function prioritizedOpponents(soldiers, commander) {
   const livingSoldiers = soldiers.filter(soldier => (soldier.userData?.alive ?? soldier.alive) !== false);
   if (livingSoldiers.length) return livingSoldiers;
@@ -493,13 +457,9 @@ export function nextDuelTurn({ attackerId, defenderId, strikeLanded }) {
   return strikeLanded ? defenderId : attackerId;
 }
 
-export function canTakeDuelTurn({ mutual, turnId, attackerId }) {
-  return !mutual || turnId == null || turnId === attackerId;
-}
-
-export function advanceDuelState({ phase, timer, distance, strikeDistance = Infinity, strikeRange = 1.15, approachRange = DUEL_READY_DISTANCE, dt }) {
+export function advanceDuelState({ phase, timer, distance, strikeDistance = Infinity, strikeRange = 1.15, dt }) {
   if (phase === DUEL_PHASE.APPROACH) {
-    return distance <= approachRange
+    return distance <= .16
       ? { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false }
       : { phase, timer: 0, strike: false };
   }
@@ -549,46 +509,6 @@ export function actorCollisionProfile(kind) {
 export function engagementAllocation(attackerCount, defenderCount) {
   const soldierDuels = Math.min(Math.max(0, attackerCount), Math.max(0, defenderCount));
   return { soldierDuels, commanderAssaults: Math.max(0, attackerCount - soldierDuels) };
-}
-
-export function exclusiveNearestPairs(left, right, existingPairs = []) {
-  const pairs = [];
-  const usedLeft = new Set();
-  const usedRight = new Set();
-  for (const pair of existingPairs) {
-    if (
-      pair.leftIndex < 0 || pair.leftIndex >= left.length ||
-      pair.rightIndex < 0 || pair.rightIndex >= right.length ||
-      usedLeft.has(pair.leftIndex) || usedRight.has(pair.rightIndex)
-    ) continue;
-    pairs.push({ leftIndex: pair.leftIndex, rightIndex: pair.rightIndex });
-    usedLeft.add(pair.leftIndex);
-    usedRight.add(pair.rightIndex);
-  }
-  while (usedLeft.size < left.length && usedRight.size < right.length) {
-    let bestLeft = -1;
-    let bestRight = -1;
-    let bestDistance = Infinity;
-    for (let leftIndex = 0; leftIndex < left.length; leftIndex++) {
-      if (usedLeft.has(leftIndex)) continue;
-      for (let rightIndex = 0; rightIndex < right.length; rightIndex++) {
-        if (usedRight.has(rightIndex)) continue;
-        const dx = left[leftIndex].x - right[rightIndex].x;
-        const dz = left[leftIndex].z - right[rightIndex].z;
-        const distance = dx * dx + dz * dz;
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestLeft = leftIndex;
-          bestRight = rightIndex;
-        }
-      }
-    }
-    if (bestLeft < 0 || bestRight < 0) break;
-    pairs.push({ leftIndex: bestLeft, rightIndex: bestRight });
-    usedLeft.add(bestLeft);
-    usedRight.add(bestRight);
-  }
-  return pairs;
 }
 
 export function soldierSpacingProfile(inBattle, swarmSize = 1) {
@@ -732,13 +652,6 @@ export function chooseLocalDetour({ start, goal, obstacles, clearance = .5, look
 export function smoothAngle(current, target, response, dt) {
   const difference = Math.atan2(Math.sin(target - current), Math.cos(target - current));
   return current + difference * (1 - Math.exp(-response * dt));
-}
-
-export function limitedFacingAngle({ current, target, dt, deadZone = .055, maxTurnRate = 4.2 }) {
-  const difference = Math.atan2(Math.sin(target - current), Math.cos(target - current));
-  if (Math.abs(difference) <= deadZone) return current;
-  const step = Math.min(Math.abs(difference), Math.max(0, maxTurnRate * dt));
-  return current + Math.sign(difference) * step;
 }
 
 export function waveSizeFromRoll(roll) {

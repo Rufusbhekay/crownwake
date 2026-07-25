@@ -1,9 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { COMMANDER_MELEE_RANGE, OPENING_SOLDIERS } from "../src/sim.js";
-import { exclusiveNearestPairs } from "../src/sim.js";
-import { canTakeDuelTurn } from "../src/sim.js";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelOpening, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatReferenceIsCurrent, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderEngagementTarget, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, duelOpeningDelay, duelPairReady, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, limitedFacingAngle, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postBattleCompanyOffset, postRespawnResolution, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -130,20 +127,6 @@ test("combat assignments reserve each opponent for only one soldier", () => {
 test("combat assignments refuse targets that are already locked", () => {
   assert.equal(chooseBalancedTargetIndex([3, 1, 2], [1, 1, 1]), -1);
   assert.equal(chooseBalancedTargetIndex([], []), -1);
-});
-
-test("exclusive nearest locks leave surplus soldiers waiting for an available opponent", () => {
-  assert.equal(OPENING_SOLDIERS,2);
-  const left=[{x:0,z:0},{x:5,z:0},{x:10,z:0}];
-  const right=[{x:1,z:0},{x:9,z:0}];
-  assert.deepEqual(exclusiveNearestPairs(left,right),[
-    {leftIndex:0,rightIndex:0},
-    {leftIndex:2,rightIndex:1}
-  ]);
-  assert.deepEqual(exclusiveNearestPairs(left,right,[{leftIndex:1,rightIndex:0}]),[
-    {leftIndex:1,rightIndex:0},
-    {leftIndex:2,rightIndex:1}
-  ]);
 });
 
 test("approaching soldiers fan into a centered battle line", () => {
@@ -302,9 +285,6 @@ test("manual commander orders override pursuit without releasing soldier duels",
 });
 
 test("duel attacks alternate only after a successful strike", () => {
-  assert.equal(canTakeDuelTurn({mutual:true,turnId:4,attackerId:4}),true);
-  assert.equal(canTakeDuelTurn({mutual:true,turnId:9,attackerId:4}),false);
-  assert.equal(canTakeDuelTurn({mutual:false,turnId:9,attackerId:4}),true);
   assert.equal(nextDuelTurn({attackerId:4,defenderId:9,strikeLanded:false}),4);
   assert.equal(nextDuelTurn({attackerId:4,defenderId:9,strikeLanded:true}),9);
   assert.equal(nextDuelTurn({attackerId:9,defenderId:4,strikeLanded:true}),4);
@@ -356,18 +336,6 @@ test("enemy commander clears blockers without chasing unrelated soldiers", () =>
   ]});
   assert.equal(threat,0);
   assert.equal(chooseCommanderBlockerIndex({...state,soldiers:[{x:0,z:-1,alive:true,threatening:false}]}),-1);
-});
-
-test("a commander keeps attacking its living lock instead of switching targets mid-strike", () => {
-  const locked={alive:true,id:"locked"},assigned={alive:true,id:"assigned"},blocker={alive:true,id:"blocker"};
-  assert.equal(commanderEngagementTarget({lockedTarget:locked,assignedTarget:assigned,blocker}),locked);
-  locked.alive=false;
-  assert.equal(commanderEngagementTarget({lockedTarget:locked,assignedTarget:assigned,blocker}),blocker);
-  blocker.alive=false;
-  assert.equal(commanderEngagementTarget({lockedTarget:locked,assignedTarget:assigned,blocker}),assigned);
-  const melee={attackerAlive:true,victimAlive:true,opposingFactions:true,cooldown:0};
-  assert.equal(canApplyAttackDamage({...melee,distance:1.1,range:COMMANDER_MELEE_RANGE}),true);
-  assert.equal(canApplyAttackDamage({...melee,distance:1.16,range:COMMANDER_MELEE_RANGE}),false);
 });
 
 test("replacement waves spawn beyond the visible battle radius", () => {
@@ -554,21 +522,6 @@ test("a promoted company follows only its own commander movement", () => {
   assert.equal(companyLeaderMotion({ownCommanderMoving:true,primaryCommanderMoving:false}),true);
 });
 
-test("promoted companies occupy unique defensive sectors after battle", () => {
-  assert.deepEqual(postBattleCompanyOffset(0,3),{x:0,z:0});
-  const left=postBattleCompanyOffset(1,3),right=postBattleCompanyOffset(2,3);
-  assert.ok(Math.hypot(left.x,left.z)>=5);
-  assert.ok(Math.hypot(right.x,right.z)>=5);
-  assert.ok(Math.hypot(left.x-right.x,left.z-right.z)>=8);
-});
-
-test("facing ignores tiny corrections and limits necessary turns", () => {
-  assert.equal(limitedFacingAngle({current:0,target:.03,dt:.1}),0);
-  assert.equal(limitedFacingAngle({current:0,target:Math.PI,dt:.1,maxTurnRate:4}),.4);
-  const wrapped=limitedFacingAngle({current:Math.PI-.1,target:-Math.PI+.1,dt:.1,maxTurnRate:4});
-  assert.ok(wrapped>Math.PI-.1);
-});
-
 test("independent commanders spread onto available opponents", () => {
   const opponents=[
     {x:1,z:0,alive:true,isCommander:false},
@@ -616,42 +569,15 @@ test("commander regeneration is delayed and uses a slow flat rate", () => {
   assert.equal(commanderRegenHealth(499,500,enemy.regenDelay,1,enemy.regenDelay,enemy.regenPerSecond),500);
 });
 
-test("commander defeat resets army growth to the two-soldier opening strength", () => {
-  assert.deepEqual(defeatRosterPlan(14),{keep:2,remove:12,spawn:0});
-  assert.deepEqual(defeatRosterPlan(3),{keep:2,remove:1,spawn:0});
-  assert.deepEqual(defeatRosterPlan(1),{keep:1,remove:0,spawn:1});
+test("commander defeat resets army growth to the six-soldier opening strength", () => {
+  assert.deepEqual(defeatRosterPlan(14),{keep:6,remove:8,spawn:0});
+  assert.deepEqual(defeatRosterPlan(3),{keep:3,remove:0,spawn:3});
+  assert.deepEqual(defeatRosterPlan(6),{keep:6,remove:0,spawn:0});
 });
 
 test("post-respawn resolution still converts enemies defeated during the respawn pause", () => {
   assert.equal(postRespawnResolution(true),"resume");
   assert.equal(postRespawnResolution(false),"resolve-victory");
-});
-
-test("post-respawn combat rejects living targets removed from the rebuilt roster", () => {
-  const removedButAlive={userData:{alive:true}},respawned={userData:{alive:true}};
-  assert.equal(combatReferenceIsCurrent(removedButAlive,[respawned]),false);
-  assert.equal(combatReferenceIsCurrent(respawned,[respawned]),true);
-  respawned.userData.alive=false;
-  assert.equal(combatReferenceIsCurrent(respawned,[respawned]),false);
-});
-
-test("duel openings use bounded independent delays", () => {
-  assert.equal(duelOpeningDelay(0),.12);
-  assert.equal(duelOpeningDelay(1),.84);
-  assert.ok(Math.abs(advanceDuelOpening(.6,.2)-.4)<1e-9);
-  assert.equal(advanceDuelOpening(.1,.2),0);
-  assert.equal(duelPairReady({distance:.1,foeDistance:.1,mutual:true}),true);
-  assert.equal(duelPairReady({distance:.1,foeDistance:.3,mutual:true}),false);
-  assert.equal(duelPairReady({distance:.1,foeDistance:9,mutual:false}),true);
-});
-
-test("collision settling near a face-off point cannot strand a duel", () => {
-  assert.equal(duelPairReady({distance:.17,foeDistance:.17,mutual:true}),true);
-  assert.deepEqual(advanceDuelState({
-    phase:DUEL_PHASE.APPROACH,timer:0,distance:.17,dt:.1
-  }),{
-    phase:DUEL_PHASE.LUNGE,timer:.48,strike:false
-  });
 });
 
 test("a stale done flag cannot block victory after the commander revives", () => {
@@ -726,7 +652,7 @@ test("duel state visibly approaches, lunges, and recovers", () => {
 test("combat animation squashes into attacks and rebounds from damage", () => {
   const attack=combatVisualPose({attack:1,damage:0});
   assert.ok(attack.scaleZ<1);
-  assert.ok(attack.forward>=.2&&attack.forward<=.3);
+  assert.ok(attack.forward>=.4);
   const damage=combatVisualPose({attack:0,damage:1});
   assert.ok(damage.scaleX>1);
   assert.ok(damage.lift>0);

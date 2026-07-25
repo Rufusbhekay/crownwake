@@ -1,7 +1,20 @@
 export const FACTION = { PLAYER: "player", CORAL: "coral", AMBER: "amber" };
 export const SERVANT_MODE = { FOLLOW: "follow", ATTACK: "attack" };
 export const FOLLOW_AWARENESS = { HOLDING: "holding", RESPONDING: "responding", TRACKING: "tracking" };
-export const DUEL_PHASE = { APPROACH: "approach", LUNGE: "lunge", RECOVER: "recover" };
+export const DUEL_PHASE = {
+  APPROACH: "approach",
+  ANTICIPATE: "anticipate",
+  LUNGE: "lunge",
+  CONTACT: "contact",
+  RECOVER: "recover"
+};
+export const ATTACK_TIMING = Object.freeze({
+  anticipate: .18,
+  lunge: .22,
+  contact: .06,
+  recover: .34,
+  blockedGrace: .18
+});
 
 export function environmentGrade() {
   return {
@@ -379,16 +392,74 @@ export function companyDivisionPlan(soldierCount, threshold = 12) {
   };
 }
 
-export function combatVisualPose({ attack = 0, damage = 0, reducedMotion = false }) {
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep(value) {
+  const t = clamp01(value);
+  return t * t * (3 - 2 * t);
+}
+
+function attackDuration(phase, tempo = 1) {
+  const safeTempo = Math.max(.88, Math.min(1.12, tempo));
+  if (phase === DUEL_PHASE.ANTICIPATE) return ATTACK_TIMING.anticipate * safeTempo;
+  if (phase === DUEL_PHASE.LUNGE) return ATTACK_TIMING.lunge * safeTempo;
+  if (phase === DUEL_PHASE.CONTACT) return ATTACK_TIMING.contact * safeTempo;
+  if (phase === DUEL_PHASE.RECOVER) return ATTACK_TIMING.recover * safeTempo;
+  return 0;
+}
+
+export function attackPhaseProgress(phase, timer, tempo = 1) {
+  const duration = attackDuration(phase, tempo);
+  return duration > 0 ? clamp01(1 - Math.max(0, timer) / duration) : 0;
+}
+
+export function combatVisualPose({
+  attackPhase = DUEL_PHASE.APPROACH,
+  attackProgress = 0,
+  damageActive = false,
+  damageProgress = 1,
+  reducedMotion = false
+}) {
   if (reducedMotion) return { scaleX: 1, scaleY: 1, scaleZ: 1, forward: 0, lift: 0 };
-  const attackPulse = Math.sin(Math.PI * .5 * Math.max(0, Math.min(1, attack)));
-  const damagePulse = Math.sin(Math.PI * .5 * Math.max(0, Math.min(1, damage)));
+  const progress = clamp01(attackProgress);
+  let scaleX = 1, scaleY = 1, scaleZ = 1, forward = 0;
+  if (attackPhase === DUEL_PHASE.ANTICIPATE) {
+    const eased = smoothstep(progress);
+    scaleX += eased * .035;
+    scaleY -= eased * .025;
+    scaleZ -= eased * .055;
+    forward -= eased * .055;
+  } else if (attackPhase === DUEL_PHASE.LUNGE) {
+    const eased = 1 - Math.pow(1 - progress, 3);
+    scaleX += eased * .045;
+    scaleY += eased * .018;
+    scaleZ -= eased * .09;
+    forward += eased * .04;
+  } else if (attackPhase === DUEL_PHASE.CONTACT) {
+    const hold = 1 - smoothstep(progress) * .24;
+    scaleX += hold * .08;
+    scaleY += hold * .025;
+    scaleZ -= hold * .12;
+    forward += hold * .04;
+  } else if (attackPhase === DUEL_PHASE.RECOVER) {
+    const settle = Math.exp(-4.8 * progress) * Math.cos(progress * Math.PI * 2.4);
+    scaleX += settle * .045;
+    scaleY += settle * .012;
+    scaleZ -= settle * .065;
+    forward += Math.max(0, settle) * .025;
+  }
+  const damageT = clamp01(damageProgress);
+  const damagePulse = damageActive && damageT > 0 && damageT < 1
+    ? Math.sin(Math.PI * damageT) * Math.exp(-1.25 * damageT)
+    : 0;
   return {
-    scaleX: 1 + attackPulse * .08 + damagePulse * .16,
-    scaleY: 1 + attackPulse * .05 - damagePulse * .12,
-    scaleZ: 1 - attackPulse * .2 + damagePulse * .14,
-    forward: attackPulse * .42,
-    lift: damagePulse * .1
+    scaleX: scaleX + damagePulse * .12,
+    scaleY: scaleY - damagePulse * .075,
+    scaleZ: scaleZ + damagePulse * .09,
+    forward,
+    lift: damagePulse * .065
   };
 }
 
@@ -457,25 +528,53 @@ export function nextDuelTurn({ attackerId, defenderId, strikeLanded }) {
   return strikeLanded ? defenderId : attackerId;
 }
 
-export function advanceDuelState({ phase, timer, distance, strikeDistance = Infinity, strikeRange = 1.15, dt }) {
+export function canAdvanceDuelAttack({ phase, hasTurn, responseDelay = 0 }) {
+  return phase === DUEL_PHASE.CONTACT
+    || phase === DUEL_PHASE.RECOVER
+    || (hasTurn && responseDelay <= 0);
+}
+
+function roundedTimer(value) {
+  return Math.round(value * 1e6) / 1e6;
+}
+
+export function advanceDuelState({
+  phase,
+  timer,
+  distance,
+  strikeDistance = Infinity,
+  strikeRange = 1.15,
+  tempo = 1,
+  dt
+}) {
   if (phase === DUEL_PHASE.APPROACH) {
     return distance <= .16
-      ? { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false }
+      ? { phase: DUEL_PHASE.ANTICIPATE, timer: attackDuration(DUEL_PHASE.ANTICIPATE, tempo), strike: false }
       : { phase, timer: 0, strike: false };
   }
-  if (phase === DUEL_PHASE.LUNGE) {
-    const strikeArmed = timer <= .34;
-    if (strikeArmed && strikeDistance <= strikeRange) {
-      return { phase: DUEL_PHASE.RECOVER, timer: .72, strike: true };
-    }
-    const remaining = timer - dt;
+  const remaining = roundedTimer(timer - dt);
+  if (phase === DUEL_PHASE.ANTICIPATE) {
     return remaining <= 0
+      ? { phase: DUEL_PHASE.LUNGE, timer: attackDuration(DUEL_PHASE.LUNGE, tempo), strike: false }
+      : { phase, timer: remaining, strike: false };
+  }
+  if (phase === DUEL_PHASE.LUNGE) {
+    if (remaining > 0) return { phase, timer: remaining, strike: false };
+    if (strikeDistance <= strikeRange) {
+      return { phase: DUEL_PHASE.CONTACT, timer: attackDuration(DUEL_PHASE.CONTACT, tempo), strike: true };
+    }
+    return remaining <= -ATTACK_TIMING.blockedGrace
       ? { phase: DUEL_PHASE.APPROACH, timer: 0, strike: false }
       : { phase, timer: remaining, strike: false };
   }
-  return timer - dt <= 0
+  if (phase === DUEL_PHASE.CONTACT) {
+    return remaining <= 0
+      ? { phase: DUEL_PHASE.RECOVER, timer: attackDuration(DUEL_PHASE.RECOVER, tempo), strike: false }
+      : { phase, timer: remaining, strike: false };
+  }
+  return remaining <= 0
     ? { phase: DUEL_PHASE.APPROACH, timer: 0, strike: false }
-    : { phase, timer: timer - dt, strike: false };
+    : { phase, timer: remaining, strike: false };
 }
 
 export function recruitRevivalTiming(index) {

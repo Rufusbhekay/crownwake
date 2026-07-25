@@ -26,8 +26,8 @@
 - Numerical advantage: soldier duels remain strictly one-to-one; surplus soldiers assault the opposing commander and return to soldier priority whenever an opponent becomes unoccupied.
 - Primary face-off radius: 0.68 world units per duelist; commander-assault support radius: 1.38 world units.
 - Lunge begins within 0.16 world units of the assigned face-off position.
-- Duel strike: 0.14 seconds of visible wind-up followed by up to 0.34 seconds of committed lunge, landing once the attacker enters its real damage range, then a 0.72-second recovery. A blocked lunge times out and retries instead of consuming the attack turn.
-- Duel sequence: paired fighters alternate guaranteed strikes. The active fighter lunges, the receiver plays an impact scale-bounce and short recoil, then the receiver answers after recovery. Dodges and counter branches are disabled so duels stay readable.
+- Melee rhythm: every soldier and commander uses 0.18 seconds of anticipation, a 0.22-second committed body lunge, a 0.06-second contact hold, and 0.34 seconds of weighted recovery. Individual tempo varies deterministically by only ±6% so battles feel alive without becoming unreadable.
+- Duel sequence: paired fighters alternate guaranteed contact-timed strikes. The active fighter completes the committed lunge before damage fires, the receiver compresses and recoils with a damped settle, then answers after a short response delay. Dodges and counter branches remain disabled.
 - Character ground height: 0.015 world units above the streamed floor, with no idle vertical bob.
 - Floor terrain: procedural 1024-square matte grey-green surface with a thin charcoal 10×10 square grid repeated once per streamed tile; roughness 0.96, metalness 0, and no overlapping line geometry.
 - Streamed floor joins: zero geometric overscan; neighboring planes meet edge-to-edge without coplanar overlap or z-fighting.
@@ -62,8 +62,8 @@
 - Commander lives: each enemy wave begins with three hearts; a player-commander defeat removes one heart immediately. Hearts refill only when the next wave begins.
 - Victory progression waits until every converted soldier has completed its revival before scheduling the next wave.
 - Commander and soldier geometry share the same 1.22-unit visual height and the same 0.215 × 0.195 collision half-extents; commander identity is communicated by colour and health bar rather than scale.
-- Attack animation: successful melee begins at a full 0.42-unit visual lunge, closing the commander stand-off gap before compressing local depth to 80% and widening 8%, then eases back without changing the actor's logical collision position. The primary player commander uses the same stand-off pursuit and lunge path as every other commander when it has no manual order.
-- Damage animation: impact applies physical knockback away from the attacker plus an 8% vertical rebound and 12% lateral squash pulse on the visual mesh.
+- Attack animation: the actor's logical body performs the lunge so collision, selection, and rendering remain aligned. The visual mesh contributes no second leap—only a restrained 0.055-unit anticipation pullback, at most 0.04 units of contact compression, and a damped recovery settle.
+- Damage animation: impact applies a reduced physical impulse away from the attacker, followed by a 0.42-second delayed compression, 6.5% vertical rebound, and damped lateral settle instead of an instant full-amplitude pop.
 - Mobile command input: discrete ground taps only; gameplay HUD keeps compact safe-area-aware Pause, Companies, and Frontier buttons plus commander hearts, with full panels shown only while paused.
 - Camera shake is capped at 0.16 world units and can be disabled.
 - Flashes are short, low-area, and can be disabled.

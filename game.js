@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "./sim-runtime-20260724g.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, arrivalSpeed, battleApproachState, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -49,7 +49,7 @@ const PLAYER_COMMANDER=commanderCombatProfile("player"),ENEMY_COMMANDER=commande
 let master, masterHealth = PLAYER_COMMANDER.maxHealth, sinceDamage = 99, followers = [], enemyUnits = [], particles = [], tombstones = [];
 const MAX_ACTIVE_PARTICLES=180;
 let totalTime = 0, shake = 0, reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches, audioOn = true;
-let selectedRegion = 2, toastTimer = 0, nextWaveTimer = 0, waveNumber = 0;
+let selectedRegion = 2, toastTimer = 0, nextWaveTimer = 0, waveNumber = 0, enemyPackAnchor = null;
 let damagePulse = 0, damageStacks = 0;
 let commanderHearts = 3, waitingForRecruitRevival = false;
 let companyLayoutDirty=true,playerCompanies=[];
@@ -518,41 +518,34 @@ function offscreenWaveSpawn(baseAngle=rand()*Math.PI*2,avoid=[]){
   }
   return {x:behindCamera.x,z:behindCamera.z};
 }
-function currentPlayerThreat(){
-  const living=followers.filter(u=>u.userData.alive);
-  const averageHealth=living.length?living.reduce((sum,u)=>sum+u.userData.hp/u.userData.maxHp,0)/living.length:0;
-  return playerThreatScore({
-    livingSoldiers:living.length,
-    averageSoldierHealthRatio:averageHealth,
-    commanderHealthRatio:masterHealth/PLAYER_COMMANDER.maxHealth
-  });
+function enemyPackFormationPoint(anchor,index,count){
+  const offset=centeredPackOffset(index,count,1.28);
+  const forward=anchor.forward.clone().setY(0);
+  if(forward.lengthSq()<.001)forward.set(0,0,1);else forward.normalize();
+  const lateral=new THREE.Vector3(-forward.z,0,forward.x);
+  return anchor.position.clone().addScaledVector(lateral,offset.lateral).addScaledVector(forward,offset.forward);
 }
-function spawnWave(count=null,initial=false){
+function spawnWave(){
+  const count=practiceWaveSize(waveNumber);
+  if(count==null){nextWaveTimer=0;return false}
   enemyUnits.forEach(u=>battle.remove(u)); enemyUnits=[];
   waveNumber++;
   commanderHearts=3;waitingForRecruitRevival=false;updateHearts();
-  const director=initial
-    ? {soldierCount:count??STARTING_SOLDIERS,swarmCount:1,swarmSizes:[count??STARTING_SOLDIERS],threatBudget:count??STARTING_SOLDIERS}
-    : difficultyEncounter({wave:waveNumber,playerThreat:currentPlayerThreat(),fluctuationRoll:rand()});
-  count=count??director.soldierCount;
   const faction=waveNumber%2?FACTION.CORAL:FACTION.AMBER;
   const baseAngle=rand()*Math.PI*2;
-  const swarmSpawns=[];
-  director.swarmSizes.forEach((swarmSize,swarmIndex)=>{
-    const spawn=initial?{x:0,z:-5.2}:offscreenWaveSpawn(baseAngle+swarmIndex*Math.PI*.78,swarmSpawns);
-    swarmSpawns.push(spawn);
-    const center=new THREE.Vector3(spawn.x,GROUND_Y,spawn.z);
-    const rival=makeMaster(faction);rival.position.copy(center);rival.userData.anchor=center.clone();rival.userData.swarm=swarmIndex;battle.add(rival);enemyUnits.push(rival);
-    const approach=master.position.clone().sub(center).setY(0).normalize();
-    for(let i=0;i<swarmSize;i++){
-      const u=makeUnit(faction);
-      u.position.copy(formationSlot(i,swarmSize,center,approach));
-      u.position.y=GROUND_Y;u.userData.swarm=swarmIndex;u.userData.leader=rival;battle.add(u);enemyUnits.push(u);
-    }
-  });
-  activeEncounter={regionId:selectedRegion,faction,totalServants:count,aggro:false,formationTime:0,done:false,victoryResolved:false,wave:waveNumber,swarmCount:director.swarmCount,threatBudget:director.threatBudget};
+  const spawn=waveNumber===1?{x:0,z:-5.2}:offscreenWaveSpawn(baseAngle);
+  const center=new THREE.Vector3(spawn.x,GROUND_Y,spawn.z);
+  const approach=master.position.clone().sub(center).setY(0).normalize();
+  enemyPackAnchor={position:center.clone(),forward:approach.clone(),velocity:new THREE.Vector3()};
+  for(let i=0;i<count;i++){
+    const u=makeUnit(faction);
+    u.position.copy(enemyPackFormationPoint(enemyPackAnchor,i,count));
+    u.position.y=GROUND_Y;u.userData.leader=null;battle.add(u);enemyUnits.push(u);
+  }
+  activeEncounter={regionId:selectedRegion,faction,totalServants:count,aggro:false,formationTime:0,done:false,victoryResolved:false,wave:waveNumber,swarmCount:1,threatBudget:count};
+  return true;
 }
-spawnWave(STARTING_SOLDIERS,true);updateFloorTiles();
+spawnWave();updateFloorTiles();
 
 function formationSlot(i,count,leaderPos,forward,spread=0){
   const heading=Math.atan2(forward.x,forward.z), ring=Math.floor(i/8), slot=i%8;
@@ -579,6 +572,28 @@ function observedLeader(unit,leader,leaderForward,dt,urgent=false){
   }
   if(data.followState===FOLLOW_AWARENESS.TRACKING&&leader.userData.velocity.lengthSq()<.01&&moved<.1)data.followState=FOLLOW_AWARENESS.HOLDING;
   return {position:data.followAnchor,forward:data.followForward};
+}
+function updateEnemyPackAnchor(livingSoldiers,{combat,preparingForContact,dt}){
+  if(!livingSoldiers.length)return;
+  const centroid=livingSoldiers.reduce((sum,soldier)=>sum.add(soldier.position),new THREE.Vector3()).multiplyScalar(1/livingSoldiers.length);
+  centroid.y=GROUND_Y;
+  if(!enemyPackAnchor)enemyPackAnchor={position:centroid.clone(),forward:new THREE.Vector3(0,0,1),velocity:new THREE.Vector3()};
+  if(combat){
+    enemyPackAnchor.position.lerp(centroid,1-Math.exp(-1.8*dt));
+    enemyPackAnchor.velocity.multiplyScalar(Math.exp(-7*dt));
+    return;
+  }
+  const advance=master.position.clone().sub(enemyPackAnchor.position).setY(0);
+  const distance=advance.length();
+  if(distance>.001){
+    advance.normalize();
+    enemyPackAnchor.forward.lerp(advance,1-Math.exp(-3.4*dt)).normalize();
+  }
+  const targetSpeed=distance>4.8?(preparingForContact?.78:1.12):0;
+  const desiredVelocity=enemyPackAnchor.forward.clone().multiplyScalar(targetSpeed);
+  enemyPackAnchor.velocity.lerp(desiredVelocity,1-Math.exp(-3.8*dt));
+  enemyPackAnchor.position.addScaledVector(enemyPackAnchor.velocity,dt);
+  enemyPackAnchor.position.y=GROUND_Y;
 }
 function nearestAlive(from,list){const origin=from.position??from;let best=null,bd=Infinity;for(const u of list){if(!u.userData.alive)continue;const d=origin.distanceToSquared(u.position);if(d<bd){bd=d;best=u}}return best}
 function assignCommanderTargets(commanders,opponents,preferCommander){
@@ -915,7 +930,9 @@ function completeEnemyDefeat(){
     if(!followers.includes(u)){followers.push(u);companyLayoutDirty=true}
   });
   rivals.forEach(rival=>battle.remove(rival));enemyUnits=[];
-  waitingForRecruitRevival=recruits.length>0;nextWaveTimer=waitingForRecruitRevival?0:1.2;
+  enemyPackAnchor=null;
+  const hasNextWave=practiceWaveSize(waveNumber)!=null;
+  waitingForRecruitRevival=recruits.length>0;nextWaveTimer=!waitingForRecruitRevival&&hasNextWave?1.2:0;
   playSound("convert");showToast(STR.converted,2600);updateStats();
 }
 function resolveBattle(){
@@ -981,7 +998,10 @@ function updateBattle(dt){
     waitingForRecruits:waitingForRecruitRevival,
     revivingFollowerCount:followers.filter(u=>u.userData.revival).length
   });
-  if(revivalState==="advance"){waitingForRecruitRevival=false;settleCompanyAnchors();nextWaveTimer=1.2}
+  if(revivalState==="advance"){
+    waitingForRecruitRevival=false;settleCompanyAnchors();
+    nextWaveTimer=practiceWaveSize(waveNumber)!=null?1.2:0;
+  }
   if(nextWaveTimer>0){nextWaveTimer-=dt;if(nextWaveTimer<=0)spawnWave()}
   const masterDirectOrder=!!master.userData.manualMoving,masterManualOrder=masterDirectOrder||ensureCompanyAnchor(0).moving;
   if(masterManualOrder)steerTowards(master,target,2.15,5.2,dt);
@@ -1010,10 +1030,8 @@ function updateBattle(dt){
   const forward=master.userData.velocity.lengthSq()>.03?master.userData.velocity.clone().normalize():new THREE.Vector3(0,0,-1);
   const livingEnemies=enemyUnits.filter(u=>u.userData.alive);
   const livingEnemySoldiers=livingEnemies.filter(u=>!u.userData.isMaster);
-  const enemyEvading=false;
-  const masterAway=rival?master.position.clone().sub(rival.position).setY(0).normalize():new THREE.Vector3();
-  const masterRetreating=combat&&rival&&master.userData.velocity.dot(masterAway)>.35;
-  const enemyMasterRetreating=!!rival&&enemyEvading;
+  updateEnemyPackAnchor(livingEnemySoldiers,{combat,preparingForContact,dt});
+  const masterRetreating=false;
   const livingFollowers=followers.filter(u=>u.userData.alive);
   const livingPlayerCommanders=[master,...livingFollowers.filter(u=>u.userData.unitCommander)].filter(u=>u.userData.alive);
   const livingPlayerSoldiers=livingFollowers.filter(u=>!u.userData.unitCommander);
@@ -1124,9 +1142,9 @@ function updateBattle(dt){
         reposition=!arrived;
       }
     }
-    if((formingBattleLine||companyDeploying)&&livingRivals.length&&!manualOrder){
+    if((formingBattleLine||companyDeploying)&&livingEnemies.length&&!manualOrder){
       const lineOrigin=companyDeploying?anchor.position:leader.position;
-      const formationRival=nearestAlive(lineOrigin,livingRivals);
+      const formationRival=nearestAlive(lineOrigin,livingEnemies);
       const advance=formationRival.position.clone().sub(lineOrigin).setY(0).normalize(),lateral=new THREE.Vector3(-advance.z,0,advance.x);
       const lineIndex=localIndex,lineCount=company.soldiers.length;
       desired=lineOrigin.clone().addScaledVector(advance,-.35).addScaledVector(lateral,battleLineOffset(Math.max(0,lineIndex),lineCount,battleLineSpacing(lineCount)));
@@ -1197,21 +1215,16 @@ function updateBattle(dt){
       return;
     }
     let foe=enemyAssignments.get(u);
-    const ownLeader=u.userData.leader;
-    const leader=ownLeader?.userData.alive?ownLeader:nearestAlive(u,livingRivals);
-    const distanceToLeader=leader?u.position.distanceTo(leader.position):0;
+    const packIndex=Math.max(0,livingEnemySoldiers.indexOf(u));
+    const distanceToPack=enemyPackAnchor?u.position.distanceTo(enemyPackAnchor.position):0;
     const committed=!!u.userData.lockedTarget?.userData.alive||u.userData.seekingTarget;
-    u.userData.mode=chooseServantMode({combat,masterRetreating:enemyMasterRetreating,distanceToMaster:distanceToLeader,attackLeash:4.4,locked:committed});
-    const enemyForward=leader?master.position.clone().sub(leader.position).setY(0).normalize():new THREE.Vector3(0,0,1);
-    const enemyObserved=leader?observedLeader(u,leader,enemyForward,dt,enemyMasterRetreating||distanceToLeader>5):null;
-    const leaderSoldiers=leader?enemyUnits.filter(v=>!v.userData.isMaster&&v.userData.alive&&v.userData.leader===leader):[];
-    const leaderIndex=leaderSoldiers.indexOf(u);
-    let desired=leader?travelFormationSlot(Math.max(0,leaderIndex),Math.max(1,leaderSoldiers.length),enemyObserved.position,enemyObserved.forward):u.position.clone(),duelMotion=null;
-    if(formingBattleLine&&leader){
-      const advance=master.position.clone().sub(leader.position).setY(0).normalize(),lateral=new THREE.Vector3(-advance.z,0,advance.x);
-      const swarmSoldiers=livingEnemySoldiers.filter(soldier=>soldier.userData.leader===ownLeader);
-      const soldierIndex=swarmSoldiers.indexOf(u);
-      desired=leader.position.clone().addScaledVector(advance,-.55).addScaledVector(lateral,battleLineOffset(Math.max(0,soldierIndex),swarmSoldiers.length,battleLineSpacing(swarmSoldiers.length)));
+    u.userData.mode=chooseServantMode({combat,masterRetreating:false,distanceToMaster:distanceToPack,attackLeash:4.4,locked:committed});
+    let desired=enemyPackAnchor?enemyPackFormationPoint(enemyPackAnchor,packIndex,livingEnemySoldiers.length):u.position.clone(),duelMotion=null;
+    if(formingBattleLine&&enemyPackAnchor){
+      const advance=master.position.clone().sub(enemyPackAnchor.position).setY(0);
+      if(advance.lengthSq()<.001)advance.copy(enemyPackAnchor.forward);else advance.normalize();
+      const lateral=new THREE.Vector3(-advance.z,0,advance.x);
+      desired=enemyPackAnchor.position.clone().addScaledVector(advance,-.35).addScaledVector(lateral,battleLineOffset(packIndex,livingEnemySoldiers.length,battleLineSpacing(livingEnemySoldiers.length)));
     }
     if(foe&&u.userData.mode===SERVANT_MODE.ATTACK){
       duelMotion=updateDuel(u,foe,dt);
@@ -1221,15 +1234,10 @@ function updateBattle(dt){
     }
     else if(u.userData.lockedTarget)resetDuel(u);
     const spacingProfile=soldierSpacingProfile(!!duelMotion,livingEnemySoldiers.length);
-    const spacing=separationVector(u.position,[...livingRivals,...enemyUnits.filter(v=>v!==u&&!v.userData.isMaster&&v.userData.alive)],spacingProfile.distance);
+    const spacing=separationVector(u.position,enemyUnits.filter(v=>v!==u&&v.userData.alive),spacingProfile.distance);
     desired.x+=spacing.x*spacingProfile.strength;desired.z+=spacing.z*spacingProfile.strength;
-    for(const allyCommander of livingRivals){
-      const rivalForward=allyCommander.userData.velocity.lengthSq()>.03?allyCommander.userData.velocity.clone().normalize():master.position.clone().sub(allyCommander.position).setY(0).normalize();
-      const clearance=commanderClearanceVector({soldier:u.position,commander:allyCommander.position,forward:rivalForward,preferRight:(u.id&1)===0});
-      desired.x+=clearance.x*1.78;desired.z+=clearance.z*1.78;
-    }
-    if(!formingBattleLine&&!duelMotion&&leader)leashTarget(desired,leader,swarmTravelRadius(leaderSoldiers.length));
-    const catchup=Math.min(1.2,Math.max(0,distanceToLeader-2.1)*.6);
+    if(!formingBattleLine&&!duelMotion&&enemyPackAnchor)leashTarget(desired,enemyPackAnchor,swarmTravelRadius(livingEnemySoldiers.length));
+    const catchup=Math.min(1.2,Math.max(0,distanceToPack-2.1)*.6);
     const speed=duelMotion?.speed??(u.userData.mode===SERVANT_MODE.ATTACK?1.8:2.15+catchup);
     const acceleration=duelMotion?.acceleration??(u.userData.mode===SERVANT_MODE.ATTACK?4.4:6.2);
     steerTowards(u,desired,speed,acceleration,dt);

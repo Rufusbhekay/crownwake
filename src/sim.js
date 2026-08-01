@@ -658,6 +658,30 @@ export function waveSizeFromRoll(roll) {
   return 2 + Math.min(3, Math.floor(Math.max(0, roll) * 4));
 }
 
+const PRACTICE_WAVE_SIZES = Object.freeze([5, 3, 6, 4]);
+
+export function practiceWaveSize(waveIndex) {
+  return PRACTICE_WAVE_SIZES[waveIndex] ?? null;
+}
+
+export function centeredPackOffset(index, count, spacing = 1.25) {
+  const safeCount = Math.max(1, Math.floor(count));
+  const columns = Math.min(3, safeCount);
+  const safeIndex = Math.min(safeCount - 1, Math.max(0, Math.floor(index)));
+  const row = Math.floor(safeIndex / columns);
+  const rowCount = Math.min(columns, safeCount - row * columns);
+  const column = safeIndex % columns;
+  const fullRows = Math.floor(safeCount / columns);
+  const remainder = safeCount % columns;
+  const weightedRow = (
+    columns * fullRows * (fullRows - 1) * .5 + fullRows * remainder
+  ) / safeCount;
+  return {
+    lateral: (column - (rowCount - 1) * .5) * spacing,
+    forward: (weightedRow - row) * spacing
+  };
+}
+
 export function playerThreatScore({ livingSoldiers, averageSoldierHealthRatio, commanderHealthRatio }) {
   const count = Math.max(0, livingSoldiers);
   const soldierHealth = Math.max(0, Math.min(1, averageSoldierHealthRatio));

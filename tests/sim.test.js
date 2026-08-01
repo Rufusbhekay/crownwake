@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, engagementAllocation, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, SOLDIER_COMBAT_STATE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -129,16 +129,23 @@ test("combat assignments refuse targets that are already locked", () => {
   assert.equal(chooseBalancedTargetIndex([], []), -1);
 });
 
+test("a soldier keeps a duel only while both living soldiers lock each other", () => {
+  assert.equal(canMaintainSoldierDuel({unitAlive:true,targetAlive:true,mutualLock:true}),true);
+  assert.equal(canMaintainSoldierDuel({unitAlive:true,targetAlive:true,mutualLock:false}),false);
+  assert.equal(canMaintainSoldierDuel({unitAlive:true,targetAlive:false,mutualLock:true}),false);
+});
+
+test("unpaired soldiers become neutral instead of roaming during battle", () => {
+  assert.equal(soldierCombatState({combat:true,formingBattleLine:false,targetAlive:false}),SOLDIER_COMBAT_STATE.NEUTRAL);
+  assert.equal(soldierCombatState({combat:true,formingBattleLine:false,targetAlive:true}),SOLDIER_COMBAT_STATE.DUEL);
+  assert.equal(soldierCombatState({combat:true,formingBattleLine:true,targetAlive:false}),SOLDIER_COMBAT_STATE.FORMATION);
+  assert.equal(soldierCombatState({combat:false,formingBattleLine:false,targetAlive:false}),SOLDIER_COMBAT_STATE.FORMATION);
+});
+
 test("approaching soldiers fan into a centered battle line", () => {
   const offsets=[0,1,2,3].map(i=>battleLineOffset(i,4));
   assert.ok(offsets.every((value,index)=>Math.abs(value-[-3.075,-1.025,1.025,3.075][index])<1e-9));
   assert.equal(battleLineOffset(0, 1), 0);
-});
-
-test("surplus soldiers assault the commander instead of crowding occupied duels", () => {
-  assert.deepEqual(engagementAllocation(5,3),{soldierDuels:3,commanderAssaults:2});
-  assert.deepEqual(engagementAllocation(3,5),{soldierDuels:3,commanderAssaults:0});
-  assert.deepEqual(engagementAllocation(4,0),{soldierDuels:0,commanderAssaults:4});
 });
 
 test("duel winners prioritize every living soldier before the commander", () => {

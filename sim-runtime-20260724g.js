@@ -2,6 +2,17 @@ export const FACTION = { PLAYER: "player", CORAL: "coral", AMBER: "amber" };
 export const SERVANT_MODE = { FOLLOW: "follow", ATTACK: "attack" };
 export const FOLLOW_AWARENESS = { HOLDING: "holding", RESPONDING: "responding", TRACKING: "tracking" };
 export const DUEL_PHASE = { APPROACH: "approach", LUNGE: "lunge", RECOVER: "recover" };
+export const SOLDIER_COMBAT_STATE = { FORMATION: "formation", DUEL: "duel", NEUTRAL: "neutral" };
+
+export function canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock }) {
+  return Boolean(unitAlive && targetAlive && mutualLock);
+}
+
+export function soldierCombatState({ combat, formingBattleLine, targetAlive }) {
+  if (targetAlive) return SOLDIER_COMBAT_STATE.DUEL;
+  if (combat && !formingBattleLine) return SOLDIER_COMBAT_STATE.NEUTRAL;
+  return SOLDIER_COMBAT_STATE.FORMATION;
+}
 
 export function environmentGrade() {
   return {
@@ -504,11 +515,6 @@ export function advanceLaggingHealthBar({ current, lag, hold, visibleTimer, dt }
 
 export function actorCollisionProfile(kind) {
   return { x: .215, z: .195 };
-}
-
-export function engagementAllocation(attackerCount, defenderCount) {
-  const soldierDuels = Math.min(Math.max(0, attackerCount), Math.max(0, defenderCount));
-  return { soldierDuels, commanderAssaults: Math.max(0, attackerCount - soldierDuels) };
 }
 
 export function soldierSpacingProfile(inBattle, swarmSize = 1) {

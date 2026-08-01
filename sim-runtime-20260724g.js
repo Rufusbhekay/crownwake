@@ -2,16 +2,49 @@ export const FACTION = { PLAYER: "player", CORAL: "coral", AMBER: "amber" };
 export const SERVANT_MODE = { FOLLOW: "follow", ATTACK: "attack" };
 export const FOLLOW_AWARENESS = { HOLDING: "holding", RESPONDING: "responding", TRACKING: "tracking" };
 export const DUEL_PHASE = { APPROACH: "approach", LUNGE: "lunge", RECOVER: "recover" };
-export const SOLDIER_COMBAT_STATE = { FORMATION: "formation", DUEL: "duel", NEUTRAL: "neutral" };
+export const SOLDIER_COMBAT_STATE = { FORMATION: "formation", DUEL: "duel", WAITING: "waiting", NEUTRAL: "neutral" };
 
 export function canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock }) {
   return Boolean(unitAlive && targetAlive && mutualLock);
 }
 
-export function soldierCombatState({ combat, formingBattleLine, targetAlive }) {
+export function soldierCombatState({ combat, formingBattleLine, targetAlive, waitingSlot = false }) {
   if (targetAlive) return SOLDIER_COMBAT_STATE.DUEL;
+  if (combat && !formingBattleLine && waitingSlot) return SOLDIER_COMBAT_STATE.WAITING;
   if (combat && !formingBattleLine) return SOLDIER_COMBAT_STATE.NEUTRAL;
   return SOLDIER_COMBAT_STATE.FORMATION;
+}
+
+export function allocateDuelWaitingSlots(waiters, duels, preferredDuel, distanceBetween) {
+  const assignments = new Map();
+  const availableDuels = new Set(duels);
+
+  for (const waiter of waiters) {
+    const preferred = preferredDuel(waiter);
+    if (preferred && availableDuels.delete(preferred)) assignments.set(waiter, preferred);
+  }
+
+  while (availableDuels.size) {
+    let nearestWaiter = null;
+    let nearestDuel = null;
+    let nearestDistance = Infinity;
+    for (const waiter of waiters) {
+      if (assignments.has(waiter)) continue;
+      for (const duel of availableDuels) {
+        const distance = distanceBetween(waiter, duel);
+        if (distance < nearestDistance) {
+          nearestWaiter = waiter;
+          nearestDuel = duel;
+          nearestDistance = distance;
+        }
+      }
+    }
+    if (!nearestWaiter) break;
+    assignments.set(nearestWaiter, nearestDuel);
+    availableDuels.delete(nearestDuel);
+  }
+
+  return assignments;
 }
 
 export function environmentGrade() {

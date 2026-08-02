@@ -196,12 +196,12 @@ test("endless waves vary deterministically from two to five soldiers", () => {
 });
 
 test("practice session runs ten waves across three size bands", () => {
-  assert.deepEqual([0,.999].map(roll=>practiceWaveSize(0,roll)),[3,6]);
+  assert.deepEqual([0,.999].map(roll=>practiceWaveSize(0,roll)),[5,6]);
   assert.deepEqual([0,.999].map(roll=>practiceWaveSize(4,roll)),[5,7]);
   assert.deepEqual([0,.999].map(roll=>practiceWaveSize(8,roll)),[6,8]);
   assert.equal(practiceWaveSize(9,.5),7);
   assert.equal(practiceWaveSize(10,.5),null);
-  assert.equal(PRACTICE_WAVE_INTERVAL,20);
+  assert.equal(PRACTICE_WAVE_INTERVAL,10);
 });
 
 test("enemy health climbs five percent through wave five, then seven and a half percent", () => {

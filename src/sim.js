@@ -699,11 +699,11 @@ export function waveSizeFromRoll(roll) {
   return 2 + Math.min(3, Math.floor(Math.max(0, roll) * 4));
 }
 
-export const PRACTICE_WAVE_INTERVAL = 20;
+export const PRACTICE_WAVE_INTERVAL = 10;
 
 export function practiceWaveSize(waveIndex, roll = 0) {
   const index = Math.max(0, Math.floor(waveIndex));
-  const range = index < 4 ? [3, 6] : index < 8 ? [5, 7] : index < 10 ? [6, 8] : null;
+  const range = index < 4 ? [5, 6] : index < 8 ? [5, 7] : index < 10 ? [6, 8] : null;
   if (!range) return null;
   const normalizedRoll = Math.min(.999999, Math.max(0, roll));
   return range[0] + Math.floor(normalizedRoll * (range[1] - range[0] + 1));

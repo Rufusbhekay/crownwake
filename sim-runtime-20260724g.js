@@ -3,6 +3,8 @@ export const SERVANT_MODE = { FOLLOW: "follow", ATTACK: "attack" };
 export const FOLLOW_AWARENESS = { HOLDING: "holding", RESPONDING: "responding", TRACKING: "tracking" };
 export const DUEL_PHASE = { APPROACH: "approach", LUNGE: "lunge", RECOVER: "recover" };
 export const SOLDIER_COMBAT_STATE = { FORMATION: "formation", DUEL: "duel", WAITING: "waiting", NEUTRAL: "neutral" };
+export const DUEL_WAITING_DISTANCE = 3.6;
+export const THREAT_FORMATION_SCALE = 2.35;
 
 export function canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock }) {
   return Boolean(unitAlive && targetAlive && mutualLock);
@@ -45,6 +47,26 @@ export function allocateDuelWaitingSlots(waiters, duels, preferredDuel, distance
   }
 
   return assignments;
+}
+
+export function chooseNearestAvailablePair(sideA, sideB, distanceBetween = (left, right) => Math.hypot(left.x - right.x, left.z - right.z)) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (const left of sideA) for (const right of sideB) {
+    const distance = distanceBetween(left, right);
+    if (distance < bestDistance) {
+      best = { left, right, distance };
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+export function advanceFormationSpread(current, { threatDetected, dt, expandRate = 4.8, contractRate = 2.8 } = {}) {
+  const target = threatDetected ? THREAT_FORMATION_SCALE : 1;
+  const rate = target > current ? expandRate : contractRate;
+  const blend = 1 - Math.exp(-Math.max(0, rate) * Math.max(0, dt));
+  return current + (target - current) * blend;
 }
 
 export function environmentGrade() {

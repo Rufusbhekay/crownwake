@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, THREAT_FORMATION_SCALE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -156,6 +156,29 @@ test("free soldiers reserve at most one stay-around slot per active duel", () =>
   assert.equal(assignments.get("near-b"),duelB);
   assert.equal(assignments.has("also-near-a"),false);
   assert.equal(new Set(assignments.values()).size,assignments.size);
+});
+
+test("waiting soldiers hold well outside the active duel", () => {
+  assert.ok(DUEL_WAITING_DISTANCE > 1.62 * 2);
+});
+
+test("free soldiers choose the closest available opponent pair", () => {
+  const pair = chooseNearestAvailablePair(
+    [{ id: "left-a", x: 0, z: 0 }, { id: "left-b", x: 8, z: 0 }],
+    [{ id: "right-a", x: 6, z: 0 }, { id: "right-b", x: 1, z: 0 }],
+    (left, right) => Math.hypot(left.x - right.x, left.z - right.z)
+  );
+  assert.equal(pair.left.id, "left-a");
+  assert.equal(pair.right.id, "right-b");
+});
+
+test("threatened formations expand beyond double spacing and settle back", () => {
+  const expanded = advanceFormationSpread(1, { threatDetected: true, dt: 1 });
+  assert.ok(expanded > 2);
+  assert.ok(expanded < THREAT_FORMATION_SCALE);
+  const settled = advanceFormationSpread(THREAT_FORMATION_SCALE, { threatDetected: false, dt: 1 });
+  assert.ok(settled > 1);
+  assert.ok(settled < THREAT_FORMATION_SCALE);
 });
 
 test("duel winners prioritize every living soldier before the commander", () => {

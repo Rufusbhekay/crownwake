@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, practiceEnemyHealthMultiplier, practiceWaveSize, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, practiceEnemyHealthMultiplier, practiceWaveSize, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -105,15 +105,24 @@ function setWidgetFill(mesh,ratio,width,height){
   mesh.scale.set(width*value,height,1);mesh.position.x=-width*(1-value)*.5;
 }
 const soldierBarGeometry=new THREE.PlaneGeometry(1,1);
+const healthDamageTexture=(()=>{
+  const canvas=document.createElement("canvas");canvas.width=64;canvas.height=16;
+  const context=canvas.getContext("2d");
+  context.fillStyle="#54595a";context.fillRect(0,0,canvas.width,canvas.height);
+  context.strokeStyle="#a9adab";context.lineWidth=1.5;
+  for(let x=-16;x<canvas.width+16;x+=7){context.beginPath();context.moveTo(x,canvas.height);context.lineTo(x+16,0);context.stroke()}
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearFilter;texture.magFilter=THREE.LinearFilter;return texture;
+})();
 function makeActorHealthWidget(unit,commander=false){
   const group=new THREE.Group();
-  const layer=(color,width,height,z,order)=>{
-    const mesh=new THREE.Mesh(soldierBarGeometry,new THREE.MeshBasicMaterial({color,transparent:true,opacity:.93,depthTest:false,depthWrite:false}));
+  const layer=(color,width,height,z,order,map=null)=>{
+    const mesh=new THREE.Mesh(soldierBarGeometry,new THREE.MeshBasicMaterial({color,map,transparent:true,opacity:.93,depthTest:false,depthWrite:false}));
     mesh.scale.set(width,height,1);mesh.position.z=z;mesh.renderOrder=order;mesh.frustumCulled=false;group.add(mesh);return mesh;
   };
   const width=commander?.88:.59,height=commander?.06:.055;
-  layer(0x253033,commander?1:.68,commander?.12:.105,0,33);
-  const lag=layer(0xffe0aa,width,height,.01,34),main=layer(0x35c9c2,width,height,.02,35);
+  layer(0x253033,width,commander?.12:.105,0,33);
+  const lag=layer(0xffffff,width,height,.01,34,healthDamageTexture),main=layer(0x35c9c2,width,height,.02,35);
+  lag.visible=false;
   group.position.y=commander?1.52:1.42;group.visible=commander;unit.add(group);
   group.userData={current:unit.userData.hp,lagHealth:unit.userData.hp,hold:0,visibleTimer:0,main,lag,width,height,alwaysVisible:commander};
   unit.userData.healthWidget=group;
@@ -121,7 +130,7 @@ function makeActorHealthWidget(unit,commander=false){
 function showActorHealth(unit,previousHealth){
   const data=unit.userData.healthWidget?.userData;if(!data)return;
   data.current=Math.max(0,unit.userData.hp);data.lagHealth=Math.max(data.lagHealth,previousHealth);
-  data.hold=.24;data.visibleTimer=data.alwaysVisible?Infinity:1.6;
+  data.hold=.24;data.visibleTimer=data.alwaysVisible?Infinity:SOLDIER_HEALTH_WIDGET_DURATION;
   data.main.material.color.setHex(unit.userData.faction==="player"?COLORS.player:unit.userData.isMaster?COLORS.coral:COLORS.amber);
   unit.userData.healthWidget.visible=true;
 }
@@ -133,7 +142,8 @@ function updateActorHealthWidgets(dt){
     const state=advanceLaggingHealthBar({current:data.current,lag:data.lagHealth,hold:data.hold,visibleTimer:data.visibleTimer,dt});
     data.lagHealth=state.lag;data.hold=state.hold;data.visibleTimer=data.alwaysVisible?Infinity:state.visibleTimer;widget.visible=data.alwaysVisible||state.visible;
     const max=Math.max(1,unit.userData.maxHp);
-    setWidgetFill(data.lag,state.lag/max,data.width,data.height);setWidgetFill(data.main,data.current/max,data.width,data.height);
+    data.lag.visible=state.lag>state.current+.001;data.lag.scale.set(data.width,data.height,1);data.lag.position.x=0;
+    setWidgetFill(data.main,data.current/max,data.width,data.height);
     widget.quaternion.copy(unit.quaternion).invert().multiply(camera.quaternion);
   }
 }

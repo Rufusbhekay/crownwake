@@ -541,6 +541,8 @@ export function shouldReleaseCombatCommitment(combat, livingEnemyCount) {
   return !combat || livingEnemyCount === 0;
 }
 
+export const SOLDIER_HEALTH_WIDGET_DURATION = 3.2;
+
 export function advanceLaggingHealthBar({ current, lag, hold, visibleTimer, dt }) {
   const nextHold = Math.max(0, hold - dt);
   const nextLag = nextHold > 0 ? Math.max(current, lag) : Math.max(current, lag - 45 * dt);

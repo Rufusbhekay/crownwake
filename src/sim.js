@@ -258,14 +258,6 @@ export function chooseBalancedTargetIndex(distances, loads) {
   return best;
 }
 
-export function battleLineOffset(index, count, spacing = 2.05) {
-  return (index - (count - 1) * .5) * spacing;
-}
-
-export function battleLineSpacing(count) {
-  return 1.72 + Math.min(.33, Math.max(0, count - 4) * .035);
-}
-
 export function activeCombatantPoints(actors) {
   return actors
     .filter(actor => (actor?.alive ?? actor?.userData?.alive) !== false && actor?.position)
@@ -286,18 +278,6 @@ export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, pa
     x: (minX + maxX) * .5,
     z: (minZ + maxZ) * .5,
     scale
-  };
-}
-
-export function battleLineFormationDuration(count) {
-  return 1.65 + Math.min(5.2, Math.max(0, count - 4) * .45);
-}
-
-export function battlePreparationState({ combat, formationTime, livingFollowerCount, livingEnemySoldierCount }) {
-  const formationSize = Math.max(livingFollowerCount, livingEnemySoldierCount);
-  return {
-    formationSize,
-    formingBattleLine: combat && formationTime < battleLineFormationDuration(formationSize)
   };
 }
 
@@ -697,10 +677,21 @@ export function waveSizeFromRoll(roll) {
   return 2 + Math.min(3, Math.floor(Math.max(0, roll) * 4));
 }
 
-const PRACTICE_WAVE_SIZES = Object.freeze([5, 3, 6, 4]);
+export const PRACTICE_WAVE_INTERVAL = 20;
 
-export function practiceWaveSize(waveIndex) {
-  return PRACTICE_WAVE_SIZES[waveIndex] ?? null;
+export function practiceWaveSize(waveIndex, roll = 0) {
+  const index = Math.max(0, Math.floor(waveIndex));
+  const range = index < 4 ? [3, 6] : index < 8 ? [5, 7] : index < 10 ? [6, 8] : null;
+  if (!range) return null;
+  const normalizedRoll = Math.min(.999999, Math.max(0, roll));
+  return range[0] + Math.floor(normalizedRoll * (range[1] - range[0] + 1));
+}
+
+export function practiceEnemyHealthMultiplier(waveNumber) {
+  const wave = Math.max(1, Math.min(10, Math.floor(waveNumber)));
+  const fivePercentSteps = Math.min(4, wave - 1);
+  const sevenPointFivePercentSteps = Math.max(0, wave - 5);
+  return 1.05 ** fivePercentSteps * 1.075 ** sevenPointFivePercentSteps;
 }
 
 export function centeredPackOffset(index, count, spacing = 1.25) {

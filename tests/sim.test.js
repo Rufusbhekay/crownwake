@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, SOLDIER_COMBAT_STATE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLineFormationDuration, battleLineOffset, battleLineSpacing, battlePreparationState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -158,12 +158,6 @@ test("free soldiers reserve at most one stay-around slot per active duel", () =>
   assert.equal(new Set(assignments.values()).size,assignments.size);
 });
 
-test("approaching soldiers fan into a centered battle line", () => {
-  const offsets=[0,1,2,3].map(i=>battleLineOffset(i,4));
-  assert.ok(offsets.every((value,index)=>Math.abs(value-[-3.075,-1.025,1.025,3.075][index])<1e-9));
-  assert.equal(battleLineOffset(0, 1), 0);
-});
-
 test("duel winners prioritize every living soldier before the commander", () => {
   const living={alive:true,id:"soldier"},fallen={alive:false,id:"fallen"},commander={alive:true,id:"commander"};
   assert.deepEqual(prioritizedOpponents([fallen,living],commander),[living]);
@@ -178,10 +172,20 @@ test("endless waves vary deterministically from two to five soldiers", () => {
   assert.equal(waveSizeFromRoll(.99), 5);
 });
 
-test("practice session runs exactly four waves in the requested order", () => {
-  assert.deepEqual([0,1,2,3].map(practiceWaveSize),[5,3,6,4]);
-  assert.equal(practiceWaveSize(4),null);
-  assert.ok([0,1,2,3].map(practiceWaveSize).every(count=>count>=3&&count<=6));
+test("practice session runs ten waves across three size bands", () => {
+  assert.deepEqual([0,.999].map(roll=>practiceWaveSize(0,roll)),[3,6]);
+  assert.deepEqual([0,.999].map(roll=>practiceWaveSize(4,roll)),[5,7]);
+  assert.deepEqual([0,.999].map(roll=>practiceWaveSize(8,roll)),[6,8]);
+  assert.equal(practiceWaveSize(9,.5),7);
+  assert.equal(practiceWaveSize(10,.5),null);
+  assert.equal(PRACTICE_WAVE_INTERVAL,20);
+});
+
+test("enemy health climbs five percent through wave five, then seven and a half percent", () => {
+  assert.equal(practiceEnemyHealthMultiplier(1),1);
+  assert.ok(Math.abs(practiceEnemyHealthMultiplier(5)-1.05**4)<1e-12);
+  assert.ok(Math.abs(practiceEnemyHealthMultiplier(6)-1.05**4*1.075)<1e-12);
+  assert.ok(Math.abs(practiceEnemyHealthMultiplier(10)-1.05**4*1.075**5)<1e-12);
 });
 
 test("leaderless enemy packs center every soldier around one shared anchor", () => {
@@ -225,14 +229,6 @@ test("exactly every third climbing encounter divides pressure between two swarms
   assert.equal(difficultyEncounter({wave:3,playerThreat:1,fluctuationRoll:0}).swarmCount,2);
 });
 
-test("larger armies widen their pre-battle horizontal frontage", () => {
-  assert.equal(battleLineSpacing(4),1.72);
-  assert.ok(battleLineSpacing(8)>battleLineSpacing(4));
-  assert.ok(battleLineSpacing(20)<=2.05);
-  assert.ok(battleLineFormationDuration(12)>battleLineFormationDuration(4));
-  assert.ok(battleLineFormationDuration(40)<=6.85);
-});
-
 test("tactical camera centers separated combatants and zooms only as much as needed", () => {
   const close=tacticalCameraFrame([{x:-2,z:1},{x:2,z:-1}],{aspect:16/9});
   assert.deepEqual(close,{x:0,z:0,scale:1});
@@ -247,14 +243,6 @@ test("tactical camera centers separated combatants and zooms only as much as nee
 test("tactical camera safely handles empty and extreme combat frames", () => {
   assert.equal(tacticalCameraFrame([]),null);
   assert.equal(tacticalCameraFrame([{x:0,z:0},{x:200,z:200}]).scale,1.58);
-});
-
-test("battle preparation derives safely from the current living armies", () => {
-  assert.deepEqual(
-    battlePreparationState({combat:true,formationTime:1,livingFollowerCount:4,livingEnemySoldierCount:8}),
-    {formationSize:8,formingBattleLine:true}
-  );
-  assert.equal(battlePreparationState({combat:false,formationTime:0,livingFollowerCount:4,livingEnemySoldierCount:4}).formingBattleLine,false);
 });
 
 test("large travel formations widen through four visual lanes", () => {

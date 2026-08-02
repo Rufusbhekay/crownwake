@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, practiceEnemyHealthMultiplier, practiceWaveSize, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, THREAT_FORMATION_SCALE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, formationExpansionOffset, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, practiceEnemyHealthMultiplier, practiceWaveSize, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -115,22 +115,23 @@ const healthDamageTexture=(()=>{
 })();
 function makeActorHealthWidget(unit,commander=false){
   const group=new THREE.Group();
+  const stripedDamageBackground=unit.userData.faction==="player";
   const layer=(color,width,height,z,order,map=null)=>{
     const mesh=new THREE.Mesh(soldierBarGeometry,new THREE.MeshBasicMaterial({color,map,transparent:true,opacity:.93,depthTest:false,depthWrite:false}));
     mesh.scale.set(width,height,1);mesh.position.z=z;mesh.renderOrder=order;mesh.frustumCulled=false;group.add(mesh);return mesh;
   };
   const width=commander?.88:.59,height=commander?.06:.055;
-  layer(0x253033,width,commander?.12:.105,0,33);
-  const lag=layer(0xffffff,width,height,.01,34,healthDamageTexture),main=layer(0x35c9c2,width,height,.02,35);
-  lag.visible=false;
+  layer(0x253033,stripedDamageBackground?width:commander?1:.68,commander?.12:.105,0,33);
+  const lag=layer(stripedDamageBackground?0xffffff:0xffe0aa,width,height,.01,34,stripedDamageBackground?healthDamageTexture:null),main=layer(0x35c9c2,width,height,.02,35);
+  lag.visible=!stripedDamageBackground;
   group.position.y=commander?1.52:1.42;group.visible=commander;unit.add(group);
-  group.userData={current:unit.userData.hp,lagHealth:unit.userData.hp,hold:0,visibleTimer:0,main,lag,width,height,alwaysVisible:commander};
+  group.userData={current:unit.userData.hp,lagHealth:unit.userData.hp,hold:0,visibleTimer:0,main,lag,width,height,alwaysVisible:commander,stripedDamageBackground};
   unit.userData.healthWidget=group;
 }
 function showActorHealth(unit,previousHealth){
   const data=unit.userData.healthWidget?.userData;if(!data)return;
   data.current=Math.max(0,unit.userData.hp);data.lagHealth=Math.max(data.lagHealth,previousHealth);
-  data.hold=.24;data.visibleTimer=data.alwaysVisible?Infinity:SOLDIER_HEALTH_WIDGET_DURATION;
+  data.hold=.24;data.visibleTimer=data.alwaysVisible?Infinity:data.stripedDamageBackground?SOLDIER_HEALTH_WIDGET_DURATION:SOLDIER_HEALTH_WIDGET_DURATION*.5;
   data.main.material.color.setHex(unit.userData.faction==="player"?COLORS.player:unit.userData.isMaster?COLORS.coral:COLORS.amber);
   unit.userData.healthWidget.visible=true;
 }
@@ -142,7 +143,8 @@ function updateActorHealthWidgets(dt){
     const state=advanceLaggingHealthBar({current:data.current,lag:data.lagHealth,hold:data.hold,visibleTimer:data.visibleTimer,dt});
     data.lagHealth=state.lag;data.hold=state.hold;data.visibleTimer=data.alwaysVisible?Infinity:state.visibleTimer;widget.visible=data.alwaysVisible||state.visible;
     const max=Math.max(1,unit.userData.maxHp);
-    data.lag.visible=state.lag>state.current+.001;data.lag.scale.set(data.width,data.height,1);data.lag.position.x=0;
+    if(data.stripedDamageBackground){data.lag.visible=state.lag>state.current+.001;data.lag.scale.set(data.width,data.height,1);data.lag.position.x=0}
+    else setWidgetFill(data.lag,state.lag/max,data.width,data.height);
     setWidgetFill(data.main,data.current/max,data.width,data.height);
     widget.quaternion.copy(unit.quaternion).invert().multiply(camera.quaternion);
   }
@@ -343,6 +345,11 @@ function formationPoint(anchor,offset){
   const lateral=new THREE.Vector3(-forward.z,0,forward.x);
   return anchor.position.clone().addScaledVector(lateral,offset.lateral).addScaledVector(forward,-offset.trailing);
 }
+function companyBattleFormationOffset(index,count,expansionProgress){
+  const base=companyFormationOffset(index,count,1.42);
+  const expansion=formationExpansionOffset(index,count,expansionProgress,6);
+  return {lateral:base.lateral+expansion.lateral,trailing:base.trailing-expansion.forward};
+}
 function settleCompanyAnchors(){
   for(const company of ensureCompanyLayout()){
     const anchor=ensureCompanyAnchor(company.groupIndex);
@@ -528,8 +535,10 @@ function offscreenWaveSpawn(baseAngle=rand()*Math.PI*2,avoid=[]){
   }
   return {x:behindCamera.x,z:behindCamera.z};
 }
-function enemyPackFormationPoint(anchor,index,count,spacingScale=1){
-  const offset=centeredPackOffset(index,count,1.28*spacingScale);
+function enemyPackFormationPoint(anchor,index,count,expansionProgress=0){
+  const base=centeredPackOffset(index,count,1.28);
+  const expansion=formationExpansionOffset(index,count,expansionProgress,3);
+  const offset={lateral:base.lateral+expansion.lateral,forward:base.forward+expansion.forward};
   const forward=anchor.forward.clone().setY(0);
   if(forward.lengthSq()<.001)forward.set(0,0,1);else forward.normalize();
   const lateral=new THREE.Vector3(-forward.z,0,forward.x);
@@ -1053,6 +1062,7 @@ function updateBattle(dt){
   const threatDetected=!!activeEncounter&&!activeEncounter.done&&approachState!=="travel";
   if(activeEncounter)activeEncounter.formationSpread=advanceFormationSpread(activeEncounter.formationSpread??1,{threatDetected,dt});
   const formationSpread=activeEncounter?.formationSpread??1;
+  const expansionProgress=THREE.MathUtils.clamp((formationSpread-1)/(THREAT_FORMATION_SCALE-1),0,1);
   const combat=activeEncounter?.aggro&&enemyUnits.some(u=>u.userData.alive)&&threatDetected;
   const preparingForContact=!!activeEncounter&&!activeEncounter.done&&!combat&&approachState==="deploy";
   if(!combat&&wasCombat)settleCompanyAnchors();
@@ -1156,13 +1166,13 @@ function updateBattle(dt){
     const ownCommanderLeading=companyLeaderMoving.get(company.groupIndex);
     const commandState=companyCommandState({manualOrder,combat,enemyDetected:companyDeploying||preparingForContact,commanderMoving:ownCommanderLeading||anchor.followingCommander});
     if(manualOrder&&combatState===SOLDIER_COMBAT_STATE.FORMATION){
-      const offset=companyFormationOffset(localIndex,company.soldiers.length,1.42*formationSpread);
+      const offset=companyBattleFormationOffset(localIndex,company.soldiers.length,expansionProgress);
       desired.copy(formationPoint(anchor,offset));
       const arrived=u.position.distanceTo(desired)<.14;
       reposition=!arrived;u.userData.holdPosition=arrived?desired.clone():null;
     }else if(!combat){
       if(commandState==="follow"||commandState==="deploy"){
-        const offset=companyFormationOffset(localIndex,company.soldiers.length,1.42*formationSpread);
+        const offset=companyBattleFormationOffset(localIndex,company.soldiers.length,expansionProgress);
         const movingAnchor={position:observed.position,forward:observed.forward};
         desired=formationPoint(movingAnchor,offset);
         const arrived=u.position.distanceTo(desired)<.1;
@@ -1247,7 +1257,7 @@ function updateBattle(dt){
     const distanceToPack=enemyPackAnchor?u.position.distanceTo(enemyPackAnchor.position):0;
     const combatState=soldierCombatState({combat,formingBattleLine:false,targetAlive:!!foe?.userData.alive,waitingSlot:!!waitingDuel});
     u.userData.mode=combatState===SOLDIER_COMBAT_STATE.DUEL?SERVANT_MODE.ATTACK:SERVANT_MODE.FOLLOW;
-    let desired=enemyPackAnchor?enemyPackFormationPoint(enemyPackAnchor,packIndex,livingEnemySoldiers.length,formationSpread):u.position.clone(),duelMotion=null;
+    let desired=enemyPackAnchor?enemyPackFormationPoint(enemyPackAnchor,packIndex,livingEnemySoldiers.length,expansionProgress):u.position.clone(),duelMotion=null;
     if(waitingDuel)desired=duelWaitingPoint(u,waitingDuel);
     if(foe&&u.userData.mode===SERVANT_MODE.ATTACK){
       duelMotion=updateDuel(u,foe,dt);

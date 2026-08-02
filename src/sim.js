@@ -405,6 +405,25 @@ export function companyFormationOffset(index, count, spacing = 1.35) {
   };
 }
 
+export function formationExpansionOffset(index, count, progress, columns = 3) {
+  const safeCount = Math.max(1, Math.floor(count));
+  const safeColumns = Math.max(1, Math.min(Math.floor(columns), safeCount));
+  const safeIndex = Math.min(safeCount - 1, Math.max(0, Math.floor(index)));
+  const row = Math.floor(safeIndex / safeColumns);
+  const rowCount = Math.min(safeColumns, safeCount - row * safeColumns);
+  const column = safeIndex % safeColumns;
+  const rows = Math.ceil(safeCount / safeColumns);
+  const lateralRadius = Math.max(.5, (safeColumns - 1) * .5);
+  const depthRadius = Math.max(.5, (rows - 1) * .5);
+  const lateralDistance = Math.abs(column - (rowCount - 1) * .5) / lateralRadius;
+  const depthDistance = Math.abs(row - (rows - 1) * .5) / depthRadius;
+  const edgeScore = Math.min(1, (lateralDistance + depthDistance * .55) / 1.55);
+  const threshold = edgeScore > .58 ? 0 : edgeScore > .28 ? .34 : .67;
+  const activation = Math.max(0, Math.min(1, (Math.max(0, Math.min(1, progress)) - threshold) / .33));
+  const sideBias = safeIndex % 5 === 1 ? -1 : safeIndex % 5 === 3 ? 1 : 0;
+  return { activation, forward: 1.35 * activation, lateral: .46 * sideBias * activation };
+}
+
 export function commanderFormationOffset(spacing = 1.35) {
   return { lateral: 0, trailing: -spacing };
 }

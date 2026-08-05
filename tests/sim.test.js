@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, THREAT_FORMATION_SCALE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, formationExpansionOffset, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, THREAT_FORMATION_SCALE, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, formationExpansionOffset, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -210,7 +210,74 @@ test("practice session runs ten waves across three size bands", () => {
   assert.deepEqual([0,.999].map(roll=>practiceWaveSize(8,roll)),[6,8]);
   assert.equal(practiceWaveSize(9,.5),7);
   assert.equal(practiceWaveSize(10,.5),null);
-  assert.equal(PRACTICE_WAVE_INTERVAL,10);
+  assert.equal(PRACTICE_WAVE_INTERVAL,5);
+  assert.deepEqual([0,.5,.999].map(practiceWaveInterval),[5,6,7]);
+});
+
+test("incoming waves widen the camera only before they arrive", () => {
+  assert.equal(incomingWaveCameraState({ distance: 24 }),"default");
+  assert.equal(incomingWaveCameraState({ distance: 14 }),"preview");
+  assert.equal(incomingWaveCameraState({ distance: 6.2 }),"default");
+});
+
+test("dividing a company widens the persistent gameplay framing in small capped steps", () => {
+  assert.equal(cameraBaselineAfterDivision(1),1.12);
+  assert.equal(cameraBaselineAfterDivision(1.12),1.24);
+  assert.equal(cameraBaselineAfterDivision(1.34),1.34);
+});
+
+test("line of sight blocks only when an obstacle sits in the combat corridor", () => {
+  assert.equal(lineOfSightBlocked({ x: 0, z: 0 }, { x: 10, z: 0 }, [{ x: 4, z: .05, radius: .28 }]), true);
+  assert.equal(lineOfSightBlocked({ x: 0, z: 0 }, { x: 10, z: 0 }, [{ x: 4, z: 1.2, radius: .28 }]), false);
+});
+
+test("actor debug snapshots summarize action, blockers, and combat timings", () => {
+  const actor = {
+    id: 7,
+    position: { x: 0, z: 0 },
+    userData: {
+      alive: true,
+      hp: 18,
+      maxHp: 24,
+      faction: "player",
+      lockedTarget: { id: 9, userData: { alive: true } },
+      duelPhase: DUEL_PHASE.APPROACH,
+      attackAnim: 0,
+      damageAnim: 0,
+      cool: .42,
+      waitingDuelTarget: { id: 2 },
+      pathFailures: 2,
+      pathStallTimer: .3,
+      hitPulse: 0,
+      manualMoving: false
+    }
+  };
+  const target = { id: 9, position: { x: 2, z: 0 }, userData: { alive: true, lockedTarget: actor } };
+  const snapshot = actorDebugSnapshot({
+    actor,
+    target,
+    combat: true,
+    targetDistance: 2,
+    lineOfSight: false,
+    pathBlocked: true,
+    collisionContacts: .4,
+    attackRange: 1.05,
+    now: 12.5
+  });
+  assert.equal(snapshot.action, "seeking");
+  assert.equal(snapshot.alive, true);
+  assert.equal(snapshot.targetAlive, true);
+  assert.equal(snapshot.locked, true);
+  assert.equal(snapshot.lineOfSight, false);
+  assert.equal(snapshot.targetLockedByOther, false);
+  assert.deepEqual(snapshot.blockers, [
+    "waiting for duel slot",
+    "cooldown 0.42s",
+    "out of range 2.00/1.05",
+    "line of sight blocked",
+    "path stalled 2",
+    "collision blocked"
+  ]);
 });
 
 test("enemy health climbs five percent through wave five, then seven and a half percent", () => {

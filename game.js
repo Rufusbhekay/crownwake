@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, THREAT_FORMATION_SCALE, actorCollisionProfile, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, formationExpansionOffset, hiddenWaveSpawn, hitKnockback, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, practiceEnemyHealthMultiplier, practiceWaveSize, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, THREAT_FORMATION_SCALE, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, formationExpansionOffset, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, limitPointToRadius, lineOfSightBlocked, makeCampaign, nextDuelTurn, particleBudgetAllows, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, recruitRevivalTiming, resolveBoxOverlap, revivalProgressionState, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -26,6 +26,10 @@ const camera = new THREE.PerspectiveCamera(37, innerWidth / innerHeight, 0.1, 16
 camera.position.set(12, 18, 18);
 const gameplayCameraFocus = new THREE.Vector3();
 let gameplayCameraScale = 1;
+let gameplayCameraBaselineScale = 1;
+const debugMode = new URLSearchParams(location.search).has("dev");
+let debugPanelVisible = false;
+let debugFocusId = null;
 
 scene.add(new THREE.HemisphereLight(0xf3f0e5, 0x566466, ENVIRONMENT.hemisphereIntensity));
 const sun = new THREE.DirectionalLight(0xf7f1df, ENVIRONMENT.sunIntensity);
@@ -49,13 +53,15 @@ const PLAYER_COMMANDER=commanderCombatProfile("player"),ENEMY_COMMANDER=commande
 let master, masterHealth = PLAYER_COMMANDER.maxHealth, sinceDamage = 99, followers = [], enemyUnits = [], particles = [], tombstones = [];
 const MAX_ACTIVE_PARTICLES=180;
 let totalTime = 0, shake = 0, reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches, audioOn = true;
-let selectedRegion = 2, toastTimer = 0, nextWaveTimer = PRACTICE_WAVE_INTERVAL, waveNumber = 0, enemyPackAnchor = null;
+let selectedRegion = 2, toastTimer = 0, nextWaveTimer = practiceWaveInterval(rand()), waveNumber = 0, enemyPackAnchor = null;
 let damagePulse = 0, damageStacks = 0;
 let commanderHearts = 3, waitingForRecruitRevival = false;
 let companyLayoutDirty=true,playerCompanies=[];
 let selectedCompanyId=null,selectedCommander=null,commandHoverCell=null,wasCombat=false;
 const companyAnchors=new Map(),selectionVisuals=[],COMMAND_CELL=3.6,COMMAND_GRID_OFFSET=1.8;
 const padPrev = new Set();
+const debugPanel = $("dev");
+const debugButton = $("debug");
 const sounds = {
   music: Object.assign(new Audio("./assets/battle_music.m4a"), { loop: true, volume: .16 }),
   move: Object.assign(new Audio("./assets/move_confirm.mp3"), { volume: .28 }),
@@ -246,6 +252,132 @@ function updateSoldierDamageEffects(dt) {
       if(material.emissive){material.emissive.copy(baseEmissive??new THREE.Color()).lerp(new THREE.Color(0xff5533),pulse);material.emissiveIntensity=.12+pulse*2}
     }
   }
+}
+
+function decayDebugSignals(dt) {
+  for (const actor of [master, ...followers, ...enemyUnits]) {
+    if (!actor?.userData) continue;
+    actor.userData.collisionContacts = Math.max(0, (actor.userData.collisionContacts ?? 0) - dt * 2.8);
+  }
+}
+
+function unitLabel(unit) {
+  if (!unit) return "none";
+  const side = unit.userData.faction === "player" ? "P" : "E";
+  const role = unit.userData.isMaster ? "commander" : unit.userData.unitCommander ? "promoted" : "soldier";
+  return `${side}-${role}-${String(unit.id ?? 0).slice(-4)}`;
+}
+
+function allLiveUnits() {
+  return [master, ...followers, ...enemyUnits].filter(Boolean);
+}
+
+function debugObstaclesFor(unit, target = null) {
+  return allLiveUnits()
+    .filter(other => other !== unit && other !== target && other.userData.alive !== false)
+    .map(other => ({
+      x: other.position.x,
+      z: other.position.z,
+      radius: Math.max(other.userData.collisionHalf?.x ?? .2, other.userData.collisionHalf?.z ?? .2)
+    }));
+}
+
+function debugTargetFor(unit) {
+  return unit.userData.lockedTarget ?? unit.userData.waitingDuelTarget ?? unit.userData.commanderTarget ?? null;
+}
+
+function debugSnapshotFor(unit) {
+  const target = debugTargetFor(unit);
+  const targetDistance = target?.position ? unit.position.distanceTo(target.position) : null;
+  const obstacles = target ? debugObstaclesFor(unit, target) : [];
+  const lineOfSight = target ? !lineOfSightBlocked(unit.position, target.position, obstacles, unit.userData.isMaster ? .42 : .34) : true;
+  const collisionContacts = unit.userData.collisionContacts ?? 0;
+  return actorDebugSnapshot({
+    actor: unit,
+    target,
+    combat: !!activeEncounter && !activeEncounter.done && activeEncounter.aggro,
+    targetDistance,
+    lineOfSight,
+    pathBlocked: (unit.userData.pathFailures ?? 0) > 0 || (unit.userData.pathStallTimer ?? 0) > .18,
+    collisionContacts,
+    attackRange: unit.userData.isMaster ? 1.4 : 1.05,
+    now: totalTime
+  });
+}
+
+function debugStateLabel(snapshot) {
+  if (!snapshot.alive) return "down";
+  if (snapshot.action === "fleeing") return "fleeing";
+  if (snapshot.action === "stunned") return "stunned";
+  if (snapshot.action === "attacking") return "attacking";
+  if (snapshot.action === "seeking") return "seeking";
+  if (snapshot.combatState === DUEL_PHASE.APPROACH || snapshot.combatState === DUEL_PHASE.LUNGE || snapshot.combatState === DUEL_PHASE.RECOVER) return "combat";
+  if (snapshot.action === "moving") return "moving";
+  return "idle";
+}
+
+function renderDebugMonitor() {
+  if (!debugMode || !debugPanelVisible) return;
+  const snapshots = allLiveUnits().map(unit => ({ unit, snapshot: debugSnapshotFor(unit) }));
+  const focus = snapshots.find(entry => entry.unit.id === debugFocusId)?.unit ?? snapshots[0]?.unit ?? null;
+  if (!debugFocusId && focus) debugFocusId = focus.id;
+  const selected = snapshots.find(entry => entry.unit.id === debugFocusId)?.snapshot ?? snapshots[0]?.snapshot ?? null;
+  const activeCount = snapshots.filter(entry => entry.snapshot.alive).length;
+  const attackingCount = snapshots.filter(entry => entry.snapshot.action === "attacking").length;
+  const waitingCount = snapshots.filter(entry => entry.snapshot.blockers.includes("waiting for duel slot")).length;
+  debugPanel.innerHTML = `
+    <div class="debug-shell">
+      <div class="debug-head">
+        <strong>AI MONITOR</strong>
+        <span>${debugPanel.dataset.stats ?? mode} | ${activeCount} alive | ${attackingCount} attacking | ${waitingCount} waiting</span>
+      </div>
+      <div class="debug-focus">
+        <small>selected</small>
+        <h3>${focus ? unitLabel(focus) : "none"}</h3>
+        ${selected ? `
+          <div class="debug-grid">
+            <span>life</span><strong>${selected.alive ? "alive" : "down"}</strong>
+            <span>action</span><strong>${debugStateLabel(selected)}</strong>
+            <span>combat</span><strong>${selected.combatState ?? "none"}</strong>
+            <span>mode</span><strong>${selected.mode ?? "none"}</strong>
+            <span>target</span><strong>${selected.targetId ?? "none"}</strong>
+            <span>distance</span><strong>${selected.targetDistance == null ? "n/a" : selected.targetDistance.toFixed(2)}</strong>
+            <span>range</span><strong>${selected.attackRange.toFixed(2)}</strong>
+            <span>cooldown</span><strong>${selected.cooldown.toFixed(2)}s</strong>
+            <span>LOS</span><strong>${selected.lineOfSight ? "clear" : "blocked"}</strong>
+            <span>nav</span><strong>${selected.pathFailures > 0 ? `stalled x${selected.pathFailures}` : "moving"}</strong>
+            <span>collisions</span><strong>${selected.collisionContacts.toFixed(2)}</strong>
+            <span>last hit</span><strong>${selected.lastDamageAt == null ? "n/a" : selected.lastDamageAt.toFixed(1)}s</strong>
+            <span>last attack</span><strong>${selected.lastAttackAt == null ? "n/a" : selected.lastAttackAt.toFixed(1)}s</strong>
+          </div>
+          <p class="debug-blockers">${selected.blockers.length ? selected.blockers.join(" | ") : "No current blockers"}</p>
+        ` : `<p class="debug-empty">No unit selected.</p>`}
+      </div>
+      <div class="debug-list">
+        ${snapshots.map(({ unit, snapshot }) => `
+          <button class="debug-row ${unit.id === debugFocusId ? "selected" : ""}" data-debug-unit="${unit.id}">
+            <span>${unitLabel(unit)}</span>
+            <strong>${debugStateLabel(snapshot)}</strong>
+            <small>${snapshot.blockers[0] ?? (snapshot.targetDistance == null ? "idle" : `d ${snapshot.targetDistance.toFixed(2)}`)}</small>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+  debugPanel.querySelectorAll("[data-debug-unit]").forEach(button => {
+    button.onclick = () => {
+      debugFocusId = Number(button.getAttribute("data-debug-unit"));
+      renderDebugMonitor();
+    };
+  });
+}
+
+function toggleDebugMonitor(force) {
+  if (!debugMode) return;
+  debugPanelVisible = typeof force === "boolean" ? force : !debugPanelVisible;
+  debugPanel.style.display = debugPanelVisible ? "block" : "none";
+  if (debugButton) debugButton.textContent = debugPanelVisible ? "MONITOR ON" : "MONITOR";
+  if (debugPanelVisible) renderDebugMonitor();
 }
 function updateActorCombatAnimations(dt){
   for(const actor of [master,...followers,...enemyUnits]){
@@ -496,14 +628,14 @@ function makeMaster(faction="player") {
   const g=new THREE.Group(), key=faction==="player"?"playerServant":"enemyServant";
   setCharacterVisual(g,key,()=>{const body=roundedBox(.42,1.22,.38,mats.warrior,.1);body.position.y=.03;return body});
   const profile=commanderCombatProfile(faction==="player"?"player":"enemy");
-  g.userData={faction,hp:profile.maxHealth,maxHp:profile.maxHealth,attack:profile.attack,regenDelay:profile.regenDelay,regenPerSecond:profile.regenPerSecond,sinceDamage:99,cool:0,alive:true,isMaster:true,companyId:0,collisionHalf:actorCollisionProfile("commander"),velocity:new THREE.Vector3(),attackAnim:0,damageAnim:0,manualMoving:false,manualTarget:null};
+  g.userData={faction,hp:profile.maxHealth,maxHp:profile.maxHealth,attack:profile.attack,regenDelay:profile.regenDelay,regenPerSecond:profile.regenPerSecond,sinceDamage:99,cool:0,alive:true,isMaster:true,companyId:0,collisionHalf:actorCollisionProfile("commander"),velocity:new THREE.Vector3(),attackAnim:0,damageAnim:0,manualMoving:false,manualTarget:null,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
   tintCharacter(g,faction==="player"?COLORS.player:COLORS.coral);prepareDamageVisual(g);makeActorHealthWidget(g,true);showActorHealth(g,profile.maxHealth);return g;
 }
 function makeUnit(faction="player") {
   const g=new THREE.Group(), key=faction==="player"?"playerServant":"enemyServant";
   setCharacterVisual(g,key,()=>{const body=roundedBox(.42,1.22,.38,mats.warrior,.1);body.position.y=.03;return body});
   const player=faction==="player",maxHp=player?32:25.6,attack=player?10:8;
-  g.userData={faction,hp:maxHp,maxHp,attack,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:0,collisionHalf:actorCollisionProfile("soldier"),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0};
+  g.userData={faction,hp:maxHp,maxHp,attack,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:0,collisionHalf:actorCollisionProfile("soldier"),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
   if(!player)tintCharacter(g,0xe4c45d);
   prepareDamageVisual(g);makeActorHealthWidget(g,false);return g;
 }
@@ -544,6 +676,7 @@ function enemyPackFormationPoint(anchor,index,count,expansionProgress=0){
   const lateral=new THREE.Vector3(-forward.z,0,forward.x);
   return anchor.position.clone().addScaledVector(lateral,offset.lateral).addScaledVector(forward,offset.forward);
 }
+function scheduleNextWave(){nextWaveTimer=practiceWaveSize(waveNumber)!=null?practiceWaveInterval(rand()):0}
 function spawnWave(){
   const count=practiceWaveSize(waveNumber,rand());
   if(count==null){nextWaveTimer=0;return false}
@@ -761,6 +894,10 @@ function resolveCharacterCollisions(){
   const units=[master,...followers,...enemyUnits].filter(u=>u.visible&&u.userData.alive!==false);
   for(let pass=0;pass<4;pass++)for(let i=0;i<units.length;i++)for(let j=i+1;j<units.length;j++){
     const a=units[i],b=units[j],correction=resolveBoxOverlap(a.position,a.userData.collisionHalf,b.position,b.userData.collisionHalf);if(!correction)continue;
+    a.userData.collisionContacts=Math.min(3,(a.userData.collisionContacts??0)+.8);
+    b.userData.collisionContacts=Math.min(3,(b.userData.collisionContacts??0)+.8);
+    a.userData.lastCollisionTime=totalTime;
+    b.userData.lastCollisionTime=totalTime;
     const aWeight=a.userData.isMaster&&!b.userData.isMaster?.25:b.userData.isMaster&&!a.userData.isMaster?1.75:1;
     const bWeight=b.userData.isMaster&&!a.userData.isMaster?.25:a.userData.isMaster&&!b.userData.isMaster?1.75:1;
     a.position.x+=correction.ax*aWeight;a.position.z+=correction.az*aWeight;b.position.x+=correction.bx*bWeight;b.position.z+=correction.bz*bWeight;
@@ -777,6 +914,8 @@ function resolveCharacterCollisions(){
 function dealDamage(attacker,victim){
   if(!attacker.userData.alive||!victim.userData.alive||attacker.userData.faction===victim.userData.faction)return false;
   const previousHealth=victim.userData.hp;
+  attacker.userData.lastAttackTime=totalTime;
+  victim.userData.lastDamageTime=totalTime;
   victim.userData.hp-=attacker.userData.attack;
   if(victim.userData.isMaster)victim.userData.sinceDamage=0;
   showActorHealth(victim,previousHealth);
@@ -971,7 +1110,7 @@ function completeEnemyDefeat(){
   rivals.forEach(rival=>battle.remove(rival));enemyUnits=[];
   enemyPackAnchor=null;
   const hasNextWave=practiceWaveSize(waveNumber)!=null;
-  waitingForRecruitRevival=recruits.length>0;nextWaveTimer=!waitingForRecruitRevival&&hasNextWave?PRACTICE_WAVE_INTERVAL:0;
+  waitingForRecruitRevival=recruits.length>0;nextWaveTimer=!waitingForRecruitRevival&&hasNextWave?practiceWaveInterval(rand()):0;
   playSound("convert");showToast(STR.converted,2600);updateStats();
 }
 function resolveBattle(){
@@ -1039,7 +1178,7 @@ function updateBattle(dt){
   });
   if(revivalState==="advance"){
     waitingForRecruitRevival=false;settleCompanyAnchors();
-    nextWaveTimer=practiceWaveSize(waveNumber)!=null?PRACTICE_WAVE_INTERVAL:0;
+    scheduleNextWave();
   }
   if(nextWaveTimer>0){nextWaveTimer-=dt;if(nextWaveTimer<=0)spawnWave()}
   const masterDirectOrder=!!master.userData.manualMoving,masterManualOrder=masterDirectOrder||ensureCompanyAnchor(0).moving;
@@ -1057,6 +1196,7 @@ function updateBattle(dt){
     approachDistanceSquared=Math.min(approachDistanceSquared,playerActor.position.distanceToSquared(enemyActor.position));
   }
   const approachDistance=Math.sqrt(approachDistanceSquared);
+  if(activeEncounter)activeEncounter.cameraApproachDistance=approachDistance;
   const approachState=battleApproachState({distance:approachDistance,detectionRadius:9.5,aggroRadius:6.2});
   if(activeEncounter&&!activeEncounter.done&&!activeEncounter.aggro&&approachState==="combat")activeEncounter.aggro=true;
   const threatDetected=!!activeEncounter&&!activeEncounter.done&&approachState!=="travel";
@@ -1283,7 +1423,7 @@ function updateBattle(dt){
   });
   resolveCharacterCollisions();
   sinceDamage+=dt;masterHealth=commanderRegenHealth(masterHealth,PLAYER_COMMANDER.maxHealth,sinceDamage,dt,PLAYER_COMMANDER.regenDelay,PLAYER_COMMANDER.regenPerSecond);master.userData.hp=masterHealth;master.userData.sinceDamage=sinceDamage;
-  updateMasterDamageEffect(dt);updateSoldierDamageEffects(dt);updateActorCombatAnimations(dt);updateActorHealthWidgets(dt);
+  updateMasterDamageEffect(dt);updateSoldierDamageEffects(dt);updateActorCombatAnimations(dt);updateActorHealthWidgets(dt);decayDebugSignals(dt);
   resolveBattle();updateParticles(dt);updateSelectionVisuals();
 }
 
@@ -1357,6 +1497,7 @@ function divideCompany(companyId){
   }
   companyLayoutDirty=true;ensureCompanyLayout();
   const newAnchor=ensureCompanyAnchor(newCompanyId);newAnchor.position.copy(commander.position);newAnchor.forward.copy(ensureCompanyAnchor(companyId).forward);
+  gameplayCameraBaselineScale=cameraBaselineAfterDivision(gameplayCameraBaselineScale);
   showToast(STR.groupDivided,1500);synthTone(520,.2,"triangle",.025);updateDivideControl();updateStats();return true;
 }
 function updateDivideControl(){
@@ -1392,7 +1533,7 @@ function closeCompanies(){if(mode!=="companies")return;mode="playing";$("compani
 function chooseRegion(region){
   if(activeEncounter?.aggro&&!activeEncounter.done){showToast(STR.battleLocked,1200);return}
   if(!region.revealed||region.owner===FACTION.PLAYER)return;
-  selectedRegion=region.id;closeMap();master.userData.velocity.set(0,0,0);nextWaveTimer=PRACTICE_WAVE_INTERVAL;showToast(STR.objective,1200);
+  selectedRegion=region.id;closeMap();master.userData.velocity.set(0,0,0);scheduleNextWave();showToast(STR.objective,1200);
 }
 
 function pointerWorld(e){
@@ -1404,6 +1545,11 @@ function pointerWorld(e){
     .map(hit=>{let object=hit.object;while(object&&object!==battle&&!object.userData?.isMaster&&!Number.isInteger(object.userData?.companyId))object=object.parent;return object&&object!==battle?object:null})
     .find(Boolean);
   if(actorHit){
+    if(debugMode&&e.altKey){
+      debugFocusId=actorHit.id;
+      renderDebugMonitor();
+      return;
+    }
     const scope=tacticalSelectionScope(actorHit.userData);
     if(scope==="commander")selectCommander(actorHit);
     else selectCompany(actorHit.userData.companyId??0);
@@ -1438,12 +1584,14 @@ function togglePause(forcePaused){
   }
 }
 addEventListener("keydown",e=>{if(e.code==="Space"){e.preventDefault();mode==="map"?closeMap():mode==="playing"&&openMap()}if(e.code==="Escape"){if(mode==="paused")togglePause(false);else if(selectedCompanyId!==null)clearTacticalSelection();else if(mode==="map")closeMap();else if(mode==="companies")closeCompanies()}});
+addEventListener("keydown",e=>{if(debugMode&&e.code==="KeyI"){e.preventDefault();toggleDebugMonitor()}});
 $("map").onclick=()=>mode==="map"?closeMap():openMap();$("return").onclick=closeMap;
 $("companies").onclick=openCompanies;$("companies-close").onclick=closeCompanies;
 $("divide-company").onclick=()=>{if(selectedCompanyId!==null&&divideCompany(selectedCompanyId)){rebuildSelectionVisuals();refreshCommandGrid()}};
 $("pause").onclick=()=>togglePause();
 $("sound").onclick=()=>{audioOn=!audioOn;sounds.music.muted=!audioOn;$("sound").textContent=audioOn?STR.audioOn:STR.audioOff};
 $("motion").onclick=()=>{reducedMotion=!reducedMotion;$("motion").textContent=reducedMotion?STR.reducedMotion:STR.fullMotion};
+if(debugButton)debugButton.onclick=()=>toggleDebugMonitor();
 addEventListener("blur",()=>{if(mode==="playing")togglePause(true)});
 
 function showToast(text,ms=1800){const t=$("toast");t.textContent=text;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),ms)}
@@ -1458,20 +1606,32 @@ function updateHearts(){
 }
 function updateStats(){const count=followers.filter(u=>u.userData.alive).length;$("army-count").textContent=count;$("army-button-count").textContent=count;$("territory-count").textContent=`${campaign.conquered.size}/7`}
 function win(){mode="end";$("end-title").textContent=STR.victory;$("end-screen").classList.remove("hidden");$("hud").classList.add("hidden")}
-function start(){mode="playing";$("title-screen").classList.add("hidden");$("hud").classList.remove("hidden");$("pause").textContent=STR.pause;$("pause").setAttribute("aria-label",STR.pause);$("sound").textContent=STR.audioOn;$("motion").textContent=reducedMotion?STR.reducedMotion:STR.fullMotion;$("mobile-command").textContent=STR.tapToMove;updateStats();updateHearts();sounds.music.play().catch(()=>{});showToast(STR.objective)}
+function start(){mode="playing";$("title-screen").classList.add("hidden");$("hud").classList.remove("hidden");$("pause").textContent=STR.pause;$("pause").setAttribute("aria-label",STR.pause);$("sound").textContent=STR.audioOn;$("motion").textContent=reducedMotion?STR.reducedMotion:STR.fullMotion;$("mobile-command").textContent=STR.tapToMove;updateStats();updateHearts();if(debugMode)toggleDebugMonitor(true);sounds.music.play().catch(()=>{});showToast(STR.objective)}
 $("begin").onclick=start;$("retry").onclick=()=>location.reload();
 
 function activeCombatCameraFrame(){
   if(!master||!activeEncounter||activeEncounter.done)return null;
   const actors=[master,...followers,...enemyUnits];
   const duelists=actors.filter(actor=>actor?.userData.alive&&actor.userData.lockedTarget?.userData.alive);
+  const closestIncomingDistance=activeEncounter.cameraApproachDistance??enemyUnits.reduce((closest,enemy)=>{
+    if(!enemy.userData.alive)return closest;
+    return Math.min(closest,enemy.position.distanceTo(master.position));
+  },Infinity);
+  if(incomingWaveCameraState({distance:closestIncomingDistance})==="preview"){
+    return tacticalCameraFrame(activeCombatantPoints(actors),{aspect:camera.aspect,baseSpan:14.5,padding:2.8,maxScale:1.34});
+  }
   if(!activeEncounter.aggro&&!duelists.length)return null;
   return tacticalCameraFrame(activeCombatantPoints(actors),{aspect:camera.aspect});
 }
 
+function defaultGameplayCameraFrame(){
+  const commanders=[master,...followers.filter(unit=>unit.userData.alive&&unit.userData.unitCommander)];
+  return tacticalCameraFrame(activeCombatantPoints(commanders),{aspect:camera.aspect,baseSpan:17,padding:2.4,maxScale:1.34});
+}
+
 function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
 addEventListener("resize",resize);addEventListener("orientationchange",resize);
-const dev=new URLSearchParams(location.search).has("dev");if(dev)$("dev").style.display="block";
+if(debugMode){if(debugButton)debugButton.classList.remove("hidden");}
 let frames=0,fps=0,fpsAt=performance.now(),acc=0,last=performance.now();const STEP=1/60;
 function loop(now){
   requestAnimationFrame(loop);let frame=Math.min(.05,(now-last)/1000);last=now;acc+=frame;if(mode==="playing")totalTime+=frame;
@@ -1483,10 +1643,13 @@ function loop(now){
   if(mapMode){
     focus=new THREE.Vector3(0,0,-1);desired=new THREE.Vector3(10,31,26);
   }else{
-    const focusTarget=combatFrame?new THREE.Vector3(combatFrame.x,0,combatFrame.z):master.position;
+    const defaultFrame=defaultGameplayCameraFrame();
+    const focusTarget=combatFrame?new THREE.Vector3(combatFrame.x,0,combatFrame.z):new THREE.Vector3(defaultFrame.x,0,defaultFrame.z);
     const focusEase=1-Math.pow(.006,frame),zoomEase=1-Math.pow(.35,frame);
     gameplayCameraFocus.lerp(focusTarget,focusEase);
-    gameplayCameraScale+=((combatFrame?.scale??1)-gameplayCameraScale)*zoomEase;
+    const defaultScale=Math.max(gameplayCameraBaselineScale,defaultFrame.scale);
+    const desiredScale=Math.max(gameplayCameraBaselineScale,combatFrame?.scale??defaultScale);
+    gameplayCameraScale+=(desiredScale-gameplayCameraScale)*zoomEase;
     focus=gameplayCameraFocus;
     desired=focus.clone().add(new THREE.Vector3(11,18,18).multiplyScalar(gameplayCameraScale));
   }
@@ -1495,6 +1658,8 @@ function loop(now){
   if(shake>0){camera.position.x+=(rand()-.5)*shake;camera.position.y+=(rand()-.5)*shake;shake*=.83}
   for(const flag of flags)flag.rotation.y=-.12+Math.sin(totalTime*2+flag.id)*.08;
   renderer.render(scene,camera);
-  if(dev&&now-fpsAt>500){fps=Math.round(frames*1000/(now-fpsAt));$("dev").textContent=`${fps} fps · ${renderer.info.render.calls} draws · ${followers.length+enemyUnits.length} units`;frames=0;fpsAt=now}frames++;
+  if(debugMode&&debugPanelVisible)renderDebugMonitor();
+  if(debugMode&&debugPanelVisible&&now-fpsAt>500){fps=Math.round(frames*1000/(now-fpsAt));debugPanel.dataset.stats=`${fps} fps | ${renderer.info.render.calls} draws | ${followers.length+enemyUnits.length} units`;frames=0;fpsAt=now}
+  frames++;
 }
 requestAnimationFrame(loop);

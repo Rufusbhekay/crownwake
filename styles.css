@@ -32,14 +32,31 @@ h1,h2{font-family:Georgia,serif;font-weight:400;letter-spacing:-.05em;margin:0;t
 #tap-marker{pointer-events:none;position:fixed;z-index:9;width:18px;height:18px;border:2px solid #f7f2df;box-shadow:0 0 0 1px #31555d66;border-radius:50%;opacity:0;transform:translate(-50%,-50%) scale(.5)}
 #tap-marker.pulse{animation:tap-command .5s ease-out}@keyframes tap-command{0%{opacity:1;transform:translate(-50%,-50%) scale(.45)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.3)}}
 #mobile-command{display:none}
-#dev{display:none;position:fixed;left:5px;bottom:5px;color:#153;background:#fff9;font:11px monospace;padding:4px;z-index:50}
+#dev{display:none;position:fixed;right:16px;top:68px;width:min(420px,calc(100vw - 32px));max-height:min(72vh,760px);overflow:auto;color:#24393e;background:#f7f2dff2;border:1px solid #fff;border-radius:8px;box-shadow:0 20px 60px #2b414733;padding:12px 12px 14px;z-index:50;pointer-events:auto;font:12px/1.35 ui,system-ui,sans-serif}
+#dev .debug-shell{display:grid;gap:10px}
+#dev .debug-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-bottom:8px;border-bottom:1px solid #d5ded6}
+#dev .debug-head strong{font:700 14px/1.1 Georgia,serif;letter-spacing:.08em}
+#dev .debug-head span{font-size:10px;letter-spacing:.12em;opacity:.68;text-transform:uppercase}
+#dev .debug-focus{display:grid;gap:8px;background:#fff9;border:1px solid #dce5dc;border-radius:6px;padding:10px}
+#dev .debug-focus small{font-size:9px;letter-spacing:.18em;text-transform:uppercase;opacity:.52}
+#dev .debug-focus h3{margin:0;font:700 18px/1.1 Georgia,serif}
+#dev .debug-grid{display:grid;grid-template-columns:max-content 1fr;gap:4px 10px;align-items:center}
+#dev .debug-grid span{font-size:9px;letter-spacing:.16em;text-transform:uppercase;opacity:.6}
+#dev .debug-grid strong{font:600 11px/1.2 ui,system-ui,sans-serif}
+#dev .debug-blockers,#dev .debug-empty{margin:0;font-size:11px;line-height:1.45;opacity:.8}
+#dev .debug-list{display:grid;gap:6px}
+#dev .debug-row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;text-align:left;border:1px solid #d8e0d9;background:#fff;padding:8px 10px;border-radius:6px;cursor:pointer;font:inherit}
+#dev .debug-row strong{font:600 11px/1.1 ui,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em}
+#dev .debug-row small{grid-column:1/-1;font-size:10px;opacity:.62}
+#dev .debug-row.selected{outline:2px solid #35c9c2;outline-offset:1px}
 @media(max-width:700px),(pointer:coarse){
   .screen{padding:max(20px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left))}
   h1{font-size:clamp(48px,18vw,74px)}.subtitle{font-size:16px}.hint{max-width:270px;line-height:1.5}
   .topbar{left:auto;right:max(8px,env(safe-area-inset-right));top:max(8px,env(safe-area-inset-top));gap:0}
-  .brand,.stats,.quiet:not(.pause-button),#objective,#mobile-command,#toast{display:none!important}
+  .brand,.stats,.quiet:not(.pause-button):not(#debug),#objective,#mobile-command,#toast{display:none!important}
   .actions{margin:0}.map-button,.army-button,.pause-button{min-width:0;min-height:0;padding:8px 9px;font-size:8px;box-shadow:0 4px 0 #70898c,0 8px 18px #40565b2e}.army-button{display:flex}.army-button strong{font-size:13px}.soldier-cube{width:7px;height:17px}
   #commander-vitals{display:block;right:max(8px,env(safe-area-inset-right));top:52px;width:auto}#hearts{gap:7px;height:28px}#hearts span{font-size:25px}.divide-company{bottom:calc(18px + env(safe-area-inset-bottom));padding:9px 12px;font-size:8px}
+  #dev{right:max(8px,env(safe-area-inset-right));left:max(8px,env(safe-area-inset-left));top:calc(56px + env(safe-area-inset-top));width:auto;max-height:42vh;padding:10px}
   #tap-marker{display:none}
   #map-panel{bottom:calc(18px + env(safe-area-inset-bottom));min-width:min(480px,94vw)}
   .companies-card{padding:20px 14px}.company-row{grid-template-columns:36px 1fr auto;gap:9px;padding:9px}.company-number{width:32px;height:32px}.split-button{padding:8px;font-size:8px}

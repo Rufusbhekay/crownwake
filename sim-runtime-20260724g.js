@@ -303,6 +303,16 @@ export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, pa
   };
 }
 
+export function incomingWaveCameraState({ distance, previewRadius = 18, arrivalRadius = 6.2 }) {
+  if (!Number.isFinite(distance) || distance > previewRadius || distance <= arrivalRadius) return "default";
+  return "preview";
+}
+
+export function cameraBaselineAfterDivision(currentScale, { increment = .12, maxScale = 1.34 } = {}) {
+  const safeScale = Number.isFinite(currentScale) ? currentScale : 1;
+  return Math.min(maxScale, Math.max(1, Math.round((safeScale + increment) * 100) / 100));
+}
+
 export function swarmTravelGroupCount(count) {
   return Math.max(1, Math.min(4, Math.ceil(Math.max(0, count) / 9)));
 }
@@ -720,7 +730,12 @@ export function waveSizeFromRoll(roll) {
   return 2 + Math.min(3, Math.floor(Math.max(0, roll) * 4));
 }
 
-export const PRACTICE_WAVE_INTERVAL = 10;
+export const PRACTICE_WAVE_INTERVAL = 5;
+
+export function practiceWaveInterval(roll = 0) {
+  const normalizedRoll = Math.min(.999999, Math.max(0, roll));
+  return PRACTICE_WAVE_INTERVAL + Math.floor(normalizedRoll * 3);
+}
 
 export function practiceWaveSize(waveIndex, roll = 0) {
   const index = Math.max(0, Math.floor(waveIndex));
@@ -861,4 +876,100 @@ export function advanceFollowAwareness({ state, moved, threshold, timer, respons
     return { state, timer: remaining, updateAnchor: false };
   }
   return { state, timer, updateAnchor: state === FOLLOW_AWARENESS.TRACKING };
+}
+
+function clamp01(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function segmentDistanceToPoint(start, end, point) {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const lengthSq = dx * dx + dz * dz;
+  if (lengthSq < 1e-6) return Math.hypot(point.x - start.x, point.z - start.z);
+  const t = clamp01(((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSq);
+  const closestX = start.x + dx * t;
+  const closestZ = start.z + dz * t;
+  return Math.hypot(point.x - closestX, point.z - closestZ);
+}
+
+export function lineOfSightBlocked(start, end, obstacles = [], corridorHalfWidth = .34) {
+  for (const obstacle of obstacles) {
+    if (!obstacle) continue;
+    const radius = Number.isFinite(obstacle.radius) ? obstacle.radius : 0;
+    if (segmentDistanceToPoint(start, end, obstacle) <= radius + corridorHalfWidth) return true;
+  }
+  return false;
+}
+
+export function actorDebugSnapshot({
+  actor,
+  target = null,
+  combat = false,
+  targetDistance = null,
+  lineOfSight = true,
+  pathBlocked = false,
+  collisionContacts = 0,
+  attackRange = 1.05,
+  now = 0
+} = {}) {
+  const data = actor?.userData ?? {};
+  const alive = data.alive !== false;
+  const targetAlive = !!target && (target.userData?.alive ?? target.alive) !== false;
+  const cooldown = Math.max(0, data.cool ?? 0);
+  const locked = !!data.lockedTarget && targetAlive;
+  const duelPhase = data.duelPhase ?? null;
+  const inRange = targetDistance == null ? null : targetDistance <= attackRange;
+  const visibleCooldown = cooldown > 0 ? `${cooldown.toFixed(2)}s` : "ready";
+  const blockers = [];
+
+  if (!alive) blockers.push("down");
+  else {
+    if (!target) blockers.push("no target");
+    else if (!targetAlive) blockers.push("target down");
+    if (data.waitingDuelTarget) blockers.push("waiting for duel slot");
+    if (cooldown > 0) blockers.push(`cooldown ${visibleCooldown}`);
+    if (targetDistance != null && !inRange) blockers.push(`out of range ${targetDistance.toFixed(2)}/${attackRange.toFixed(2)}`);
+    if (!lineOfSight) blockers.push("line of sight blocked");
+    if (pathBlocked) blockers.push(`path stalled ${data.pathFailures ?? 0}`);
+    if (collisionContacts > 0.1) blockers.push("collision blocked");
+  }
+
+  let action = "idle";
+  if (!alive) action = "down";
+  else if ((data.damageAnim ?? 0) > .2 || (data.hitPulse ?? 0) > .2) action = "stunned";
+  else if (locked && targetAlive) action = duelPhase === DUEL_PHASE.LUNGE || (data.attackAnim ?? 0) > .1 ? "attacking" : "seeking";
+  else if (combat && (data.manualMoving || data.seekingTarget)) action = "seeking";
+  else if ((data.manualMoving || (data.velocity?.lengthSq?.() ?? 0) > .01) && !data.lockedTarget) action = "moving";
+
+  if (combat && data.manualMoving && !data.lockedTarget && targetDistance != null && targetDistance > attackRange * 1.75) {
+    action = "fleeing";
+  }
+
+  return {
+    action,
+    alive,
+    attackRange,
+    blockers,
+    combatState: data.duelPhase ?? null,
+    collisionContacts,
+    cooldown,
+    lineOfSight,
+    locked,
+    now,
+    pathFailures: data.pathFailures ?? 0,
+    pathStallTimer: data.pathStallTimer ?? 0,
+    targetAlive,
+    targetDistance,
+    targetId: target?.id ?? null,
+    targetLockedByOther: target ? target.userData?.lockedTarget && target.userData.lockedTarget !== actor : false,
+    lastAttackAt: data.lastAttackTime ?? null,
+    lastDamageAt: data.lastDamageTime ?? null,
+    mode: data.mode ?? null,
+    faction: data.faction ?? null,
+    isMaster: !!data.isMaster,
+    hp: data.hp ?? 0,
+    maxHp: data.maxHp ?? 1,
+    followState: data.followState ?? null
+  };
 }

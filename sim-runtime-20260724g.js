@@ -10,6 +10,11 @@ export function canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock }) {
   return Boolean(unitAlive && targetAlive && mutualLock);
 }
 
+export function preserveLockedCombatants(units = [], commandableUnits = []) {
+  const commandable = new Set(commandableUnits);
+  return units.filter(unit => commandable.has(unit) || unit?.userData?.lockedTarget?.userData?.alive);
+}
+
 export function soldierCombatState({ combat, formingBattleLine, targetAlive, waitingSlot = false }) {
   if (targetAlive) return SOLDIER_COMBAT_STATE.DUEL;
   if (combat && !formingBattleLine && waitingSlot) return SOLDIER_COMBAT_STATE.WAITING;

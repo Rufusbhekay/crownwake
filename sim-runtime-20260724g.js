@@ -303,6 +303,12 @@ export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, pa
   };
 }
 
+export function gameplayCameraDistanceScale(scale, { combat = false, defaultZoom = 1.2 } = {}) {
+  const safeScale = Number.isFinite(scale) ? scale : 1;
+  const safeDefaultZoom = Number.isFinite(defaultZoom) ? Math.max(1, defaultZoom) : 1.2;
+  return safeScale * (combat ? 1 : safeDefaultZoom);
+}
+
 export function incomingWaveCameraState({ distance, previewRadius = 18, arrivalRadius = 6.2 }) {
   if (!Number.isFinite(distance) || distance > previewRadius || distance <= arrivalRadius) return "default";
   return "preview";

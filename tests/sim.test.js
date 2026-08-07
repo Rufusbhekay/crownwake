@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, THREAT_FORMATION_SCALE, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatRosterPlan, difficultyEncounter, duelAttackHits, encounterResolutionState, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, particleBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierSpacingProfile, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, ENEMY_TARGET_REVIEW_INTERVAL, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatCinematicState, defeatRosterPlan, difficultyEncounter, duelAttackHits, duelLungeDirection, enemyTargetReviewDue, encounterResolutionState, enemyWaveApproachAngle, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, normalizePracticeConfig, particleBudgetAllows, persistentFragmentBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, scatteredPackOffset, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, shouldRetargetToCloserOpponent, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -143,6 +143,12 @@ test("a soldier keeps a duel only while both living soldiers lock each other", (
   assert.equal(canMaintainSoldierDuel({unitAlive:true,targetAlive:false,mutualLock:true}),false);
 });
 
+test("detection rings appear only for living soldiers in a mutual duel", () => {
+  assert.equal(activeDuelRingState({unitAlive:true,targetAlive:true,mutualLock:true}),true);
+  assert.equal(activeDuelRingState({unitAlive:true,targetAlive:true,mutualLock:false}),false);
+  assert.equal(activeDuelRingState({unitAlive:false,targetAlive:true,mutualLock:true}),false);
+});
+
 test("unpaired soldiers become neutral instead of roaming during battle", () => {
   assert.equal(soldierCombatState({combat:true,formingBattleLine:false,targetAlive:false}),SOLDIER_COMBAT_STATE.NEUTRAL);
   assert.equal(soldierCombatState({combat:true,formingBattleLine:false,targetAlive:true}),SOLDIER_COMBAT_STATE.DUEL);
@@ -178,6 +184,18 @@ test("free soldiers choose the closest available opponent pair", () => {
   );
   assert.equal(pair.left.id, "left-a");
   assert.equal(pair.right.id, "right-b");
+});
+
+test("duel lanes distribute face-offs evenly across the battle line", () => {
+  assert.deepEqual([0,1,2].map(index=>battleLaneOffset(index,3,1.6)),[-1.6,0,1.6]);
+  assert.equal(battleLaneOffset(0,1,1.6),0);
+});
+
+test("final defeat slows debris briefly, then restores normal time for three seconds before handoff", () => {
+  assert.deepEqual(defeatCinematicState(.4),{timeScale:.28,complete:false});
+  assert.deepEqual(defeatCinematicState(1.5),{timeScale:1,complete:false});
+  assert.deepEqual(defeatCinematicState(3),{timeScale:1,complete:false});
+  assert.deepEqual(defeatCinematicState(4.25),{timeScale:1,complete:true});
 });
 
 test("threatened formations expand beyond double spacing and settle back", () => {
@@ -220,6 +238,13 @@ test("practice session runs ten waves across three size bands", () => {
   assert.equal(practiceWaveSize(10,.5),null);
   assert.equal(PRACTICE_WAVE_INTERVAL,5);
   assert.deepEqual([0,.5,.999].map(practiceWaveInterval),[5,6,7]);
+});
+
+test("custom practice settings clamp the starting army and ten wave sizes", () => {
+  const settings=normalizePracticeConfig({playerSoldiers:0,waveCounts:[0,99,4]});
+  assert.equal(settings.playerSoldiers,1);
+  assert.deepEqual(settings.waveCounts.slice(0,4),[1,24,4,5]);
+  assert.equal(settings.waveCounts.length,10);
 });
 
 test("incoming waves widen the camera only before they arrive", () => {
@@ -352,10 +377,10 @@ test("tactical camera safely handles empty and extreme combat frames", () => {
   assert.equal(tacticalCameraFrame([{x:0,z:0},{x:200,z:200}]).scale,1.58);
 });
 
-test("default gameplay camera sits 20 percent farther out without changing combat framing", () => {
-  assert.equal(gameplayCameraDistanceScale(1),1.2);
-  assert.ok(Math.abs(gameplayCameraDistanceScale(1.5)-1.8)<1e-9);
-  assert.equal(gameplayCameraDistanceScale(1.5,{combat:true}),1.5);
+test("default gameplay and combat camera both sit farther out", () => {
+  assert.equal(gameplayCameraDistanceScale(1),1.38);
+  assert.ok(Math.abs(gameplayCameraDistanceScale(1.5)-2.07)<1e-9);
+  assert.ok(Math.abs(gameplayCameraDistanceScale(1.5,{combat:true})-1.74)<1e-9);
 });
 
 test("large travel formations widen through four visual lanes", () => {
@@ -371,6 +396,25 @@ test("large travel formations widen through four visual lanes", () => {
   assert.equal(swarmTravelGroupCount(60),4);
   assert.ok(swarmTravelRadius(28)>swarmTravelRadius(18));
   assert.equal(swarmTravelRadius(60),swarmTravelRadius(36));
+});
+
+test("enemy spawn packs use varied compact formation slots without crowding", () => {
+  const offsets=Array.from({length:10},(_,index)=>spawnPackOffset(index,10,.37));
+  assert.equal(new Set(offsets.map(offset=>`${offset.lateral.toFixed(3)},${offset.forward.toFixed(3)}`)).size,10);
+  const nearest=Math.min(...offsets.flatMap((offset,index)=>offsets.slice(index+1).map(other=>Math.hypot(offset.lateral-other.lateral,offset.forward-other.forward))));
+  assert.ok(nearest>1.05);
+  assert.ok(Math.max(...offsets.map(offset=>Math.abs(offset.lateral)))<2.1);
+  assert.ok(Math.max(...offsets.map(offset=>Math.abs(offset.forward)))<2.3);
+});
+
+test("initial player pack scatters compactly without visible straight rows", () => {
+  const offsets=Array.from({length:7},(_,index)=>scatteredPackOffset(index,7,.37));
+  assert.equal(new Set(offsets.map(offset=>`${offset.lateral.toFixed(3)},${offset.forward.toFixed(3)}`)).size,7);
+  const nearest=Math.min(...offsets.flatMap((offset,index)=>offsets.slice(index+1).map(other=>Math.hypot(offset.lateral-other.lateral,offset.forward-other.forward))));
+  assert.ok(nearest>.7);
+  assert.ok(Math.max(...offsets.map(offset=>Math.hypot(offset.lateral,offset.forward)))<2.9);
+  assert.equal(new Set(offsets.map(offset=>offset.lateral.toFixed(3))).size,7);
+  assert.equal(new Set(offsets.map(offset=>offset.forward.toFixed(3))).size,7);
 });
 
 test("capped companies grow deeper without reusing formation slots", () => {
@@ -402,8 +446,8 @@ test("tactical command tiles cover exactly four terrain squares", () => {
   assert.equal(tacticalCellAction({inRange:false,occupied:false}),"reject");
 });
 
-test("selecting a company slows time until its order is issued", () => {
-  assert.equal(tacticalCommandScale(true),.25);
+test("selecting a soldier never slows time", () => {
+  assert.equal(tacticalCommandScale(true),1);
   assert.equal(tacticalCommandScale(false),1);
 });
 
@@ -451,9 +495,9 @@ test("companies resume following after battle when the commander moves", () => {
 });
 
 test("enemy proximity telegraphs deployment before full combat contact", () => {
-  assert.equal(battleApproachState({distance:8,detectionRadius:9.5,aggroRadius:6.2}),"deploy");
-  assert.equal(battleApproachState({distance:5.5,detectionRadius:9.5,aggroRadius:6.2}),"combat");
-  assert.equal(battleApproachState({distance:11,detectionRadius:9.5,aggroRadius:6.2}),"travel");
+  assert.equal(battleApproachState({distance:30}),"deploy");
+  assert.equal(battleApproachState({distance:16.5}),"combat");
+  assert.equal(battleApproachState({distance:34}),"travel");
 });
 
 test("a company fans around its grid anchor instead of stacking into one cell", () => {
@@ -566,13 +610,22 @@ test("commander clearance pushes allies out of its circle and forward travel lan
   assert.deepEqual(commanderClearanceVector({soldier:{x:2,z:2},commander:{x:0,z:0},forward:{x:0,z:-1}}),{x:0,z:0});
 });
 
-test("three failed path windows trigger a clean target reacquisition", () => {
-  let state={previousDistance:2,distance:2,timer:0,failures:0,dt:.72};
+test("two failed path windows trigger a clean target reacquisition", () => {
+  let state={previousDistance:2,distance:2,timer:0,failures:0,dt:.55};
   state=advancePathFailure(state);assert.equal(state.relock,false);assert.equal(state.failures,1);
-  state=advancePathFailure({...state,distance:2,dt:.72});assert.equal(state.relock,false);assert.equal(state.failures,2);
-  state=advancePathFailure({...state,distance:2,dt:.72});assert.equal(state.relock,true);assert.equal(state.failures,3);
+  state=advancePathFailure({...state,distance:2,dt:.55});assert.equal(state.relock,true);assert.equal(state.failures,2);
   const progressing=advancePathFailure({...state,distance:1.8,dt:.1});
   assert.equal(progressing.relock,false);assert.equal(progressing.failures,0);
+});
+
+test("enemy target reviews run each second and only replace a distant target with a meaningfully closer one", () => {
+  assert.equal(ENEMY_TARGET_REVIEW_INTERVAL,1);
+  assert.equal(enemyTargetReviewDue({now:4.99,nextReviewAt:5}),false);
+  assert.equal(enemyTargetReviewDue({now:5,nextReviewAt:5}),true);
+  assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.APPROACH,currentDistance:4,candidateDistance:2}),true);
+  assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.APPROACH,currentDistance:1.1,candidateDistance:.4}),false);
+  assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.LUNGE,currentDistance:4,candidateDistance:2}),false);
+  assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.APPROACH,currentDistance:4,candidateDistance:3.8}),false);
 });
 
 test("enemy soldiers never evade, even when one remains", () => {
@@ -629,6 +682,24 @@ test("soldier chip health remains readable for the extended HUD duration", () =>
   const expired=advanceLaggingHealthBar({...hit,dt:SOLDIER_HEALTH_WIDGET_DURATION});
   assert.equal(expired.visible,false);
   assert.equal(expired.visibleTimer,0);
+});
+
+test("a damaged soldier regenerates from its last damage level over ten seconds", () => {
+  assert.equal(SOLDIER_REGEN_DURATION,10);
+  assert.equal(soldierRegenHealth({health:16,maxHealth:32,regenStartHealth:16,sinceDamage:SOLDIER_REGEN_DELAY-.01,dt:1}),16);
+  assert.equal(soldierRegenHealth({health:16,maxHealth:32,regenStartHealth:16,sinceDamage:SOLDIER_REGEN_DELAY,dt:5}),24);
+  assert.equal(soldierRegenHealth({health:30.4,maxHealth:32,regenStartHealth:16,sinceDamage:SOLDIER_REGEN_DELAY,dt:1}),32);
+});
+
+test("regeneration clears the white delayed-damage bar instead of leaving stale damage", () => {
+  const state=advanceLaggingHealthBar({current:21,lag:28,hold:.24,visibleTimer:2,regenerating:true,dt:.1});
+  assert.equal(state.lag,21);
+  assert.equal(state.visible,true);
+});
+
+test("the player wave is defeated only when no soldiers remain alive", () => {
+  assert.equal(isPlayerWaveDefeated(1),false);
+  assert.equal(isPlayerWaveDefeated(0),true);
 });
 
 test("health changes only for a live opposing attack inside current range", () => {
@@ -689,6 +760,14 @@ test("replacement waves choose an off-camera candidate beyond the safety range",
   const chosen = chooseHiddenSpawn(center, candidates, 20, point => point.x === 24);
   assert.deepEqual(chosen, { x: 0, z: 28 });
   assert.equal(chooseHiddenSpawn(center, candidates, 20, () => true), null);
+});
+
+test("waves with three or more enemies approach from distinct circular sectors", () => {
+  const angles = [0, 1, 2].map(index => enemyWaveApproachAngle(index, 3, .4));
+  assert.ok(Math.abs(angles[0] - angles[1]) > 1.5);
+  assert.ok(Math.abs(angles[1] - angles[2]) > 1.5);
+  assert.equal(enemyWaveApproachAngle(0, 2, .4), .4);
+  assert.equal(enemyWaveApproachAngle(1, 2, .4), .4);
 });
 
 test("duel strikes always land", () => {
@@ -761,6 +840,12 @@ test("the shared particle budget never permits a 181st active effect", () => {
   assert.equal(particleBudgetAllows(181),false);
 });
 
+test("persistent shatter debris uses its own larger session budget", () => {
+  assert.equal(persistentFragmentBudgetAllows(180),true);
+  assert.equal(persistentFragmentBudgetAllows(799),true);
+  assert.equal(persistentFragmentBudgetAllows(800),false);
+});
+
 test("a group can divide only above twelve soldiers and stays balanced", () => {
   assert.equal(canDivideCompany(12),false);
   assert.equal(canDivideCompany(13),true);
@@ -773,6 +858,9 @@ test("a group can divide only above twelve soldiers and stays balanced", () => {
 test("duel state visibly approaches, lunges, and recovers", () => {
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .12, dt: .1 }), {
     phase: DUEL_PHASE.LUNGE, timer: .48, strike: false
+  });
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .5, strikeDistance: 1.35, strikeRange: 1.15, dt: .1 }), {
+    phase: DUEL_PHASE.LUNGE, timer: .42, strike: false
   });
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .3, distance: .7, strikeDistance: 1.2, strikeRange: 1.15, dt: .11 }), {
     phase: DUEL_PHASE.LUNGE, timer: .19, strike: false
@@ -789,6 +877,28 @@ test("duel state visibly approaches, lunges, and recovers", () => {
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.RECOVER, timer: .05, distance: 1.7, dt: .06 }), {
     phase: DUEL_PHASE.APPROACH, timer: 0, strike: false
   });
+});
+
+test("a lunge keeps its committed combat side after crossing its opponent", () => {
+  const committed={x:1,z:0};
+  assert.deepEqual(duelLungeDirection({
+    phase:DUEL_PHASE.LUNGE,
+    previousPhase:DUEL_PHASE.LUNGE,
+    committedDirection:committed,
+    currentDirection:{x:-1,z:0}
+  }),committed);
+  assert.deepEqual(duelLungeDirection({
+    phase:DUEL_PHASE.LUNGE,
+    previousPhase:DUEL_PHASE.APPROACH,
+    committedDirection:null,
+    currentDirection:{x:0,z:-1}
+  }),{x:0,z:-1});
+  assert.equal(duelLungeDirection({
+    phase:DUEL_PHASE.RECOVER,
+    previousPhase:DUEL_PHASE.LUNGE,
+    committedDirection:committed,
+    currentDirection:{x:-1,z:0}
+  }),null);
 });
 
 test("combat animation squashes into attacks and rebounds from damage", () => {

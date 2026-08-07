@@ -28,11 +28,10 @@
       </div>
       <div class="actions">
         <button id="pause" class="quiet pause-button"></button>
-        <button id="sound" class="quiet"></button>
-        <button id="motion" class="quiet"></button>
+        <button id="settings" class="quiet settings-button" aria-label="Settings">&#9881;</button>
+        <button id="exit" class="quiet exit-button">EXIT</button>
         <button id="debug" class="quiet hidden" aria-label="Toggle AI monitor">MONITOR</button>
         <button id="companies" class="army-button" aria-label="View my companies"><i class="soldier-cube"></i><strong>× <span id="army-button-count">4</span></strong></button>
-        <button id="map" class="map-button"></button>
       </div>
     </div>
     <div id="commander-vitals">
@@ -61,6 +60,31 @@
         <div id="companies-list"></div>
         <button id="companies-close" class="primary small"></button>
       </div>
+    </div>
+    <div id="settings-panel" class="hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <section class="settings-card">
+        <p class="kicker">CROWNWAKE</p>
+        <h2 id="settings-title">SETTINGS</h2>
+        <div class="settings-row"><span>HUD</span><button id="hud-toggle" class="quiet">HUD ON</button></div>
+        <div class="settings-row"><span>AUDIO</span><button id="settings-audio" class="quiet">SOUND ON</button></div>
+        <div class="settings-section">
+          <div class="settings-label"><span>GAME SPEED</span><strong id="speed-value">1Ã—</strong></div>
+          <input id="speed" type="range" min="0" max="5" step="1" value="2" aria-label="Game speed">
+          <div class="speed-labels"><span>0.5</span><span>0.75</span><span>1</span><span>1.25</span><span>1.5</span><span>2</span></div>
+        </div>
+        <div class="settings-section customize-section">
+          <div class="settings-label"><span>CUSTOMIZE</span><small>Changes apply on restart</small></div>
+          <h3>CHARACTER</h3>
+          <label class="number-setting"><span>Starting soldiers</span><input id="starting-soldiers" type="number" min="1" max="36" inputmode="numeric"></label>
+          <h3>ENEMY WAVES</h3>
+          <div id="wave-settings" class="wave-settings"></div>
+        </div>
+        <div class="settings-footer">
+          <button id="settings-exit" class="quiet exit-button">EXIT</button>
+          <button id="settings-cancel" class="quiet">CANCEL</button>
+          <button id="settings-apply" class="primary small">APPLY &amp; RESTART</button>
+        </div>
+      </section>
     </div>
   </section>
   <div id="tap-marker" aria-hidden="true"></div>

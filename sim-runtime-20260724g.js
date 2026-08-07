@@ -10,6 +10,12 @@ export function canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock }) {
   return Boolean(unitAlive && targetAlive && mutualLock);
 }
 
+// Detection alone is intentionally not enough to mark a unit visually. A ring
+// means this soldier is actively committed to a living, mutual face-off.
+export function activeDuelRingState({ unitAlive, targetAlive, mutualLock }) {
+  return canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock });
+}
+
 export function preserveLockedCombatants(units = [], commandableUnits = []) {
   const commandable = new Set(commandableUnits);
   return units.filter(unit => commandable.has(unit) || unit?.userData?.lockedTarget?.userData?.alive);
@@ -65,6 +71,14 @@ export function chooseNearestAvailablePair(sideA, sideB, distanceBetween = (left
     }
   }
   return best;
+}
+
+// Centres parallel duels around the battle midpoint.  Keeping the result pure
+// makes the lane spacing easy to tune without touching the live simulation.
+export function battleLaneOffset(index, count, spacing = 1.6) {
+  const safeCount = Math.max(1, Math.floor(count));
+  const safeIndex = Math.min(safeCount - 1, Math.max(0, Math.floor(index)));
+  return (safeIndex - (safeCount - 1) * .5) * spacing;
 }
 
 export function advanceFormationSpread(current, { threatDetected, dt, expandRate = 4.8, contractRate = 2.8 } = {}) {
@@ -215,6 +229,15 @@ export function advanceGroundFragment({ position, velocity, halfSize, bounces, s
     nextVelocity.z *= .7;
     return { position: nextPosition, velocity: nextVelocity, bounces: bounces + 1, settled: false };
   }
+  const rollingSpeed = Math.hypot(nextVelocity.x, nextVelocity.z);
+  if (rollingSpeed > .08) {
+    return {
+      position: nextPosition,
+      velocity: { x: nextVelocity.x * .72, y: 0, z: nextVelocity.z * .72 },
+      bounces,
+      settled: false
+    };
+  }
   return {
     position: nextPosition,
     velocity: { x: 0, y: 0, z: 0 },
@@ -223,8 +246,28 @@ export function advanceGroundFragment({ position, velocity, halfSize, bounces, s
   };
 }
 
+export const DEFEAT_CINEMATIC_SLOW_DURATION = 1.25;
+export const DEFEAT_CINEMATIC_POST_DELAY = 3;
+export const DEFEAT_CINEMATIC_DURATION = DEFEAT_CINEMATIC_SLOW_DURATION + DEFEAT_CINEMATIC_POST_DELAY;
+
+export function defeatCinematicState(elapsed, {
+  duration = DEFEAT_CINEMATIC_DURATION,
+  slowDuration = DEFEAT_CINEMATIC_SLOW_DURATION,
+  slowScale = .28
+} = {}) {
+  const safeElapsed = Math.max(0, elapsed ?? 0);
+  return {
+    timeScale: safeElapsed < slowDuration ? slowScale : 1,
+    complete: safeElapsed >= duration
+  };
+}
+
 export function particleBudgetAllows(activeCount, maximum = 180) {
   return activeCount < maximum;
+}
+
+export function persistentFragmentBudgetAllows(fragmentCount, maximum = 800) {
+  return fragmentCount < maximum;
 }
 
 export function unitCommanderProfile() {
@@ -308,10 +351,11 @@ export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, pa
   };
 }
 
-export function gameplayCameraDistanceScale(scale, { combat = false, defaultZoom = 1.2 } = {}) {
+export function gameplayCameraDistanceScale(scale, { combat = false, defaultZoom = 1.38, combatZoom = 1.16 } = {}) {
   const safeScale = Number.isFinite(scale) ? scale : 1;
-  const safeDefaultZoom = Number.isFinite(defaultZoom) ? Math.max(1, defaultZoom) : 1.2;
-  return safeScale * (combat ? 1 : safeDefaultZoom);
+  const safeDefaultZoom = Number.isFinite(defaultZoom) ? Math.max(1, defaultZoom) : 1.38;
+  const safeCombatZoom = Number.isFinite(combatZoom) ? Math.max(1, combatZoom) : 1.16;
+  return safeScale * (combat ? safeCombatZoom : safeDefaultZoom);
 }
 
 export function incomingWaveCameraState({ distance, previewRadius = 18, arrivalRadius = 6.2 }) {
@@ -375,7 +419,7 @@ export function tacticalCellAction({ inRange, occupied }) {
 }
 
 export function tacticalCommandScale(hasSelection) {
-  return hasSelection ? .25 : 1;
+  return 1;
 }
 
 export function tacticalInputEnabled(mode) {
@@ -408,7 +452,7 @@ export function companyLeaderMotion({ ownCommanderMoving }) {
   return Boolean(ownCommanderMoving);
 }
 
-export function battleApproachState({ distance, detectionRadius = 9.5, aggroRadius = 6.2 }) {
+export function battleApproachState({ distance, detectionRadius = 32, aggroRadius = 17 }) {
   if (distance <= aggroRadius) return "combat";
   if (distance <= detectionRadius) return "deploy";
   return "travel";
@@ -543,14 +587,26 @@ export function nextDuelTurn({ attackerId, defenderId, strikeLanded }) {
   return strikeLanded ? defenderId : attackerId;
 }
 
+// A lunge is committed to one side of an opponent. Re-evaluating that side
+// from the attacker's current position lets an overshoot flip the destination
+// through the opponent, producing a visible back-and-forth oscillation.
+export function duelLungeDirection({ phase, previousPhase, committedDirection, currentDirection }) {
+  if (phase !== DUEL_PHASE.LUNGE) return null;
+  if (previousPhase === DUEL_PHASE.LUNGE && committedDirection) return committedDirection;
+  return currentDirection;
+}
+
 export function advanceDuelState({ phase, timer, distance, strikeDistance = Infinity, strikeRange = 1.15, dt }) {
   if (phase === DUEL_PHASE.APPROACH) {
-    return distance <= .16
-      ? { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false }
-      : { phase, timer: 0, strike: false };
+    if (distance <= .16) return { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false };
+    // A pair that has already met does not need to settle onto its invisible
+    // face-off marker first. Arm the lunge immediately and let the existing
+    // stand-off distance prevent overlap.
+    if (strikeDistance <= strikeRange + .28) return { phase: DUEL_PHASE.LUNGE, timer: .42, strike: false };
+    return { phase, timer: 0, strike: false };
   }
   if (phase === DUEL_PHASE.LUNGE) {
-    const strikeArmed = timer <= .34;
+    const strikeArmed = timer <= .30;
     if (strikeArmed && strikeDistance <= strikeRange) {
       return { phase: DUEL_PHASE.RECOVER, timer: .72, strike: true };
     }
@@ -582,10 +638,35 @@ export function shouldReleaseCombatCommitment(combat, livingEnemyCount) {
 }
 
 export const SOLDIER_HEALTH_WIDGET_DURATION = 3.2;
+export const SOLDIER_REGEN_DELAY = 1.2;
+export const SOLDIER_REGEN_DURATION = 10;
 
-export function advanceLaggingHealthBar({ current, lag, hold, visibleTimer, dt }) {
+export function soldierRegenHealth({
+  health,
+  maxHealth,
+  regenStartHealth = health,
+  sinceDamage,
+  dt,
+  delay = SOLDIER_REGEN_DELAY,
+  duration = SOLDIER_REGEN_DURATION
+} = {}) {
+  const safeMax = Math.max(0, maxHealth ?? 0);
+  const safeHealth = Math.min(safeMax, Math.max(0, health ?? 0));
+  if (safeHealth >= safeMax || (sinceDamage ?? 0) < delay) return safeHealth;
+  const safeStart = Math.min(safeMax, Math.max(0, regenStartHealth ?? safeHealth));
+  const rate = (safeMax - safeStart) / Math.max(.001, duration);
+  return Math.min(safeMax, safeHealth + rate * Math.max(0, dt ?? 0));
+}
+
+export function isPlayerWaveDefeated(livingPlayerCount) {
+  return Math.max(0, Number(livingPlayerCount) || 0) === 0;
+}
+
+export function advanceLaggingHealthBar({ current, lag, hold, visibleTimer, regenerating = false, dt }) {
   const nextHold = Math.max(0, hold - dt);
-  const nextLag = nextHold > 0 ? Math.max(current, lag) : Math.max(current, lag - 45 * dt);
+  const nextLag = regenerating
+    ? current
+    : nextHold > 0 ? Math.max(current, lag) : Math.max(current, lag - 45 * dt);
   const nextTimer = Math.max(0, visibleTimer - dt);
   return { current, lag: nextLag, hold: nextHold, visibleTimer: nextTimer, visible: nextTimer > 0 };
 }
@@ -687,7 +768,7 @@ export function commanderClearanceVector({ soldier, commander, forward, preferRi
   return { x, z };
 }
 
-export function advancePathFailure({ previousDistance, distance, timer, failures, dt, window = .72, progressEpsilon = .07, maxFailures = 3 }) {
+export function advancePathFailure({ previousDistance, distance, timer, failures, dt, window = .55, progressEpsilon = .07, maxFailures = 2 }) {
   if (!Number.isFinite(previousDistance) || distance < previousDistance - progressEpsilon) {
     return { previousDistance: distance, timer: 0, failures: 0, relock: false };
   }
@@ -695,6 +776,24 @@ export function advancePathFailure({ previousDistance, distance, timer, failures
   if (nextTimer < window) return { previousDistance, timer: nextTimer, failures, relock: false };
   const nextFailures = failures + 1;
   return { previousDistance: distance, timer: 0, failures: nextFailures, relock: nextFailures >= maxFailures };
+}
+
+export const ENEMY_TARGET_REVIEW_INTERVAL = 1;
+
+export function enemyTargetReviewDue({ now, nextReviewAt }) {
+  return Number.isFinite(nextReviewAt) && now >= nextReviewAt;
+}
+
+export function shouldRetargetToCloserOpponent({
+  phase,
+  currentDistance,
+  candidateDistance,
+  closeRange = 1.15,
+  advantage = .35
+}) {
+  return phase === DUEL_PHASE.APPROACH
+    && currentDistance > closeRange
+    && candidateDistance + advantage < currentDistance;
 }
 
 export function canApplyAttackDamage({ attackerAlive, victimAlive, opposingFactions, cooldown, distance, range }) {
@@ -742,6 +841,19 @@ export function waveSizeFromRoll(roll) {
 }
 
 export const PRACTICE_WAVE_INTERVAL = 5;
+export const DEFAULT_PRACTICE_WAVE_COUNTS = [5, 5, 6, 5, 6, 6, 7, 6, 7, 8];
+
+export function normalizePracticeConfig({ playerSoldiers, waveCounts } = {}) {
+  const integer = (value, fallback, min, max) => {
+    const parsed = Number(value);
+    const safeValue = Number.isFinite(parsed) ? parsed : fallback;
+    return Math.min(max, Math.max(min, Math.floor(safeValue)));
+  };
+  return {
+    playerSoldiers: integer(playerSoldiers, 7, 1, 36),
+    waveCounts: Array.from({ length: 10 }, (_, index) => integer(waveCounts?.[index], DEFAULT_PRACTICE_WAVE_COUNTS[index], 1, 24))
+  };
+}
 
 export function practiceWaveInterval(roll = 0) {
   const normalizedRoll = Math.min(.999999, Math.max(0, roll));
@@ -781,6 +893,57 @@ export function centeredPackOffset(index, count, spacing = 1.25) {
   };
 }
 
+// Initial wave placement keeps the same centred rows as the travelling pack,
+// then adds a tiny deterministic variation so arrivals do not read as a grid.
+export function spawnPackOffset(index, count, variation = 0) {
+  const safeCount = Math.max(1, Math.floor(count));
+  const safeIndex = Math.min(safeCount - 1, Math.max(0, Math.floor(index)));
+  const columns = Math.min(4, Math.ceil(Math.sqrt(safeCount)));
+  const row = Math.floor(safeIndex / columns);
+  const rowCount = Math.min(columns, safeCount - row * columns);
+  const rows = Math.ceil(safeCount / columns);
+  let weightedRow = 0;
+  for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+    const countInRow = Math.min(columns, safeCount - rowIndex * columns);
+    weightedRow += rowIndex * countInRow;
+  }
+  weightedRow /= safeCount;
+  const spacing = 1.3;
+  const base = {
+    lateral: (safeIndex % columns - (rowCount - 1) * .5) * spacing,
+    forward: (weightedRow - row) * spacing
+  };
+  if (safeCount <= 1) return base;
+  const seed = Number.isFinite(variation) ? variation : 0;
+  const sample = salt => {
+    const value = Math.sin((index + 1) * 12.9898 + seed * 78.233 + salt * 37.719) * 43758.5453;
+    return value - Math.floor(value);
+  };
+  const jitter = .095;
+  return {
+    lateral: base.lateral + (sample(1) - .5) * jitter * 2,
+    forward: base.forward + (sample(2) - .5) * jitter * 2
+  };
+}
+
+// A compact seeded scatter keeps a starting army organic without placing
+// soldiers on an obvious row, grid, or tightly overlapping clump.
+export function scatteredPackOffset(index, count, variation = 0) {
+  const safeCount = Math.max(1, Math.floor(count));
+  const safeIndex = Math.min(safeCount - 1, Math.max(0, Math.floor(index)));
+  if (safeCount === 1) return { lateral: 0, forward: 0 };
+  const sample = salt => {
+    const value = Math.sin((safeIndex + 1) * 17.173 + variation * 63.727 + salt * 29.531) * 43758.5453;
+    return value - Math.floor(value);
+  };
+  const angle = variation * Math.PI * 2 + safeIndex * 2.399963229728653 + (sample(1) - .5) * .34;
+  const radius = .55 + Math.sqrt((safeIndex + .5) / safeCount) * 2.08 + (sample(2) - .5) * .16;
+  return {
+    lateral: Math.cos(angle) * radius,
+    forward: Math.sin(angle) * radius
+  };
+}
+
 export function playerThreatScore({ livingSoldiers, averageSoldierHealthRatio, commanderHealthRatio }) {
   const count = Math.max(0, livingSoldiers);
   const soldierHealth = Math.max(0, Math.min(1, averageSoldierHealthRatio));
@@ -802,6 +965,16 @@ export function difficultyEncounter({ wave, playerThreat, fluctuationRoll }) {
 
 export function hiddenWaveSpawn(center, angle, distance) {
   return { x: center.x + Math.sin(angle) * distance, z: center.z + Math.cos(angle) * distance };
+}
+
+// Larger waves arrive from evenly distributed points around the player. The
+// caller supplies a random rotation per wave, preserving variation without
+// allowing two soldiers to share an entry direction.
+export function enemyWaveApproachAngle(index, count, rotation = 0) {
+  const safeCount = Math.max(1, Math.floor(count));
+  if (safeCount <= 2) return rotation;
+  const safeIndex = Math.min(safeCount - 1, Math.max(0, Math.floor(index)));
+  return rotation + safeIndex * Math.PI * 2 / safeCount;
 }
 
 export function chooseHiddenSpawn(center, candidates, minDistance, isVisible) {

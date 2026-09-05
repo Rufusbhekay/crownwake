@@ -10,7 +10,6 @@
 </head>
 <body>
   <canvas id="game" aria-label="Crownwake 3D game"></canvas>
-  <div id="vignette"></div>
   <section id="title-screen" class="screen">
     <div class="title-mark"><span></span><i></i><span></span></div>
     <p class="kicker">A TINY TALE OF CONQUEST</p>
@@ -31,7 +30,12 @@
         <button id="settings" class="quiet settings-button" aria-label="Settings">&#9881;</button>
         <button id="exit" class="quiet exit-button">EXIT</button>
         <button id="debug" class="quiet hidden" aria-label="Toggle AI monitor">MONITOR</button>
-        <button id="companies" class="army-button" aria-label="View my companies"><i class="soldier-cube"></i><strong>× <span id="army-button-count">4</span></strong></button>
+        <div id="deployment-options" class="deployment-options" aria-label="Deployment size">
+          <button type="button" data-deployment-batch="1" aria-pressed="true">×1</button>
+          <button type="button" data-deployment-batch="2" aria-pressed="false">×2</button>
+          <button type="button" data-deployment-batch="4" aria-pressed="false">×4</button>
+        </div>
+        <button id="companies" class="army-button" aria-label="View my companies"><i class="soldier-cube"></i><strong><span id="army-button-count">4</span></strong></button>
       </div>
     </div>
     <div id="commander-vitals">
@@ -67,25 +71,203 @@
         <h2 id="settings-title">SETTINGS</h2>
         <div class="settings-row"><span>HUD</span><button id="hud-toggle" class="quiet">HUD ON</button></div>
         <div class="settings-row"><span>AUDIO</span><button id="settings-audio" class="quiet">SOUND ON</button></div>
+        <div class="settings-row"><span>LEVEL EDITOR</span><button id="level-editor" class="quiet">OPEN EDITOR</button></div>
         <div class="settings-section">
           <div class="settings-label"><span>GAME SPEED</span><strong id="speed-value">1Ã—</strong></div>
           <input id="speed" type="range" min="0" max="5" step="1" value="2" aria-label="Game speed">
           <div class="speed-labels"><span>0.5</span><span>0.75</span><span>1</span><span>1.25</span><span>1.5</span><span>2</span></div>
         </div>
-        <div class="settings-section customize-section">
-          <div class="settings-label"><span>CUSTOMIZE</span><small>Changes apply on restart</small></div>
-          <h3>CHARACTER</h3>
-          <label class="number-setting"><span>Starting soldiers</span><input id="starting-soldiers" type="number" min="1" max="36" inputmode="numeric"></label>
-          <h3>ENEMY WAVES</h3>
-          <div id="wave-settings" class="wave-settings"></div>
-        </div>
         <div class="settings-footer">
           <button id="settings-exit" class="quiet exit-button">EXIT</button>
           <button id="settings-cancel" class="quiet">CANCEL</button>
-          <button id="settings-apply" class="primary small">APPLY &amp; RESTART</button>
         </div>
       </section>
     </div>
+    <div id="editor-shell" class="editor-shell hidden" aria-label="Crownwake level editor">
+      <header id="editor-topbar" class="editor-topbar">
+        <div id="editor-toolbar-slot" class="editor-toolbar-slot"></div>
+        <div class="editor-topbar-actions">
+          <button id="editor-maximize" type="button" aria-pressed="false" title="Maximize viewport (Tab)">VIEWPORT</button>
+          <button id="editor-save" type="button" title="Save level (Ctrl+S)">SAVE</button>
+        </div>
+      </header>
+      <nav id="editor-tool-rail" class="editor-tool-rail" aria-label="Editor contexts">
+        <button id="editor-context-select" type="button" aria-pressed="true" title="Select (Q)"><span aria-hidden="true">&#9651;</span><small>SELECT</small></button>
+        <button id="editor-context-assets" type="button" aria-pressed="false" title="Assets"><span aria-hidden="true">&#9638;</span><small>ASSETS</small></button>
+        <button id="editor-context-foliage" type="button" aria-pressed="false" title="Foliage"><span aria-hidden="true">&#10047;</span><small>FOLIAGE</small></button>
+        <button id="editor-context-environment" type="button" aria-pressed="false" title="Environment"><span aria-hidden="true">&#9728;</span><small>ENV</small></button>
+        <button id="editor-left-collapse" class="editor-rail-collapse" type="button" aria-label="Collapse left panel" aria-pressed="false">&#8249;</button>
+      </nav>
+      <aside id="editor-context-panel" class="editor-context-panel" aria-label="Context tools">
+        <div class="editor-dock-heading"><small id="editor-context-kicker">EDITOR MODE</small><strong id="editor-context-title">SELECT</strong></div>
+        <section data-editor-context-panel="select" class="editor-context-section">
+          <p class="editor-context-copy">Select an object in the viewport or World Outliner. Use Shift or Ctrl to add to the selection.</p>
+          <div class="editor-shortcuts"><span>Q</span> Select <span>W</span> Move <span>E</span> Rotate <span>R</span> Scale</div>
+        </section>
+        <section data-editor-context-panel="foliage" class="editor-context-section hidden">
+          <div id="editor-foliage-context-slot" class="editor-context-slot"></div>
+        </section>
+        <section data-editor-context-panel="assets" class="editor-context-section hidden">
+          <div id="editor-assets-context-slot" class="editor-context-slot"></div>
+        </section>
+      </aside>
+      <button id="editor-left-resizer" class="editor-resizer editor-left-resizer" type="button" tabindex="-1" aria-label="Resize left editor panel"></button>
+      <main id="editor-viewport-frame" class="editor-viewport-frame" aria-label="3D level viewport"></main>
+      <button id="editor-right-resizer" class="editor-resizer editor-right-resizer" type="button" tabindex="-1" aria-label="Resize right editor panel"></button>
+      <aside id="editor-right-dock" class="editor-right-dock">
+        <div id="editor-outliner-slot" class="editor-outliner-slot"></div>
+        <section id="editor-inspector" class="editor-inspector" aria-label="Inspector">
+          <div class="editor-dock-heading"><small>DETAILS</small><strong id="editor-inspector-title">NOTHING SELECTED</strong></div>
+          <details id="inspector-transform-section" class="hidden" open><summary>TRANSFORM</summary><div id="editor-transform-slot"></div></details>
+          <details id="inspector-camera-section" class="hidden" open><summary>CAMERA</summary><div class="camera-inspector-controls"><label><span>CAMERA ZOOM <output data-world-look-output="cameraZoom">1&times;</output></span><input data-world-look-setting="cameraZoom" type="range" min="0.6" max="1.8" step="0.05" value="1"></label></div></details>
+          <details id="inspector-foliage-section" class="hidden"><summary>FOLIAGE</summary><div id="editor-foliage-slot"></div></details>
+          <details id="inspector-environment-section" class="hidden" open><summary>ENVIRONMENT</summary><div id="editor-environment-slot"></div></details>
+          <div id="editor-confirm-slot"></div>
+        </section>
+        <button id="editor-right-collapse" class="editor-dock-collapse" type="button" aria-label="Collapse right dock" aria-pressed="false">&#8250;</button>
+      </aside>
+      <div id="editor-content-drawer-slot" class="editor-content-drawer-slot"></div>
+      <footer id="editor-status-slot" class="editor-status-slot"><div class="editor-status-meta"><span id="editor-status-selection">NO SELECTION</span><span id="editor-status-coordinates">X 0 | Y 0 | Z 0</span><span id="editor-status-tool">SELECT | CAMERA ISO</span></div></footer>
+    </div>
+    <div id="editor-toolbar" class="editor-toolbar hidden" aria-label="Level editor tools">
+      <div class="editor-heading"><div><small>LEVEL EDITOR</small><strong>WORLD TOOLS</strong></div><button id="editor-undo" type="button" class="editor-undo" disabled aria-label="Undo last editor change" title="Undo last editor change">&#8617;</button></div>
+      <section class="editor-zoom" aria-label="Camera zoom controls">
+        <span>ZOOM</span>
+        <div>
+          <button id="editor-zoom-out" type="button" aria-label="Zoom out">&minus;</button>
+          <output id="editor-zoom-value" aria-live="polite">100%</output>
+          <button id="editor-zoom-in" type="button" aria-label="Zoom in">+</button>
+        </div>
+      </section>
+      <button id="editor-environment-toggle" class="editor-environment-toggle" type="button" aria-pressed="false" title="Lighting and post-processing">ENV</button>
+      <section class="editor-transform" aria-label="Asset transform controls">
+        <span>TRANSFORM</span>
+        <div role="toolbar" aria-label="Transform mode">
+          <button id="editor-transform-select" type="button" aria-pressed="true" title="Select (Q)"><i aria-hidden="true">&#9651;</i> SELECT</button>
+          <button id="editor-transform-move" type="button" aria-pressed="false" title="Move selected asset"><i aria-hidden="true">&#8596;</i> MOVE</button>
+          <button id="editor-transform-rotate" type="button" aria-pressed="false" title="Rotate selected asset"><i aria-hidden="true">&#8635;</i> ROTATE</button>
+          <button id="editor-transform-scale" type="button" aria-pressed="false" title="Scale selected asset"><i aria-hidden="true">&#10548;</i> SCALE</button>
+        </div>
+      </section>
+      <button id="editor-duplicate" class="editor-tool" disabled title="Duplicate selected asset"><span aria-hidden="true">&#8862;</span> DUPLICATE</button>
+      <button id="editor-delete" class="editor-tool editor-delete" disabled><span aria-hidden="true">&#10005;</span> DELETE</button>
+      <button id="editor-done" class="editor-tool editor-done">PLAYTEST</button>
+    </div>
+    <aside id="world-look-panel" class="world-look-panel hidden" aria-label="Lighting and post-processing controls">
+      <div class="editor-panel-heading"><small>WORLD TOOLS</small><strong>LIGHTING &amp; POST</strong></div>
+      <div class="world-look-controls">
+        <label><span>TONE MAPPING</span><select data-world-look-setting="toneMapping"><option value="aces">ACES FILMIC</option><option value="neutral">NEUTRAL</option><option value="none">NONE</option></select></label>
+        <label><span>EXPOSURE <output data-world-look-output="exposure">0.78</output></span><input data-world-look-setting="exposure" type="range" min="0.3" max="1.5" step="0.01" value="0.78"></label>
+        <label><span>HEMISPHERE <output data-world-look-output="hemisphereIntensity">1.55</output></span><input data-world-look-setting="hemisphereIntensity" type="range" min="0" max="3" step="0.05" value="1.55"></label>
+        <label><span>SUN INTENSITY <output data-world-look-output="sunIntensity">1.85</output></span><input data-world-look-setting="sunIntensity" type="range" min="0" max="4" step="0.05" value="1.85"></label>
+        <label class="world-look-colour"><span>SUN COLOUR</span><input data-world-look-setting="sunColor" type="color" value="#f7f1df"></label>
+        <label><span>SHADOW TYPE</span><select data-world-look-setting="shadowType"><option value="pcfSoft">PCF SOFT</option><option value="pcf">PCF</option><option value="basic">BASIC</option></select></label>
+        <label><span>SHADOW SOFTNESS <output data-world-look-output="shadowRadius">4</output></span><input data-world-look-setting="shadowRadius" type="range" min="0" max="8" step="0.25" value="4"></label>
+        <label class="world-look-colour"><span>SKY COLOUR</span><input data-world-look-setting="background" type="color" value="#8fa4a7"></label>
+        <label><span>DISTANCE FOG <output data-world-look-output="fogDensity">0.009</output></span><input data-world-look-setting="fogDensity" type="range" min="0" max="0.02" step="0.0005" value="0.0091"></label>
+        <label><span>MEADOW ROUGHNESS <output data-world-look-output="meadowRoughness">0.97</output></span><input data-world-look-setting="meadowRoughness" type="range" min="0.5" max="1" step="0.01" value="0.97"></label>
+        <label><span>MEADOW METALNESS <output data-world-look-output="meadowMetalness">0</output></span><input data-world-look-setting="meadowMetalness" type="range" min="0" max="0.4" step="0.01" value="0"></label>
+      </div>
+    </aside>
+    <aside id="foliage-paint-panel" class="foliage-paint-panel hidden" aria-label="Foliage paint controls">
+      <div class="editor-panel-heading"><small>WORLD TOOL</small><strong>FOLIAGE PAINT</strong></div>
+      <div class="foliage-paint-operations" role="group" aria-label="Paint operation">
+        <button id="foliage-paint-add" type="button" aria-pressed="true">ADD</button>
+        <button id="foliage-paint-remove" type="button" aria-pressed="false">REMOVE</button>
+      </div>
+      <div class="foliage-controls foliage-paint-controls">
+        <label><span>BRUSH SIZE <output data-foliage-paint-output="brushSize">5</output></span><input data-foliage-paint-setting="brushSize" type="range" min="1" max="20" step="0.5" value="5"></label>
+        <label><span>PAINT AMOUNT <output data-foliage-paint-output="paintAmount">5</output></span><input data-foliage-paint-setting="paintAmount" type="range" min="1" max="25" step="1" value="5"></label>
+        <label><span>SCALE VARIATION <output data-foliage-paint-output="scaleVariation">20%</output></span><input data-foliage-paint-setting="scaleVariation" type="range" min="0" max="50" step="1" value="20"></label>
+      </div>
+      <p class="foliage-paint-hint">Tick one or more foliage types, then click or drag on the terrain.</p>
+      <div id="foliage-paint-assets" class="foliage-paint-assets" aria-label="Foliage types to paint"></div>
+    </aside>
+    <aside id="editor-transform-panel" class="editor-transform-panel hidden" aria-label="Selected asset transform">
+      <div class="editor-panel-heading"><small>SELECTED ASSET</small><strong>TRANSFORM</strong></div>
+      <div class="editor-transform-fields">
+        <span>LOCATION</span>
+        <label>X <input data-transform-property="position" data-transform-axis="x" type="number" step="0.1" value="0" disabled></label>
+        <label>Y <input data-transform-property="position" data-transform-axis="y" type="number" step="0.1" value="0" disabled></label>
+        <label>Z <input data-transform-property="position" data-transform-axis="z" type="number" step="0.1" value="0" disabled></label>
+        <span>ROTATION</span>
+        <label>X <input data-transform-property="rotation" data-transform-axis="x" type="number" step="1" value="0" disabled></label>
+        <label>Y <input data-transform-property="rotation" data-transform-axis="y" type="number" step="1" value="0" disabled></label>
+        <label>Z <input data-transform-property="rotation" data-transform-axis="z" type="number" step="1" value="0" disabled></label>
+        <span class="scale-heading">SCALE <button id="editor-scale-lock" class="editor-scale-lock" type="button" aria-pressed="true" aria-label="Unlock proportional scale" title="Lock proportional scale">&#128274;</button></span>
+        <label>X <input data-transform-property="scale" data-transform-axis="x" type="number" min="0.02" step="0.05" value="0" disabled></label>
+        <label>Y <input data-transform-property="scale" data-transform-axis="y" type="number" min="0.02" step="0.05" value="0" disabled></label>
+        <label>Z <input data-transform-property="scale" data-transform-axis="z" type="number" min="0.02" step="0.05" value="0" disabled></label>
+      </div>
+    </aside>
+    <aside id="foliage-panel" class="foliage-panel hidden" aria-label="Foliage wind controls">
+      <div class="editor-panel-heading"><small>FOLIAGE CONTROLS</small><strong id="foliage-panel-title">GRASS WIND</strong></div>
+      <div class="foliage-controls">
+        <label data-foliage-kind="grass"><span>GRASS SIZE <output data-foliage-output="size">1x</output></span><input data-foliage-setting="size" type="range" min="0.5" max="2" step="0.25" value="1"></label>
+        <label data-foliage-kind="grass"><span>PROXIMITY <output data-foliage-output="proximity">1x</output></span><input data-foliage-setting="proximity" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+        <label><span>WIND SPEED <output data-foliage-output="windSpeed">4.5</output></span><input data-foliage-setting="windSpeed" type="range" min="0.1" max="8" step="0.1" value="4.5"></label>
+        <label><span>BASE STRENGTH <output data-foliage-output="baseWindStrength">0.64</output></span><input data-foliage-setting="baseWindStrength" type="range" min="0" max="1.2" step="0.01" value="0.64"></label>
+        <label><span>GUST STRENGTH <output data-foliage-output="gustStrength">1.6</output></span><input data-foliage-setting="gustStrength" type="range" min="0" max="3" step="0.05" value="1.6"></label>
+        <label><span>SPRING RESPONSE <output data-foliage-output="springStrength">14</output></span><input data-foliage-setting="springStrength" type="range" min="1" max="30" step="0.5" value="14"></label>
+        <label><span>MOTION DAMPING <output data-foliage-output="damping">0.88</output></span><input data-foliage-setting="damping" type="range" min="0.7" max="0.98" step="0.01" value="0.88"></label>
+        <label><span>SECONDARY SWAY <output data-foliage-output="secondaryMovement">0.3</output></span><input data-foliage-setting="secondaryMovement" type="range" min="0" max="0.8" step="0.01" value="0.3"></label>
+        <label><span>MAX BEND <output data-foliage-output="maxBendAngle">30&deg;</output></span><input data-foliage-setting="maxBendAngle" type="range" min="0" max="60" step="1" value="30"></label>
+        <label><span>WAVE SCALE <output data-foliage-output="spatialFrequency">0.7</output></span><input data-foliage-setting="spatialFrequency" type="range" min="0.1" max="1.5" step="0.05" value="0.7"></label>
+        <label><span>WIND VARIATION <output data-foliage-output="noiseScale">0.25</output></span><input data-foliage-setting="noiseScale" type="range" min="0.05" max="0.8" step="0.05" value="0.25"></label>
+      </div>
+      <button id="foliage-reset" type="button" class="foliage-reset">RESET DEFAULTS</button>
+      <div class="foliage-preset-toolbar" aria-label="Foliage preset actions">
+        <button id="foliage-preset-load" type="button">LOAD</button>
+        <button id="foliage-preset-save" type="button">SAVE</button>
+      </div>
+    </aside>
+    <aside id="foliage-presets-panel" class="foliage-presets-panel hidden" aria-label="Saved foliage presets">
+      <div class="foliage-presets-heading">
+        <div class="editor-panel-heading"><small>SAVED FOLIAGE</small><strong id="foliage-presets-title">GRASS PRESETS</strong></div>
+        <button id="foliage-presets-close" type="button" aria-label="Close foliage presets">&#10005;</button>
+      </div>
+      <div id="foliage-preset-list" class="foliage-preset-list"></div>
+      <div id="foliage-preset-actions" class="foliage-preset-actions hidden">
+        <button id="foliage-preset-apply" type="button">LOAD SLOT</button>
+        <button id="foliage-preset-delete" type="button">DELETE</button>
+      </div>
+    </aside>
+    <aside id="world-outliner" class="world-outliner hidden" aria-label="World Outliner">
+      <div class="editor-panel-heading"><small>LEVEL CONTENTS</small><strong>WORLD OUTLINER</strong></div>
+      <label class="world-outliner-search"><span class="sr-only">Search scene objects</span><input id="world-outliner-search" type="search" placeholder="Search Scene" autocomplete="off"></label>
+      <div class="world-outliner-columns"><span>LABEL</span><span>TYPE</span></div>
+      <div id="world-outliner-list" class="world-outliner-list"></div>
+    </aside>
+    <aside id="asset-panel" class="asset-panel hidden" aria-label="Level assets">
+      <div class="asset-panel-head">
+        <div><small>ASSET LIBRARY</small><h3 id="asset-panel-title">CONTENT BROWSER</h3></div>
+        <div class="content-browser-header-actions" aria-label="Content Browser controls">
+          <button id="content-browser-add" type="button" title="Create folder">+ ADD</button>
+          <button id="content-browser-filter" type="button" title="Show all assets">ALL</button>
+          <button id="content-browser-view" type="button" aria-pressed="false" title="Toggle asset view">&#9638;</button>
+          <button id="content-browser-visibility" type="button" aria-pressed="true" title="Hide Content Browser">&#128065;</button>
+        </div>
+      </div>
+      <div id="content-browser-breadcrumb" class="content-browser-breadcrumb" aria-label="Asset folder path"></div>
+      <label class="content-browser-search"><span class="sr-only">Search current folder</span><input id="content-browser-search" type="search" placeholder="Search current folder"></label>
+      <div class="content-browser-body">
+        <nav id="content-browser-tree" class="content-browser-tree" aria-label="Asset folder tree"></nav>
+        <section id="content-browser-content" class="content-browser-content" aria-label="Current folder contents">
+          <p id="asset-panel-copy">Choose a folder to browse its assets.</p>
+          <div id="editor-asset-list" class="editor-asset-list content-browser-grid"></div>
+        </section>
+      </div>
+      <button id="content-browser-resizer" class="content-browser-resizer" type="button" tabindex="-1" aria-label="Resize Content Browser"></button>
+      <div id="content-browser-context-menu" class="content-browser-context-menu hidden" role="menu"></div>
+    </aside>
+    <section id="editor-delete-confirm" class="editor-delete-confirm hidden" role="dialog" aria-modal="false" aria-labelledby="editor-delete-title">
+      <div class="editor-delete-card">
+        <h2 id="editor-delete-title">DELETE?</h2>
+        <p id="editor-delete-copy">Remove this asset?</p>
+        <div><button id="editor-delete-cancel" class="small">CANCEL</button><button id="editor-delete-confirm-button" class="small danger">DELETE</button></div>
+      </div>
+    </section>
+    <div id="editor-status" class="editor-status hidden" aria-live="polite">Arrow keys or drag empty ground to explore.</div>
   </section>
   <div id="tap-marker" aria-hidden="true"></div>
   <section id="end-screen" class="screen hidden">

@@ -29,7 +29,7 @@
 - Duel strike: 0.14 seconds of visible wind-up followed by up to 0.34 seconds of committed lunge, landing once the attacker enters its real damage range, then a 0.72-second recovery. A blocked lunge times out and retries instead of consuming the attack turn.
 - Duel sequence: paired fighters alternate guaranteed strikes. The active fighter lunges, the receiver plays an impact scale-bounce and short recoil, then the receiver answers after recovery. Dodges and counter branches are disabled so duels stay readable.
 - Character ground height: 0.015 world units above the streamed floor, with no idle vertical bob.
-- Floor terrain: procedural 1024-square matte grey-green surface with a thin charcoal 10×10 square grid repeated once per streamed tile; roughness 0.96, metalness 0, and no overlapping line geometry.
+- Floor terrain: seamless procedural matte grey-olive meadow with restrained broad sage variation, high roughness (0.97), metalness 0, and no grid, paths, or overlapping terrain geometry.
 - Streamed floor joins: zero geometric overscan; neighboring planes meet edge-to-edge without coplanar overlap or z-fighting.
 - Environment grade: exposure 0.78, hemisphere intensity 1.55, directional intensity 1.85.
 - Player soldier defeat: immediate disappearance into 8–12 compact cube fragments lasting 0.7–1.05 seconds.

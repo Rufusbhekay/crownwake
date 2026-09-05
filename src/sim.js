@@ -6,6 +6,15 @@ export const SOLDIER_COMBAT_STATE = { FORMATION: "formation", DUEL: "duel", WAIT
 export const DUEL_WAITING_DISTANCE = 3.6;
 export const THREAT_FORMATION_SCALE = 2.35;
 
+export function levelCameraFrame(frame, { minScale = .32, maxScale = 3 } = {}) {
+  if (!Number.isFinite(frame?.x) || !Number.isFinite(frame?.z) || !Number.isFinite(frame?.scale)) return null;
+  return {
+    x: frame.x,
+    z: frame.z,
+    scale: Math.min(maxScale, Math.max(minScale, frame.scale))
+  };
+}
+
 export function canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock }) {
   return Boolean(unitAlive && targetAlive && mutualLock);
 }
@@ -96,9 +105,6 @@ export function environmentGrade() {
     sunIntensity: 1.85,
     roughness: .96,
     metalness: 0,
-    groundColor: 0x73796f,
-    gridColor: 0x4d5651,
-    gridCells: 10,
     tileOverscan: 0
   };
 }
@@ -351,10 +357,13 @@ export function tacticalCameraFrame(points, { aspect = 16 / 9, baseSpan = 14, pa
   };
 }
 
-export function gameplayCameraDistanceScale(scale, { combat = false, defaultZoom = 1.38, combatZoom = 1.16 } = {}) {
+// Keep the established camera angle, but frame 40% more of the world in both
+// regular travel and combat. This avoids a distracting zoom change at battle
+// start while giving the player a consistently wider tactical view.
+export function gameplayCameraDistanceScale(scale, { combat = false, defaultZoom = 1.932, combatZoom = 1.624 } = {}) {
   const safeScale = Number.isFinite(scale) ? scale : 1;
-  const safeDefaultZoom = Number.isFinite(defaultZoom) ? Math.max(1, defaultZoom) : 1.38;
-  const safeCombatZoom = Number.isFinite(combatZoom) ? Math.max(1, combatZoom) : 1.16;
+  const safeDefaultZoom = Number.isFinite(defaultZoom) ? Math.max(1, defaultZoom) : 1.932;
+  const safeCombatZoom = Number.isFinite(combatZoom) ? Math.max(1, combatZoom) : 1.624;
   return safeScale * (combat ? safeCombatZoom : safeDefaultZoom);
 }
 
@@ -413,9 +422,9 @@ export function tacticalCellBlocked({ cell, actors, excludedIds = [], cellSize =
   });
 }
 
-export function tacticalCellAction({ inRange, occupied }) {
+export function tacticalCellAction({ inRange }) {
   if (!inRange) return "reject";
-  return occupied ? "cancel" : "move";
+  return "move";
 }
 
 export function tacticalCommandScale(hasSelection) {
@@ -841,17 +850,53 @@ export function waveSizeFromRoll(roll) {
 }
 
 export const PRACTICE_WAVE_INTERVAL = 5;
+export const DEFAULT_PRACTICE_WAVE_DELAY = 6;
 export const DEFAULT_PRACTICE_WAVE_COUNTS = [5, 5, 6, 5, 6, 6, 7, 6, 7, 8];
+export const OPENING_ENEMY_COUNT = 10;
+export const DEPLOYMENT_BATCH_SIZES = Object.freeze([1, 2, 4]);
 
-export function normalizePracticeConfig({ playerSoldiers, waveCounts } = {}) {
+function seededUnit(value) {
+  const sample = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
+  return sample - Math.floor(sample);
+}
+
+export function openingRingSpawn(index, count = OPENING_ENEMY_COUNT, radius = 8, seed = 0) {
+  const safeCount = Math.max(1, Math.floor(count));
+  const safeIndex = ((Math.floor(index) % safeCount) + safeCount) % safeCount;
+  const safeRadius = Math.max(0, Number.isFinite(radius) ? radius : 8);
+  if (safeCount === 1 || safeRadius === 0) return { x: 0, z: 0 };
+  const safeSeed = Number.isFinite(seed) ? seed : 0;
+  const radialJitter = seededUnit(safeIndex + safeSeed * 31.7) - .5;
+  const angleJitter = seededUnit(safeIndex * 3.1 + safeSeed * 47.3) - .5;
+  const baseAngle = safeIndex * 2.399963229728653 + safeSeed * Math.PI * 2;
+  const angle = baseAngle + angleJitter * .46;
+  const radialBand = Math.sqrt((safeIndex + .55) / safeCount);
+  const distance = Math.min(safeRadius * .94, Math.max(safeRadius * .18, safeRadius * (radialBand * .82 + .08 + radialJitter * .04)));
+  return { x: Math.cos(angle) * distance, z: Math.sin(angle) * distance };
+}
+
+export function canDeploySoldier(reserve, amount = 1) {
+  const safeAmount = Math.max(1, Math.floor(Number.isFinite(amount) ? amount : 1));
+  return Number.isFinite(reserve) && Math.floor(reserve) >= safeAmount;
+}
+
+export function deploymentReserveAfterDeploy(reserve, amount = 1) {
+  const safeAmount = Math.max(1, Math.floor(Number.isFinite(amount) ? amount : 1));
+  return Math.max(0, Math.floor(Number.isFinite(reserve) ? reserve : 0) - safeAmount);
+}
+
+export function normalizePracticeConfig({ playerSoldiers, startingEnemies, waveCounts, waveDelay } = {}) {
   const integer = (value, fallback, min, max) => {
     const parsed = Number(value);
     const safeValue = Number.isFinite(parsed) ? parsed : fallback;
     return Math.min(max, Math.max(min, Math.floor(safeValue)));
   };
+  const delay = Number(waveDelay);
   return {
     playerSoldiers: integer(playerSoldiers, 7, 1, 36),
-    waveCounts: Array.from({ length: 10 }, (_, index) => integer(waveCounts?.[index], DEFAULT_PRACTICE_WAVE_COUNTS[index], 1, 24))
+    startingEnemies: integer(startingEnemies, OPENING_ENEMY_COUNT, 1, 24),
+    waveCounts: Array.from({ length: 10 }, (_, index) => integer(waveCounts?.[index], DEFAULT_PRACTICE_WAVE_COUNTS[index], 0, 24)),
+    waveDelay: Number.isFinite(delay) ? Math.min(60, Math.max(0, delay)) : DEFAULT_PRACTICE_WAVE_DELAY
   };
 }
 
@@ -1084,6 +1129,20 @@ export function lineOfSightBlocked(start, end, obstacles = [], corridorHalfWidth
     if (segmentDistanceToPoint(start, end, obstacle) <= radius + corridorHalfWidth) return true;
   }
   return false;
+}
+
+export function editorPanVector({
+  forward = { x: 0, z: -1 },
+  right = { x: 1, z: 0 },
+  horizontal = 0,
+  vertical = 0,
+  distance = 0
+} = {}) {
+  const x = right.x * horizontal + forward.x * vertical;
+  const z = right.z * horizontal + forward.z * vertical;
+  const length = Math.hypot(x, z);
+  if (length < 1e-9 || distance <= 0) return { x: 0, z: 0 };
+  return { x: x / length * distance, z: z / length * distance };
 }
 
 export function actorDebugSnapshot({

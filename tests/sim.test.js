@@ -1,6 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, ENEMY_TARGET_REVIEW_INTERVAL, FACTION, FOLLOW_AWARENESS, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatCinematicState, defeatRosterPlan, difficultyEncounter, duelAttackHits, duelLungeDirection, enemyTargetReviewDue, encounterResolutionState, enemyWaveApproachAngle, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, normalizePracticeConfig, particleBudgetAllows, persistentFragmentBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, scatteredPackOffset, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, shouldRetargetToCloserOpponent, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, ENEMY_TARGET_REVIEW_INTERVAL, FACTION, FOLLOW_AWARENESS, OPENING_ENEMY_COUNT, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDeploySoldier, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatCinematicState, defeatRosterPlan, deploymentReserveAfterDeploy, difficultyEncounter, duelAttackHits, duelLungeDirection, editorPanVector, enemyTargetReviewDue, encounterResolutionState, enemyWaveApproachAngle, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, levelCameraFrame, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, normalizePracticeConfig, openingRingSpawn, particleBudgetAllows, persistentFragmentBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, scatteredPackOffset, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, shouldRetargetToCloserOpponent, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+
+test("level editor camera pan follows the screen-facing axes without faster diagonals", () => {
+  assert.deepEqual(editorPanVector({ horizontal: 1, vertical: 0, distance: 5 }), { x: 5, z: 0 });
+  assert.deepEqual(editorPanVector({ horizontal: 0, vertical: 1, distance: 5 }), { x: 0, z: -5 });
+  const diagonal = editorPanVector({ horizontal: 1, vertical: 1, distance: 5 });
+  assert.ok(Math.abs(Math.hypot(diagonal.x, diagonal.z) - 5) < 1e-9);
+});
+
+test("saved level camera frames preserve focus and clamp editor zoom", () => {
+  assert.deepEqual(levelCameraFrame({ x: 14.125, z: -7.5, scale: 1.42 }), { x: 14.125, z: -7.5, scale: 1.42 });
+  assert.deepEqual(levelCameraFrame({ x: 0, z: 0, scale: 9 }), { x: 0, z: 0, scale: 3 });
+  assert.equal(levelCameraFrame({ x: "bad", z: 0, scale: 1 }), null);
+});
 
 test("victory resurrects all servants only after the entire enemy group dies", () => {
   assert.deepEqual(resolveEncounter({ playerHealth: 1, enemyMasterHealth: 0, livingEnemyServants: 1, enemyServantCount: 7 }), { outcome: "active", recruits: 0 });
@@ -240,11 +253,36 @@ test("practice session runs ten waves across three size bands", () => {
   assert.deepEqual([0,.5,.999].map(practiceWaveInterval),[5,6,7]);
 });
 
-test("custom practice settings clamp the starting army and ten wave sizes", () => {
-  const settings=normalizePracticeConfig({playerSoldiers:0,waveCounts:[0,99,4]});
+test("custom practice settings clamp the starting army, opening enemies, and ten wave sizes", () => {
+  const settings=normalizePracticeConfig({playerSoldiers:0,startingEnemies:99,waveCounts:[0,99,4],waveDelay:12.5});
   assert.equal(settings.playerSoldiers,1);
-  assert.deepEqual(settings.waveCounts.slice(0,4),[1,24,4,5]);
+  assert.equal(settings.startingEnemies,24);
+  assert.deepEqual(settings.waveCounts.slice(0,4),[0,24,4,5]);
   assert.equal(settings.waveCounts.length,10);
+  assert.equal(settings.waveDelay,12.5);
+});
+
+test("opening encounter places enemies in a loose, deterministic scatter within its protected radius", () => {
+  assert.equal(OPENING_ENEMY_COUNT, 10);
+  const positions=Array.from({length:OPENING_ENEMY_COUNT},(_,index)=>openingRingSpawn(index,OPENING_ENEMY_COUNT,8,.37));
+  assert.ok(positions.every(position=>Math.hypot(position.x,position.z)<=8));
+  assert.ok(positions.some(position=>Math.hypot(position.x,position.z)<6));
+  assert.notDeepEqual(positions[0],positions[1]);
+  assert.deepEqual(positions,Array.from({length:OPENING_ENEMY_COUNT},(_,index)=>openingRingSpawn(index,OPENING_ENEMY_COUNT,8,.37)));
+  assert.ok(Math.min(...positions.flatMap((position,index)=>positions.slice(index+1).map(other=>Math.hypot(position.x-other.x,position.z-other.z))))>1.1);
+  const crowdedPositions=Array.from({length:24},(_,index)=>openingRingSpawn(index,24,8,.81));
+  assert.ok(Math.min(...crowdedPositions.flatMap((position,index)=>crowdedPositions.slice(index+1).map(other=>Math.hypot(position.x-other.x,position.z-other.z))))>0.9);
+});
+
+test("deployment reserve validates and deducts the selected batch", () => {
+  assert.equal(canDeploySoldier(1),true);
+  assert.equal(canDeploySoldier(0),false);
+  assert.equal(canDeploySoldier(4,4),true);
+  assert.equal(canDeploySoldier(3,4),false);
+  assert.equal(deploymentReserveAfterDeploy(3),2);
+  assert.equal(deploymentReserveAfterDeploy(8,4),4);
+  assert.equal(deploymentReserveAfterDeploy(1,4),0);
+  assert.equal(deploymentReserveAfterDeploy(0),0);
 });
 
 test("incoming waves widen the camera only before they arrive", () => {
@@ -377,10 +415,10 @@ test("tactical camera safely handles empty and extreme combat frames", () => {
   assert.equal(tacticalCameraFrame([{x:0,z:0},{x:200,z:200}]).scale,1.58);
 });
 
-test("default gameplay and combat camera both sit farther out", () => {
-  assert.equal(gameplayCameraDistanceScale(1),1.38);
-  assert.ok(Math.abs(gameplayCameraDistanceScale(1.5)-2.07)<1e-9);
-  assert.ok(Math.abs(gameplayCameraDistanceScale(1.5,{combat:true})-1.74)<1e-9);
+test("default gameplay and combat camera both use the wider tactical framing", () => {
+  assert.equal(gameplayCameraDistanceScale(1),1.932);
+  assert.ok(Math.abs(gameplayCameraDistanceScale(1.5)-2.898)<1e-9);
+  assert.ok(Math.abs(gameplayCameraDistanceScale(1.5,{combat:true})-2.436)<1e-9);
 });
 
 test("large travel formations widen through four visual lanes", () => {
@@ -441,7 +479,7 @@ test("tactical command tiles cover exactly four terrain squares", () => {
   assert.equal(tacticalCellBlocked({cell:{x:1.8,z:1.8},actors:occupied,excludedIds:[],cellSize:3.6,offset:1.8}),true);
   assert.equal(tacticalCellBlocked({cell:{x:1.8,z:1.8},actors:occupied,excludedIds:[1],cellSize:3.6,offset:1.8}),false);
   assert.equal(tacticalCellBlocked({cell:{x:1.8,z:1.8},actors:neighboring,excludedIds:[],cellSize:3.6,offset:1.8}),false);
-  assert.equal(tacticalCellAction({inRange:true,occupied:true}),"cancel");
+  assert.equal(tacticalCellAction({inRange:true,occupied:true}),"move");
   assert.equal(tacticalCellAction({inRange:true,occupied:false}),"move");
   assert.equal(tacticalCellAction({inRange:false,occupied:false}),"reject");
 });
@@ -641,14 +679,11 @@ test("player soldier deaths create a compact fragment burst", () => {
   assert.equal(soldierFragmentCount(.99),12);
 });
 
-test("environment uses the original matte square-grid ground without tile overscan", () => {
+test("environment keeps the matte non-metallic terrain grade without tile overscan", () => {
   const grade=environmentGrade();
   assert.ok(grade.exposure<.85);
   assert.ok(grade.roughness>=.95);
   assert.equal(grade.metalness,0);
-  assert.equal(grade.groundColor,0x73796f);
-  assert.equal(grade.gridColor,0x4d5651);
-  assert.equal(grade.gridCells,10);
   assert.equal(grade.tileOverscan,0);
 });
 

@@ -1,8 +1,8 @@
 import * as THREE from "./vendor/three.module.js";
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { STR } from "./strings.js";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, defeatCinematicState, duelAttackHits, duelLungeDirection, editorPanVector, enemyWaveApproachAngle, environmentGrade, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, limitPointToRadius, lineOfSightBlocked, makeCampaign, nextDuelTurn, normalizePracticeConfig, particleBudgetAllows, persistentFragmentBudgetAllows, practiceEnemyHealthMultiplier, preserveLockedCombatants, resolveBoxOverlap, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
-import { DEPLOYMENT_BATCH_SIZES, ENEMY_TARGET_REVIEW_INTERVAL, canDeploySoldier, deploymentReserveAfterDeploy, enemyTargetReviewDue, levelCameraFrame, scatteredPackOffset, shouldRetargetToCloserOpponent } from "./sim-runtime-20260724g.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, defeatCinematicState, duelAttackHits, duelLungeDirection, duelMeetingPoint, duelPathFailureAction, editorPanVector, enemyWaveApproachAngle, environmentGrade, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, limitPointToRadius, lineOfSightBlocked, makeCampaign, nextDuelTurn, normalizePracticeConfig, particleBudgetAllows, persistentFragmentBudgetAllows, practiceEnemyHealthMultiplier, preserveLockedCombatants, resolveBoxOverlap, resolveDuelTurnId, separationVector, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
+import { DEPLOYMENT_BATCH_SIZES, ENEMY_TARGET_REVIEW_INTERVAL, canDeploySoldier, deploymentFootprintSupported, deploymentReserveAfterDeploy, enemyTargetReviewDue, levelCameraFrame, scatteredPackOffset, shouldRetargetToCloserOpponent, walkableSurfaceCandidates } from "./sim-runtime-20260724g.js";
 
 const $ = id => document.getElementById(id);
 const ENVIRONMENT=environmentGrade();
@@ -107,7 +107,7 @@ const EDITOR_CAMERA_OFFSET=ISOMETRIC_CAMERA_OFFSET.clone();
 const EDITOR_PAN_FORWARD=new THREE.Vector3(-EDITOR_CAMERA_OFFSET.x,0,-EDITOR_CAMERA_OFFSET.z).normalize();
 const EDITOR_PAN_RIGHT=new THREE.Vector3(-EDITOR_PAN_FORWARD.z,0,EDITOR_PAN_FORWARD.x);
 const EDITOR_ZOOM_MIN=.32,EDITOR_ZOOM_MAX=3,EDITOR_ZOOM_STEP=.15;
-let editorReturnMode="playing",editorCameraScale=1,editorSelection=null,editorSelectionAnchor=null,editorSelectionHelper=null,editorSelectionHelpers=[],editorTransformGizmo=null,editorTransformMode=null,editorScaleLocked=true,editorPointerState=null,editorPendingAsset=null,editorLibrarySelection=null,editorLibrarySelectionLabel="",editorAssetFolder=null,pendingEditorDelete=null,editorUndoHistory=[],editorCameraTravel=null,editorEnvironmentOpen=false,savedLevelCamera=null,foliagePaintActive=false,foliagePaintOperation="add",foliagePaintStroke=null,foliagePaintBrush=null;
+let editorReturnMode="playing",editorCameraScale=1,editorSelection=null,editorSelectionAnchor=null,editorSelectionHelper=null,editorSelectionHelpers=[],editorTransformGizmo=null,editorTransformMode=null,editorScaleLocked=true,editorPointerState=null,editorPendingAsset=null,editorLibrarySelection=null,editorLibrarySelectionLabel="",editorAssetFolder=null,pendingEditorDelete=null,editorUndoHistory=[],editorCameraTravel=null,editorEnvironmentOpen=false,savedLevelCamera=null,savedLevelState=null,foliagePaintActive=false,foliagePaintOperation="add",foliagePaintStroke=null,foliagePaintBrush=null;
 const EDITOR_LAYOUT_STORAGE_KEY="crownwake-editor-layout-v1";
 const CONTENT_BROWSER_STORAGE_KEY="crownwake-content-browser-v1",CONTENT_BROWSER_ROOT_ID="content";
 const EDITOR_CONTEXTS=Object.freeze({select:{title:"SELECT",kicker:"EDITOR MODE"},assets:{title:"ASSETS",kicker:"WORLD TOOL"},foliage:{title:"FOLIAGE",kicker:"WORLD TOOL"},environment:{title:"ENVIRONMENT",kicker:"WORLD LOOK"}});
@@ -1295,6 +1295,13 @@ function addLevelAsset(record){
   }
   return null;
 }
+function rememberLevelState(layout){
+  savedLevelState={
+    version:LEVEL_LAYOUT_VERSION,
+    assets:(layout.assets??[]).map(record=>({...record,rotation:record.rotation?.slice(),scale:record.scale?.slice()})),
+    camera:layout.camera?{...layout.camera}:null
+  };
+}
 function restoreLevelLayout(){
   try{
     const layout=JSON.parse(localStorage.getItem(LEVEL_LAYOUT_KEY)||"null");
@@ -1310,6 +1317,7 @@ function restoreLevelLayout(){
       if(record.type==="grass-cluster"&&layout.version===LEGACY_LEVEL_LAYOUT_VERSION)continue;
       addLevelAsset(record);
     }
+    rememberLevelState({assets:layout.assets.slice(0,180).filter(record=>record.type!=="bush"+"-sprite"&&!(record.type==="grass-cluster"&&layout.version===LEGACY_LEVEL_LAYOUT_VERSION)),camera:savedLevelCamera});
     if(layout.version===LEGACY_LEVEL_LAYOUT_VERSION)saveLevelLayout();
     return true;
   }catch(error){console.warn("Saved level layout could not be restored",error);return false}
@@ -1317,7 +1325,8 @@ function restoreLevelLayout(){
 function saveLevelLayout(){
   const assets=editorObjects.map(levelAssetRecord).filter(Boolean);
   if(mode==="editor")savedLevelCamera=levelCameraFrame({x:editorCameraFocus.x,z:editorCameraFocus.z,scale:editorCameraScale},{minScale:EDITOR_ZOOM_MIN,maxScale:EDITOR_ZOOM_MAX});
-  try{localStorage.setItem(LEVEL_LAYOUT_KEY,JSON.stringify({version:LEVEL_LAYOUT_VERSION,assets,camera:savedLevelCamera}));localStorage.setItem(EDITOR_ASSET_LIBRARY_KEY,JSON.stringify([...hiddenEditorAssets]));persistContentBrowserState();}
+  const layout={version:LEVEL_LAYOUT_VERSION,assets,camera:savedLevelCamera};rememberLevelState(layout);
+  try{localStorage.setItem(LEVEL_LAYOUT_KEY,JSON.stringify(layout));localStorage.setItem(EDITOR_ASSET_LIBRARY_KEY,JSON.stringify([...hiddenEditorAssets]));persistContentBrowserState();}
   catch(error){console.warn("Level layout could not be saved",error);}
 }
 function editorSnapshot(){return {assets:editorObjects.map(levelAssetRecord).filter(Boolean),hiddenAssets:[...hiddenEditorAssets],contentBrowser:copyContentBrowserState()};}
@@ -1327,13 +1336,14 @@ function restoreEditorSnapshot(snapshot){
   if(!snapshot)return;
   selectEditorObject(null);
   removeEditorCameraObject();
-  for(const object of [...editorObjects])battle.remove(object);
+  for(const object of [...editorObjects]){detachEditorActorFromCombat(object);battle.remove(object)}
   editorObjects.length=0;editorFoliageObjects.clear();worldFloor=null;
   for(const record of snapshot.assets??[])addLevelAsset(record);
   hiddenEditorAssets.clear();for(const assetId of snapshot.hiddenAssets??[])hiddenEditorAssets.add(assetId);
   restoreContentBrowserState(snapshot.contentBrowser);
   editorPendingAsset=null;editorLibrarySelection=null;editorLibrarySelectionLabel="";
   ensureEditorCameraObject();
+  rebuildPlacedCharacterEncounter();
   renderEditorAssets();updateEditorAssetSelection();renderWorldOutliner();
 }
 function undoEditorAction(){
@@ -1385,13 +1395,20 @@ function walkableSurfaceHeightAt(surface,x,z){
   supportSurfacePoint.set(supportProbeLocal.x,type==="island"?0:1,supportProbeLocal.z);surface.localToWorld(supportSurfacePoint);
   return supportSurfacePoint.y;
 }
-function actorSupportHeight(actor){
+function walkableSupportHeightAt(x,z){
   let highest=null;
   for(const surface of editorObjects){
-    const height=walkableSurfaceHeightAt(surface,actor.position.x,actor.position.z);
+    const height=walkableSurfaceHeightAt(surface,x,z);
     if(height!==null&&(highest===null||height>highest))highest=height;
   }
   return highest;
+}
+function actorSupportHeight(actor){return walkableSupportHeightAt(actor.position.x,actor.position.z)}
+function commandCellSupported(cell){
+  return deploymentFootprintSupported(
+    {x:cell.x,z:cell.z,size:COMMAND_CELL-.06},
+    point=>walkableSupportHeightAt(point.x,point.z)
+  );
 }
 function removeActorIntoVoid(actor){
   if(!actor?.userData?.alive)return;
@@ -1525,11 +1542,13 @@ function clearCommandGrid(){
   commandGrid.clear();
 }
 function addCommandGridCell(cell,{blocked=false,hovered=false}={}){
+  if(!commandCellSupported(cell))return false;
+  const surfaceY=walkableSupportHeightAt(cell.x,cell.z);
   const color=hovered?(blocked?0xd45d65:0x62d493):0xc7d5ca;
   const opacity=hovered?.72:.16;
   const mesh=new THREE.Mesh(commandCellGeometry,new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide}));
   const outline=new THREE.Mesh(commandCellOutlineGeometry,new THREE.MeshBasicMaterial({color:0xf7fff1,transparent:true,opacity:.88,depthWrite:false,side:THREE.DoubleSide}));
-  mesh.position.set(cell.x,GROUND_Y+.08,cell.z);outline.position.set(cell.x,GROUND_Y+.082,cell.z);mesh.renderOrder=90;outline.renderOrder=91;mesh.frustumCulled=false;outline.frustumCulled=false;mesh.userData={commandCell:cell,blocked};commandGrid.add(mesh,outline);
+  mesh.position.set(cell.x,surfaceY+.012,cell.z);outline.position.set(cell.x,surfaceY+.014,cell.z);mesh.renderOrder=90;outline.renderOrder=91;mesh.frustumCulled=false;outline.frustumCulled=false;mesh.userData={commandCell:cell,blocked};commandGrid.add(mesh,outline);return true;
 }
 function refreshCommandGrid(){
   clearCommandGrid();
@@ -1578,6 +1597,7 @@ function normalizeDeploymentBatch(){
   deploymentBatch=[...DEPLOYMENT_BATCH_SIZES].reverse().find(batch=>canDeploySoldier(deploymentReserve,batch))??1;
 }
 function deploymentCellBlocked(cell){
+  if(!commandCellSupported(cell))return true;
   const center=enemyPackAnchor?.position;
   return Boolean(center&&Math.hypot(cell.x-center.x,cell.z-center.z)<OPENING_ENEMY_RADIUS);
 }
@@ -1597,10 +1617,11 @@ function toggleDeploymentMode(){
 function deploySoldier(point){
   if(!deploymentArmed||!canDeploySoldier(deploymentReserve))return false;
   const count=Math.min(deploymentBatch,deploymentReserve),cell=snapTacticalCell(point,COMMAND_CELL,COMMAND_GRID_OFFSET),seed=rand();
-  if(deploymentCellBlocked(cell)){commandHoverCell=cell;refreshCommandGrid();showToast("ENEMY GROUND",1000);return false}
+  if(deploymentCellBlocked(cell)){commandHoverCell=commandCellSupported(cell)?cell:null;refreshCommandGrid();showToast(commandHoverCell?"ENEMY GROUND":"CHOOSE THE ISLAND",1000);return false}
+  const surfaceY=walkableSupportHeightAt(cell.x,cell.z);
   for(let index=0;index<count;index++){
     const offset=scatteredPackOffset(index,count,seed),unit=makeUnit("player");
-    unit.position.set(cell.x+offset.lateral*.48,GROUND_Y,cell.z+offset.forward*.48);unit.userData.holdPosition=unit.position.clone();battle.add(unit);followers.push(unit);
+    unit.position.set(cell.x+offset.lateral*.48,surfaceY+ACTOR_FOOT_CLEARANCE,cell.z+offset.forward*.48);unit.userData.holdPosition=unit.position.clone();battle.add(unit);followers.push(unit);
   }
   deploymentReserve=deploymentReserveAfterDeploy(deploymentReserve,count);deploymentStarted=true;activatePlacedCharacterEncounter();normalizeDeploymentBatch();deploymentArmed=canDeploySoldier(deploymentReserve);commandHoverCell=deploymentArmed?cell:null;refreshCommandGrid();updateStats();playSound("move");synthTone(520,.12,"sine",.022);showToast(count===1?"SOLDIER DEPLOYED":`${count} SOLDIERS DEPLOYED`,950);
   return true;
@@ -1608,7 +1629,7 @@ function deploySoldier(point){
 function issueCompanyOrder(point){
   if(selectedCompanyId===null&&!selectedCommander)return false;
   const cell=snapTacticalCell(point,COMMAND_CELL,COMMAND_GRID_OFFSET);
-  const action=tacticalCellAction({inRange:tacticalCellInRange(cell)});
+  const action=tacticalCellAction({inRange:tacticalCellInRange(cell)&&commandCellSupported(cell)});
   if(action==="reject"){showToast(STR.blockedGround,1000);commandHoverCell=cell;refreshCommandGrid();return true}
   if(action==="cancel"){
     clearTacticalSelection();showToast(STR.orderCancelled,1100);synthTone(220,.1,"sine",.014);return true;
@@ -1677,8 +1698,8 @@ function playerFocus(){
   return livingPlayerUnits()[0]??master;
 }
 function activatePlacedCharacterEncounter(){
-  const livingPlayers=followers.filter(unit=>unit?.visible&&unit.userData?.alive);
-  const livingEnemies=enemyUnits.filter(unit=>unit?.visible&&unit.userData?.alive);
+  const livingPlayers=followers.filter(unit=>unit?.parent===battle&&unit.visible&&unit.userData?.alive);
+  const livingEnemies=enemyUnits.filter(unit=>unit?.parent===battle&&unit.visible&&unit.userData?.alive);
   if(!livingPlayers.length||!livingEnemies.length||activeEncounter&&!activeEncounter.done)return false;
   deploymentStarted=true;
   const enemyCenter=livingEnemies.reduce((sum,unit)=>sum.add(unit.position),new THREE.Vector3()).multiplyScalar(1/livingEnemies.length);enemyCenter.y=GROUND_Y;
@@ -1687,6 +1708,37 @@ function activatePlacedCharacterEncounter(){
   enemyPackAnchor={position:enemyCenter.clone(),forward,velocity:new THREE.Vector3()};
   activeEncounter={regionId:selectedRegion,faction:FACTION.AMBER,totalServants:livingEnemies.length,aggro:false,done:false,victoryResolved:false,wave:0,swarmCount:1,threatBudget:livingEnemies.length,formationSpread:1};
   return true;
+}
+function detachActorFromCombat(object){
+  if(!object?.userData)return false;
+  const combatants=[master,...followers,...enemyUnits].filter(Boolean);
+  for(const unit of combatants){
+    if(unit===object)continue;
+    if(unit.userData.lockedTarget===object||unit.userData.waitingDuelTarget===object){
+      resetDuel(unit);unit.userData.seekingTarget=false;
+    }
+    if(unit.userData.commanderTarget===object)unit.userData.commanderTarget=null;
+  }
+  resetDuel(object);object.userData.seekingTarget=false;object.userData.commanderTarget=null;object.userData.manualMoving=false;object.userData.manualTarget=null;
+  object.userData.alive=false;object.userData.velocity?.set(0,0,0);object.visible=false;
+  for(const roster of [followers,enemyUnits])for(let index=roster.length-1;index>=0;index--)if(roster[index]===object)roster.splice(index,1);
+  return true;
+}
+function detachEditorActorFromCombat(object){
+  return object?.userData?.editorActor?detachActorFromCombat(object):false;
+}
+function rebuildPlacedCharacterEncounter(){
+  const attached=unit=>unit?.parent===battle&&unit.visible&&unit.userData?.alive;
+  followers=followers.filter(attached);enemyUnits=enemyUnits.filter(attached);
+  for(const unit of [...followers,...enemyUnits]){
+    resetDuel(unit);unit.userData.seekingTarget=false;unit.userData.commanderTarget=null;
+  }
+  activeEncounter=null;enemyPackAnchor=null;wasCombat=false;defeatCinematic=null;
+  activatePlacedCharacterEncounter();
+}
+function removeUnplacedEnemyActors(){
+  for(const enemy of [...enemyUnits])if(!enemy.userData?.editorActor){detachActorFromCombat(enemy);battle.remove(enemy)}
+  rebuildPlacedCharacterEncounter();
 }
 
 const spawnFrustum=new THREE.Frustum(),spawnProjection=new THREE.Matrix4(),spawnSphere=new THREE.Sphere(new THREE.Vector3(),3.6);
@@ -1767,6 +1819,34 @@ if(!restoredLevelLayout){
   addWorldFloor();
   addSampleTreeClusters();
   addArcherTower({x:11,z:-3});
+}
+if(!savedLevelCamera)savedLevelCamera=levelCameraFrame({x:0,z:0,scale:1},{minScale:EDITOR_ZOOM_MIN,maxScale:EDITOR_ZOOM_MAX});
+if(!savedLevelState)rememberLevelState({assets:editorObjects.map(levelAssetRecord).filter(Boolean),camera:savedLevelCamera});
+
+function disposePlaytestParticle(particle){
+  battle.remove(particle);particle.geometry?.dispose?.();
+  const materials=Array.isArray(particle.material)?particle.material:[particle.material];
+  for(const material of materials)material?.dispose?.();
+}
+function resetPlaytestToSavedLevel(){
+  if(!savedLevelState)return false;
+  clearTacticalSelection();selectEditorObject(null);removeEditorCameraObject();clearCommandGrid();
+  for(const particle of particles)disposePlaytestParticle(particle);
+  for(const marker of tombstones)battle.remove(marker);
+  for(const object of new Set([...editorObjects,...followers,...enemyUnits]))battle.remove(object);
+  particles=[];tombstones=[];followers=[];enemyUnits=[];editorObjects.length=0;editorFoliageObjects.clear();worldFloor=null;
+  activeEncounter=null;enemyPackAnchor=null;enemyRetreat=null;defeatCinematic=null;nextWaveTimer=0;waveNumber=0;wasCombat=false;
+  companyAnchors.clear();playerCompanies=[];companyLayoutDirty=true;selectedCompanyId=null;selectedCommander=null;commandHoverCell=null;
+  campaign=makeCampaign();selectedRegion=2;deploymentReserve=PLAYER_DEPLOYMENT_RESERVE_START;deploymentBatch=1;deploymentArmed=false;deploymentStarted=false;
+  commanderHearts=3;masterHealth=INDEPENDENT_SOLDIERS?32:PLAYER_COMMANDER.maxHealth;sinceDamage=99;damagePulse=0;damageStacks=0;shake=0;totalTime=0;rngState=0xC0FFEE;
+  master.visible=false;master.userData.alive=false;master.userData.falling=false;master.userData.verticalVelocity=0;master.userData.velocity.set(0,0,0);master.position.set(0,GROUND_Y,0);resetDuel(master);target.copy(master.position);
+  savedLevelCamera=levelCameraFrame(savedLevelState.camera,{minScale:EDITOR_ZOOM_MIN,maxScale:EDITOR_ZOOM_MAX});
+  if(savedLevelCamera){
+    gameplayCameraFocus.set(savedLevelCamera.x,0,savedLevelCamera.z);gameplayCameraScale=savedLevelCamera.scale;gameplayCameraBaselineScale=savedLevelCamera.scale;
+  }
+  for(const record of savedLevelState.assets)addLevelAsset(record);
+  rebuildPlacedCharacterEncounter();battle.visible=true;overview.visible=false;overview.clear();
+  $("map-panel")?.classList.add("hidden");$("end-screen")?.classList.add("hidden");updateHearts();updateStats();return true;
 }
 
 function formationSlot(i,count,leaderPos,forward,spread=0){
@@ -1854,7 +1934,7 @@ function commanderRoute(attacker,targetActor,actors){
 function resetDuel(unit){
   unit.userData.lockedTarget=null;unit.userData.duelRole=null;unit.userData.faceoffCenter=null;unit.userData.faceoffAxis=null;unit.userData.faceoffHold=null;unit.userData.lungeAxis=null;unit.userData.nextTargetReviewAt=null;
   unit.userData.lastTargetPosition=null;unit.userData.duelTurnId=null;unit.userData.waitingDuelTarget=null;
-  unit.userData.duelPhase=DUEL_PHASE.APPROACH;unit.userData.duelTimer=0;unit.userData.pathPreviousDistance=Infinity;unit.userData.pathStallTimer=0;unit.userData.pathFailures=0;unit.scale.set(1,1,1);
+  unit.userData.duelPhase=DUEL_PHASE.APPROACH;unit.userData.duelTimer=0;unit.userData.pathPreviousDistance=Infinity;unit.userData.pathStallTimer=0;unit.userData.pathFailures=0;unit.userData.pathRouteRevision=0;unit.scale.set(1,1,1);
 }
 function releaseStaleDuel(unit){
   const foe=unit.userData.lockedTarget;
@@ -1871,7 +1951,8 @@ function avoidBlockedDuelAndReassign(unit){
 }
 function reviewEnemyDuelTarget(unit,foe,candidates){
   const data=unit.userData;
-  if(!foe?.userData.alive||foe.userData.lockedTarget!==unit||!enemyTargetReviewDue({now:totalTime,nextReviewAt:data.nextTargetReviewAt}))return foe;
+  const mutualLock=foe?.userData.lockedTarget===unit;
+  if(!foe?.userData.alive||mutualLock||!enemyTargetReviewDue({now:totalTime,nextReviewAt:data.nextTargetReviewAt}))return foe;
   data.nextTargetReviewAt=totalTime+ENEMY_TARGET_REVIEW_INTERVAL;
   let alternative=null,alternativeDistance=Infinity;
   for(const candidate of candidates){
@@ -1880,7 +1961,7 @@ function reviewEnemyDuelTarget(unit,foe,candidates){
     if(distance<alternativeDistance){alternative=candidate;alternativeDistance=distance}
   }
   const currentDistance=unit.position.distanceTo(foe.position);
-  if(!alternative||!shouldRetargetToCloserOpponent({phase:data.duelPhase,currentDistance,candidateDistance:alternativeDistance}))return foe;
+  if(!alternative||!shouldRetargetToCloserOpponent({phase:data.duelPhase,currentDistance,candidateDistance:alternativeDistance,mutualLock}))return foe;
   releaseStaleDuel(unit);
   const center=unit.position.clone().add(alternative.position).multiplyScalar(.5);center.y=GROUND_Y;
   lockDuel(unit,alternative,"primary",0,center);lockDuel(alternative,unit,"primary",0,center);
@@ -1901,7 +1982,15 @@ function duelPathNeedsRelock(unit,desired,dt){
     timer:unit.userData.pathStallTimer??0,failures:unit.userData.pathFailures??0,dt
   });
   unit.userData.pathPreviousDistance=state.previousDistance;unit.userData.pathStallTimer=state.timer;unit.userData.pathFailures=state.failures;
-  return state.relock;
+  const foe=unit.userData.lockedTarget;
+  const action=duelPathFailureAction({
+    relock:state.relock,mutualLock:foe?.userData.lockedTarget===unit,targetAlive:!!foe?.userData.alive,targetOnFloor:!!foe&&actorSupportHeight(foe)!==null
+  });
+  if(action==="reroute"){
+    unit.userData.pathRouteRevision=(unit.userData.pathRouteRevision??0)+1;
+    unit.userData.pathPreviousDistance=Infinity;unit.userData.pathStallTimer=0;unit.userData.pathFailures=0;
+  }
+  return action==="release";
 }
 function lockDuel(unit,foe,role="primary",supportIndex=0,sharedCenter=null){
   if(unit.userData.lockedTarget===foe&&unit.userData.duelRole===role)return;
@@ -1937,20 +2026,14 @@ function assignEngagements(sideA,sideB){
     const {left:bestA,right:bestB}=pair;
     aMap.set(bestA,bestB);bMap.set(bestB,bestA);
   }
-  const pairs=[...aMap].map(([left,right])=>({left,right,midpoint:left.position.clone().add(right.position).multiplyScalar(.5)}));
+  const pairs=[...aMap].map(([left,right])=>({left,right}));
   if(pairs.length){
-    const aCenter=a.reduce((sum,unit)=>sum.add(unit.position),new THREE.Vector3()).multiplyScalar(1/a.length);
-    const bCenter=b.reduce((sum,unit)=>sum.add(unit.position),new THREE.Vector3()).multiplyScalar(1/b.length);
-    const heading=bCenter.clone().sub(aCenter).setY(0);
-    if(heading.lengthSq()<.001)heading.set(0,0,1);else heading.normalize();
-    const lateral=new THREE.Vector3(-heading.z,0,heading.x);
-    const battleCenter=aCenter.add(bCenter).multiplyScalar(.5);battleCenter.y=GROUND_Y;
-    pairs.sort((first,second)=>first.midpoint.dot(lateral)-second.midpoint.dot(lateral));
-    for(const [index,pair] of pairs.entries()){
-      const laneCenter=battleCenter.clone().addScaledVector(lateral,battleLaneOffset(index,pairs.length,1.6));
+    for(const pair of pairs){
       const alreadyMutual=pair.left.userData.lockedTarget===pair.right&&pair.right.userData.lockedTarget===pair.left;
       if(!alreadyMutual){
-        lockDuel(pair.left,pair.right,"primary",0,laneCenter);lockDuel(pair.right,pair.left,"primary",0,laneCenter);
+        const meeting=duelMeetingPoint(pair.left.position,pair.right.position);
+        const pairCenter=new THREE.Vector3(meeting.x,GROUND_Y,meeting.z);
+        lockDuel(pair.left,pair.right,"primary",0,pairCenter);lockDuel(pair.right,pair.left,"primary",0,pairCenter);
         const firstAttacker=((pair.left.id+pair.right.id)&1)===0?pair.left:pair.right;
         pair.left.userData.duelTurnId=firstAttacker.id;pair.right.userData.duelTurnId=firstAttacker.id;
       }
@@ -2085,9 +2168,12 @@ function updateDuel(unit,foe,dt){
   const strikeRange=foe.userData.isMaster?1.4:1.15;
   const strikeDistance=unit.position.distanceTo(foe.position);
   const mutual=foe.userData.lockedTarget===unit;
-  if(mutual&&data.duelTurnId==null){
-    const firstAttacker=Math.min(unit.id,foe.id);
-    data.duelTurnId=firstAttacker;foe.userData.duelTurnId=firstAttacker;
+  if(mutual){
+    const turnId=resolveDuelTurnId({
+      unitId:unit.id,targetId:foe.id,
+      unitTurnId:data.duelTurnId,targetTurnId:foe.userData.duelTurnId
+    });
+    data.duelTurnId=turnId;foe.userData.duelTurnId=turnId;
   }
   const mayAttack=!mutual||data.duelTurnId===unit.id;
   const next=mayAttack
@@ -2134,7 +2220,7 @@ function routeLockedDesired(unit,desired,foe){
     .filter(actor=>actor!==unit&&actor!==foe&&actor.visible&&actor.userData.alive!==false)
     .map(actor=>({x:actor.position.x,z:actor.position.z,radius:Math.max(actor.userData.collisionHalf?.x??.2,actor.userData.collisionHalf?.z??.2)}));
   const detour=chooseLocalDetour({
-    start:unit.position,goal:desired,obstacles,clearance:.58,lookAhead:2.45,preferLeft:((unit.id+(unit.userData.pathFailures??0))&1)===0
+    start:unit.position,goal:desired,obstacles,clearance:.58,lookAhead:2.45,preferLeft:((unit.id+(unit.userData.pathRouteRevision??0))&1)===0
   });
   return detour?new THREE.Vector3(detour.x,desired.y,detour.z):desired;
 }
@@ -2180,13 +2266,15 @@ function updateParticles(dt){
       continue;
     }
     if(p.userData.kind==="shatter"){
+      const supportY=walkableSupportHeightAt(p.position.x,p.position.z);
       const state=advanceGroundFragment({
         position:p.position,velocity:p.userData.vel,halfSize:p.userData.halfSize,
-        bounces:p.userData.bounces,settled:p.userData.settled,dt,groundY:GROUND_Y
+        bounces:p.userData.bounces,settled:p.userData.settled,dt,groundY:supportY
       });
       p.position.set(state.position.x,state.position.y,state.position.z);
       p.userData.vel.set(state.velocity.x,state.velocity.y,state.velocity.z);
       p.userData.bounces=state.bounces;p.userData.settled=state.settled;
+      if(p.position.y<ACTOR_VOID_Y){battle.remove(p);p.geometry.dispose();p.material.dispose();particles.splice(index,1);continue}
       if(state.settled){p.rotation.x=0;p.rotation.z=0}
       if(!state.settled&&p.userData.spin){p.rotation.x+=p.userData.spin.x*dt;p.rotation.y+=p.userData.spin.y*dt;p.rotation.z+=p.userData.spin.z*dt}
       p.scale.setScalar(p.userData.persistent?1:p.userData.life<.45?p.userData.life/.45:1);
@@ -3170,8 +3258,10 @@ function selectEditorObjectFromEvent(object,event){
 }
 function removeEditorObject(object){
   const index=editorObjects.indexOf(object);if(index<0||object.userData.editorProtected)return false;
+  const removedActor=detachEditorActorFromCombat(object);
   editorObjects.splice(index,1);editorFoliageObjects.delete(object);battle.remove(object);
   if(object===worldFloor)worldFloor=null;
+  if(removedActor)rebuildPlacedCharacterEncounter();
   return true;
 }
 function deleteEditorSelection(){
@@ -3702,13 +3792,30 @@ function updateEditorKeyboardPan(dt){
   const pan=editorPanVector({forward:EDITOR_PAN_FORWARD,right:EDITOR_PAN_RIGHT,horizontal,vertical,distance:14*dt*editorCameraScale});editorCameraFocus.x+=pan.x;editorCameraFocus.z+=pan.z;ensureEditorCameraObject();
 }
 
+const gameplaySurfaceNormal=new THREE.Vector3(),gameplaySurfaceNormalMatrix=new THREE.Matrix3();
+function gameplayFloorPoint(targetPoint=new THREE.Vector3()){
+  const surfaces=walkableSurfaceCandidates(editorObjects);
+  if(!surfaces.length)return null;
+  const hit=raycaster.intersectObjects(surfaces,true).find(candidate=>{
+    if(!candidate.face)return false;
+    gameplaySurfaceNormalMatrix.getNormalMatrix(candidate.object.matrixWorld);
+    gameplaySurfaceNormal.copy(candidate.face.normal).applyMatrix3(gameplaySurfaceNormalMatrix).normalize();
+    return gameplaySurfaceNormal.y>.55;
+  });
+  return hit?targetPoint.copy(hit.point):null;
+}
+
 function pointerWorld(e){
   if(mode==="editor"){editorPointerDown(e);return}
   if(mode!=="map"&&!tacticalInputEnabled(mode))return;
   const rect=canvas.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);
   if(mode==="map"){const hit=raycaster.intersectObjects(hoverable,false)[0];if(hit)chooseRegion(hit.object.userData.region);return}
-  const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-GROUND_Y),p=new THREE.Vector3();
-  if(deploymentArmed&&raycaster.ray.intersectPlane(plane,p)){deploySoldier(p);return}
+  const p=new THREE.Vector3(),floorHit=gameplayFloorPoint(p);
+  if(deploymentArmed){
+    if(floorHit)deploySoldier(p);
+    else{commandHoverCell=null;refreshCommandGrid();showToast("CHOOSE THE ISLAND",900)}
+    return;
+  }
   ensureCompanyLayout();
   const actorHit=raycaster.intersectObjects([master,...followers.filter(unit=>unit.userData.alive&&unit.visible)],true)
     .map(hit=>{let object=hit.object;while(object&&object!==battle&&!object.userData?.isMaster&&!Number.isInteger(object.userData?.companyId))object=object.parent;return object&&object!==battle?object:null})
@@ -3724,7 +3831,7 @@ function pointerWorld(e){
     selectCommander(actorHit);
     return;
   }
-  if(raycaster.ray.intersectPlane(plane,p)&&(selectedCompanyId!==null||selectedCommander)){
+  if(floorHit&&(selectedCompanyId!==null||selectedCommander)){
     if(issueCompanyOrder(p)){
       const marker=$("tap-marker");marker.style.left=`${e.clientX}px`;marker.style.top=`${e.clientY}px`;marker.classList.remove("pulse");void marker.offsetWidth;marker.classList.add("pulse");
       $("mobile-command")?.classList.add("dismissed");
@@ -3734,11 +3841,11 @@ function pointerWorld(e){
 function hoverTacticalGrid(e){
   if(!tacticalInputEnabled(mode)||(!deploymentArmed&&selectedCompanyId===null&&!selectedCommander))return;
   const rect=canvas.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);
-  const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-GROUND_Y),p=new THREE.Vector3();
-  if(raycaster.ray.intersectPlane(plane,p)){
+  const p=new THREE.Vector3();
+  if(gameplayFloorPoint(p)){
     const cell=snapTacticalCell(p,COMMAND_CELL,COMMAND_GRID_OFFSET);
     if(!commandHoverCell||cell.x!==commandHoverCell.x||cell.z!==commandHoverCell.z){commandHoverCell=cell;refreshCommandGrid()}
-  }
+  }else if(commandHoverCell){commandHoverCell=null;refreshCommandGrid()}
 }
 canvas.addEventListener("pointerdown",pointerWorld);
 canvas.addEventListener("pointermove",hoverTacticalGrid);
@@ -3774,7 +3881,7 @@ function renderSettings(){
 }
 function openSettings(){
   if(!["playing","paused"].includes(mode))return;
-  settingsReturnMode=mode;mode="settings";deploymentArmed=false;clearTacticalSelection();refreshCommandGrid();updateDeploymentControl();renderSettings();$("settings-panel").classList.remove("hidden");
+  settingsReturnMode=mode;mode="settings";resetPlaytestToSavedLevel();deploymentArmed=false;clearTacticalSelection();refreshCommandGrid();updateDeploymentControl();renderSettings();$("settings-panel").classList.remove("hidden");
 }
 function closeSettings(){
   if(mode!=="settings")return;$("settings-panel").classList.add("hidden");mode=settingsReturnMode;
@@ -3830,7 +3937,7 @@ $("content-browser-filter").onclick=()=>{contentBrowserQuery="";$("content-brows
 $("content-browser-view").onclick=()=>{const panel=$("asset-panel"),active=!panel.classList.contains("content-browser-list-view");panel.classList.toggle("content-browser-list-view",active);$("content-browser-view").setAttribute("aria-pressed",String(active));};
 $("content-browser-visibility").onclick=()=>{const slot=$("editor-content-drawer-slot"),hidden=slot.dataset.contentHidden!=="true";slot.dataset.contentHidden=String(hidden);$("content-browser-visibility").setAttribute("aria-pressed",String(!hidden));$("content-browser-visibility").setAttribute("title",hidden?"Show Content Browser":"Hide Content Browser");};
 $("editor-environment-toggle").onclick=()=>toggleEditorEnvironmentPopover();
-$("content-browser-search").addEventListener("input",event=>{contentBrowserQuery=event.currentTarget.value;renderContentBrowser();});$("editor-delete").onclick=()=>openEditorDeleteConfirm();$("editor-delete-cancel").onclick=closeEditorDeleteConfirm;$("editor-delete-confirm-button").onclick=confirmEditorDelete;$("editor-done").onclick=()=>{saveLevelLayout();closeLevelEditor();};
+$("content-browser-search").addEventListener("input",event=>{contentBrowserQuery=event.currentTarget.value;renderContentBrowser();});$("editor-delete").onclick=()=>openEditorDeleteConfirm();$("editor-delete-cancel").onclick=closeEditorDeleteConfirm;$("editor-delete-confirm-button").onclick=confirmEditorDelete;$("editor-done").onclick=()=>{saveLevelLayout();resetPlaytestToSavedLevel();editorReturnMode="playing";closeLevelEditor();};
 document.addEventListener("pointerdown",event=>{if(!event.target.closest("#content-browser-context-menu")&&!event.target.closest("#asset-panel"))hideContentBrowserContextMenu();});
 for(const context of Object.keys(EDITOR_CONTEXTS))$("editor-context-"+context).onclick=()=>setEditorContext(context);
 $("editor-save").onclick=saveEditorSession;$("editor-maximize").onclick=toggleEditorViewportMaximize;
@@ -3855,7 +3962,7 @@ function updateHearts(){
 }
 function updateStats(){const count=livingPlayerUnits().length;$("army-count").textContent=count;$("army-button-count").textContent=deploymentReserve;$("territory-count").textContent=`${campaign.conquered.size}/7`;updateDeploymentControl()}
 function win(){mode="end";$("end-title").textContent=STR.victory;$("retry").textContent=STR.retry;$("end-screen").classList.remove("hidden");$("hud").classList.add("hidden")}
-function start(){mode="playing";$("title-screen").classList.add("hidden");$("hud").classList.remove("hidden");$("commander-vitals")?.classList.add("hidden");$("companies")?.classList.remove("hidden");$("divide-company")?.classList.add("hidden");$("pause").textContent=STR.pause;$("pause").setAttribute("aria-label",STR.pause);$("mobile-command").textContent="TAP THE SOLDIER ICON TO DEPLOY";updateStats();if(debugMode)toggleDebugMonitor(true);if(audioOn)sounds.music.play().catch(()=>{});showToast("DEPLOY YOUR SOLDIERS")}
+function start(){removeUnplacedEnemyActors();mode="playing";$("title-screen").classList.add("hidden");$("hud").classList.remove("hidden");$("commander-vitals")?.classList.add("hidden");$("companies")?.classList.remove("hidden");$("divide-company")?.classList.add("hidden");$("pause").textContent=STR.pause;$("pause").setAttribute("aria-label",STR.pause);$("mobile-command").textContent="TAP THE SOLDIER ICON TO DEPLOY";updateStats();if(debugMode)toggleDebugMonitor(true);if(audioOn)sounds.music.play().catch(()=>{});showToast("DEPLOY YOUR SOLDIERS")}
 $("begin").onclick=start;$("retry").onclick=()=>location.reload();
 
 function activeCombatCameraFrame(){

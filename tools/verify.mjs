@@ -80,6 +80,23 @@ if (!restoreSnapshotSource.includes("removeEditorCameraObject();") ||
     !restoreSnapshotSource.includes("ensureEditorCameraObject();")) {
   throw new Error("Undo must reconstruct the editor camera in the scene and World Outliner");
 }
+if (!gameSource.includes("function detachEditorActorFromCombat(object)")) {
+  throw new Error("Editor actors must have a shared combat-roster cleanup path");
+}
+if (!restoreSnapshotSource.includes("detachEditorActorFromCombat(object)")) {
+  throw new Error("Undo restore must remove discarded editor actors from combat rosters");
+}
+const removeEditorObjectSource = gameSource.slice(
+  gameSource.indexOf("function removeEditorObject(object)"),
+  gameSource.indexOf("function deleteEditorSelection()")
+);
+if (!removeEditorObjectSource.includes("detachEditorActorFromCombat(object)")) {
+  throw new Error("Deleting an editor actor must remove it from combat rosters");
+}
+const startSource = gameSource.slice(gameSource.indexOf("function start()"), gameSource.indexOf('$("begin").onclick'));
+if (!startSource.includes("removeUnplacedEnemyActors()")) {
+  throw new Error("Starting play must purge enemies that were not placed in the level editor");
+}
 for (const contract of [
   ['.editor-shell{', "Editor shell must have dedicated docked layout styles"],
   ['grid-template-areas:', "Editor shell must reserve explicit toolbar, rail, viewport, dock and status regions"],

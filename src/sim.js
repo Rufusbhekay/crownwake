@@ -82,6 +82,13 @@ export function chooseNearestAvailablePair(sideA, sideB, distanceBetween = (left
   return best;
 }
 
+export function duelMeetingPoint(left, right) {
+  return {
+    x: (left.x + right.x) * .5,
+    z: (left.z + right.z) * .5
+  };
+}
+
 // Centres parallel duels around the battle midpoint.  Keeping the result pure
 // makes the lane spacing easy to tune without touching the live simulation.
 export function battleLaneOffset(index, count, spacing = 1.6) {
@@ -210,7 +217,8 @@ export function revivalProgressionState({ waitingForRecruits, revivingFollowerCo
 }
 
 export function advanceGroundFragment({ position, velocity, halfSize, bounces, settled, dt, groundY = .02 }) {
-  if (settled) {
+  const hasGround = Number.isFinite(groundY);
+  if (settled && hasGround) {
     return {
       position: { x: position.x, y: groundY + halfSize, z: position.z },
       velocity: { x: 0, y: 0, z: 0 },
@@ -224,6 +232,9 @@ export function advanceGroundFragment({ position, velocity, halfSize, bounces, s
     y: position.y + nextVelocity.y * dt,
     z: position.z + nextVelocity.z * dt
   };
+  if (!hasGround) {
+    return { position: nextPosition, velocity: nextVelocity, bounces, settled: false };
+  }
   const floor = groundY + halfSize;
   if (nextPosition.y > floor) {
     return { position: nextPosition, velocity: nextVelocity, bounces, settled: false };
@@ -605,13 +616,21 @@ export function duelLungeDirection({ phase, previousPhase, committedDirection, c
   return currentDirection;
 }
 
+export function resolveDuelTurnId({ unitId, targetId, unitTurnId, targetTurnId }) {
+  const belongsToPair = turnId => turnId === unitId || turnId === targetId;
+  if (belongsToPair(unitTurnId) && unitTurnId === targetTurnId) return unitTurnId;
+  if (belongsToPair(unitTurnId) && targetTurnId == null) return unitTurnId;
+  if (belongsToPair(targetTurnId) && unitTurnId == null) return targetTurnId;
+  return Math.min(unitId, targetId);
+}
+
 export function advanceDuelState({ phase, timer, distance, strikeDistance = Infinity, strikeRange = 1.15, dt }) {
   if (phase === DUEL_PHASE.APPROACH) {
     if (distance <= .16) return { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false };
     // A pair that has already met does not need to settle onto its invisible
     // face-off marker first. Arm the lunge immediately and let the existing
     // stand-off distance prevent overlap.
-    if (strikeDistance <= strikeRange + .28) return { phase: DUEL_PHASE.LUNGE, timer: .42, strike: false };
+    if (strikeDistance <= strikeRange + .4) return { phase: DUEL_PHASE.LUNGE, timer: .42, strike: false };
     return { phase, timer: 0, strike: false };
   }
   if (phase === DUEL_PHASE.LUNGE) {
@@ -787,6 +806,12 @@ export function advancePathFailure({ previousDistance, distance, timer, failures
   return { previousDistance: distance, timer: 0, failures: nextFailures, relock: nextFailures >= maxFailures };
 }
 
+export function duelPathFailureAction({ relock, mutualLock, targetAlive, targetOnFloor }) {
+  if (!targetAlive || !targetOnFloor) return "release";
+  if (!relock) return "continue";
+  return mutualLock ? "reroute" : "release";
+}
+
 export const ENEMY_TARGET_REVIEW_INTERVAL = 1;
 
 export function enemyTargetReviewDue({ now, nextReviewAt }) {
@@ -797,10 +822,12 @@ export function shouldRetargetToCloserOpponent({
   phase,
   currentDistance,
   candidateDistance,
+  mutualLock = false,
   closeRange = 1.15,
   advantage = .35
 }) {
-  return phase === DUEL_PHASE.APPROACH
+  return !mutualLock
+    && phase === DUEL_PHASE.APPROACH
     && currentDistance > closeRange
     && candidateDistance + advantage < currentDistance;
 }
@@ -878,6 +905,26 @@ export function openingRingSpawn(index, count = OPENING_ENEMY_COUNT, radius = 8,
 export function canDeploySoldier(reserve, amount = 1) {
   const safeAmount = Math.max(1, Math.floor(Number.isFinite(amount) ? amount : 1));
   return Number.isFinite(reserve) && Math.floor(reserve) >= safeAmount;
+}
+
+export function deploymentFootprintSupported({ x, z, size }, supportAt) {
+  if (![x, z, size].every(Number.isFinite) || size <= 0 || typeof supportAt !== "function") return false;
+  const inset = size * .48;
+  return [
+    { x, z },
+    { x: x - inset, z: z - inset },
+    { x: x + inset, z: z - inset },
+    { x: x + inset, z: z + inset },
+    { x: x - inset, z: z + inset }
+  ].every(point => {
+    const support = supportAt(point);
+    return support !== null && support !== undefined;
+  });
+}
+
+export function walkableSurfaceCandidates(objects) {
+  if (!Array.isArray(objects)) return [];
+  return objects.filter(object => object?.parent && object.userData?.walkableSurface);
 }
 
 export function deploymentReserveAfterDeploy(reserve, amount = 1) {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, ENEMY_TARGET_REVIEW_INTERVAL, FACTION, FOLLOW_AWARENESS, OPENING_ENEMY_COUNT, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDeploySoldier, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatCinematicState, defeatRosterPlan, deploymentReserveAfterDeploy, difficultyEncounter, duelAttackHits, duelLungeDirection, editorPanVector, enemyTargetReviewDue, encounterResolutionState, enemyWaveApproachAngle, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, levelCameraFrame, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, normalizePracticeConfig, openingRingSpawn, particleBudgetAllows, persistentFragmentBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, scatteredPackOffset, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, shouldRetargetToCloserOpponent, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, ENEMY_TARGET_REVIEW_INTERVAL, FACTION, FOLLOW_AWARENESS, OPENING_ENEMY_COUNT, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDeploySoldier, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatCinematicState, defeatRosterPlan, deploymentFootprintSupported, deploymentReserveAfterDeploy, difficultyEncounter, duelAttackHits, duelLungeDirection, duelMeetingPoint, duelPathFailureAction, editorPanVector, enemyTargetReviewDue, encounterResolutionState, enemyWaveApproachAngle, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, levelCameraFrame, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, normalizePracticeConfig, openingRingSpawn, particleBudgetAllows, persistentFragmentBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveDuelTurnId, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, scatteredPackOffset, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, shouldRetargetToCloserOpponent, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, walkableSurfaceCandidates, waveSizeFromRoll } from "../src/sim.js";
 
 test("level editor camera pan follows the screen-facing axes without faster diagonals", () => {
   assert.deepEqual(editorPanVector({ horizontal: 1, vertical: 0, distance: 5 }), { x: 5, z: 0 });
@@ -197,6 +197,21 @@ test("free soldiers choose the closest available opponent pair", () => {
   );
   assert.equal(pair.left.id, "left-a");
   assert.equal(pair.right.id, "right-b");
+});
+
+test("a duel meets halfway between its own two opponents", () => {
+  assert.deepEqual(
+    duelMeetingPoint({ x: -7, z: 3 }, { x: -1, z: 9 }),
+    { x: -4, z: 6 }
+  );
+});
+
+test("mutual duels repair missing, stale, or disagreeing turn ownership", () => {
+  assert.equal(resolveDuelTurnId({unitId:12,targetId:19,unitTurnId:null,targetTurnId:null}),12);
+  assert.equal(resolveDuelTurnId({unitId:12,targetId:19,unitTurnId:99,targetTurnId:99}),12);
+  assert.equal(resolveDuelTurnId({unitId:12,targetId:19,unitTurnId:12,targetTurnId:19}),12);
+  assert.equal(resolveDuelTurnId({unitId:12,targetId:19,unitTurnId:19,targetTurnId:19}),19);
+  assert.equal(resolveDuelTurnId({unitId:12,targetId:19,unitTurnId:19,targetTurnId:null}),19);
 });
 
 test("duel lanes distribute face-offs evenly across the battle line", () => {
@@ -656,11 +671,20 @@ test("two failed path windows trigger a clean target reacquisition", () => {
   assert.equal(progressing.relock,false);assert.equal(progressing.failures,0);
 });
 
+test("a brief path stall reroutes without releasing a living mutual duel", () => {
+  assert.equal(duelPathFailureAction({relock:true,mutualLock:true,targetAlive:true,targetOnFloor:true}),"reroute");
+  assert.equal(duelPathFailureAction({relock:true,mutualLock:false,targetAlive:true,targetOnFloor:true}),"release");
+  assert.equal(duelPathFailureAction({relock:false,mutualLock:true,targetAlive:true,targetOnFloor:true}),"continue");
+  assert.equal(duelPathFailureAction({relock:true,mutualLock:true,targetAlive:false,targetOnFloor:true}),"release");
+  assert.equal(duelPathFailureAction({relock:true,mutualLock:true,targetAlive:true,targetOnFloor:false}),"release");
+});
+
 test("enemy target reviews run each second and only replace a distant target with a meaningfully closer one", () => {
   assert.equal(ENEMY_TARGET_REVIEW_INTERVAL,1);
   assert.equal(enemyTargetReviewDue({now:4.99,nextReviewAt:5}),false);
   assert.equal(enemyTargetReviewDue({now:5,nextReviewAt:5}),true);
   assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.APPROACH,currentDistance:4,candidateDistance:2}),true);
+  assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.APPROACH,currentDistance:4,candidateDistance:2,mutualLock:true}),false);
   assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.APPROACH,currentDistance:1.1,candidateDistance:.4}),false);
   assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.LUNGE,currentDistance:4,candidateDistance:2}),false);
   assert.equal(shouldRetargetToCloserOpponent({phase:DUEL_PHASE.APPROACH,currentDistance:4,candidateDistance:3.8}),false);
@@ -869,6 +893,31 @@ test("cube fragments bounce above the floor and then settle instead of falling t
   assert.equal(settled.settled,true);
 });
 
+test("deployment requires floor support across the visible command tile", () => {
+  const supported = point => Math.abs(point.x) <= 4 && Math.abs(point.z) <= 4 ? 0 : null;
+  assert.equal(deploymentFootprintSupported({ x: 0, z: 0, size: 2 }, supported), true);
+  assert.equal(deploymentFootprintSupported({ x: 4, z: 0, size: 2 }, supported), false);
+  assert.equal(deploymentFootprintSupported({ x: 8, z: 0, size: 2 }, supported), false);
+});
+
+test("deployment raycasts every walkable level surface but never actors or props", () => {
+  const island={id:"island",parent:{},userData:{walkableSurface:"island"}};
+  const scaledCube={id:"cube",parent:{},userData:{walkableSurface:"cube"}};
+  const player={id:"player",parent:{},userData:{editorActor:true}};
+  const tree={id:"tree",parent:{},userData:{editorAssetType:"tree-cluster"}};
+  const detached={id:"detached",parent:null,userData:{walkableSurface:"cube"}};
+  assert.deepEqual(walkableSurfaceCandidates([island,scaledCube,player,tree,detached]),[island,scaledCube]);
+});
+
+test("cube fragments cannot settle on the legacy ground height when no floor exists", () => {
+  const falling=advanceGroundFragment({
+    position:{x:40,y:.08,z:40},velocity:{x:0,y:0,z:0},halfSize:.1,bounces:2,settled:true,dt:.1,groundY:null
+  });
+  assert.ok(falling.position.y<.08);
+  assert.ok(falling.velocity.y<0);
+  assert.equal(falling.settled,false);
+});
+
 test("the shared particle budget never permits a 181st active effect", () => {
   assert.equal(particleBudgetAllows(179),true);
   assert.equal(particleBudgetAllows(180),false);
@@ -895,6 +944,9 @@ test("duel state visibly approaches, lunges, and recovers", () => {
     phase: DUEL_PHASE.LUNGE, timer: .48, strike: false
   });
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .5, strikeDistance: 1.35, strikeRange: 1.15, dt: .1 }), {
+    phase: DUEL_PHASE.LUNGE, timer: .42, strike: false
+  });
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .3, strikeDistance: 1.48, strikeRange: 1.15, dt: .1 }), {
     phase: DUEL_PHASE.LUNGE, timer: .42, strike: false
   });
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .3, distance: .7, strikeDistance: 1.2, strikeRange: 1.15, dt: .11 }), {

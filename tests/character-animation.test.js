@@ -5,7 +5,7 @@ import vm from "node:vm";
 import * as THREE from "../vendor/three.module.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { attachCharacterAnimation, cloneAnimatedModel, queueCharacterStrike, updateCharacterAnimation } from "../src/character-animation.js";
-import { activeDuelRingState, normalizePracticeConfig, soldierCombatState, SOLDIER_COMBAT_STATE, SERVANT_MODE } from "../src/sim.js";
+import { activeDuelRingState, arrivalSpeed, choosePatrolGoal, normalizePracticeConfig, smoothAngle, soldierCombatState, SOLDIER_COMBAT_STATE, SERVANT_MODE } from "../src/sim.js";
 
 const bytes = await readFile(new URL("../Models/crownwake-swordsman-v02.glb", import.meta.url));
 const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
@@ -41,10 +41,39 @@ test("Content Browser CH and EN Blueprints save movement defaults for new placem
 
 test("CH and EN rotate into their front-radar direction before moving", () => {
   assert.match(game, /frontConstrained=Boolean\(unit\.userData\?\.actorArchetypeId&&!unit\.userData\?\.isMaster\)/);
-  assert.match(game, /desiredVelocity=forward\.multiplyScalar\(speed\*alignment\)/);
+  assert.match(game, /desiredVelocity=forward\.multiplyScalar\(speed\*turnSpeed\)/);
 });
 
-test("ordered CH groups use a compact single-file travel column", () => {
+test("CH and EN brake and turn gradually rather than slide through a reversal", () => {
+  const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle });
+  const start = game.indexOf("function steerStraightTowards("), end = game.indexOf("function steerTowards(", start);
+  vm.runInContext(game.slice(start, end), context);
+  for(const actorArchetypeId of ["ch2", "en1"]){
+    const unit = new THREE.Group(), destination = new THREE.Vector3(0, 0, -10);
+    unit.userData = { actorArchetypeId, velocity: new THREE.Vector3(0, 0, 2.65) };
+    let forwardSlip = 0;
+    for(let frame = 0; frame < 12; frame++){
+      context.steerStraightTowards(unit, destination, 2.65, 5.4, 1 / 60);
+      if(frame === 0)assert.ok(unit.rotation.y < .4, `${actorArchetypeId} turned too fast`);
+      forwardSlip = Math.max(forwardSlip, unit.position.z);
+    }
+    assert.ok(forwardSlip < .25, `${actorArchetypeId} slid ${forwardSlip.toFixed(2)} units away`);
+  }
+});
+
+test("CH orders and both factions' patrols rotate only once per frame", () => {
+  const start = game.indexOf("function updateIndependentSoldier("), end = game.indexOf("\nfunction ", start + 1);
+  assert.doesNotMatch(game.slice(start, end), /speed>0\?desired:null/);
+  for(const [startName, endName] of [
+    ["function updateIndependentGroupPatrol(", "function updateIndependentSoldier("],
+    ["function updatePeacefulPatrol(", "function clearBuildingAttackSlot("]
+  ]){
+    const startIndex = game.indexOf(startName);
+    assert.doesNotMatch(game.slice(startIndex, game.indexOf(endName, startIndex)), /unit\.rotation\.y=smoothAngle/);
+  }
+});
+
+test("ordered CH groups have separate destinations without following the leader's trail", () => {
   const context = vm.createContext({ INDEPENDENT_GROUP_COLUMN_GAP: .68 });
   const start = game.indexOf("function compactGroupColumnOffset(");
   const end = game.indexOf("function independentGroupPatrolTarget(", start);
@@ -57,12 +86,11 @@ test("ordered CH groups use a compact single-file travel column", () => {
   const orderSource = game.slice(orderStart, orderEnd);
   assert.match(orderSource, /const offset=compactGroupColumnOffset\(index\)/);
   assert.match(orderSource, /member\.userData\.manualFinalTarget=destination\.clone\(\)/);
-  assert.match(orderSource, /anchor\.orderTrail=\[members\[0\]\?\.position\.clone\(\)\?\?center\.clone\(\)\]/);
-  const columnStart = game.indexOf("function manualColumnDestination(");
-  const columnEnd = game.indexOf("function independentGroupPatrolTarget(", columnStart);
-  const columnSource = game.slice(columnStart, columnEnd);
-  assert.match(columnSource, /manualColumnTrailPoint\(anchor\.orderTrail,index\*INDEPENDENT_GROUP_COLUMN_GAP/);
-  assert.doesNotMatch(columnSource, /members\[index-1\]\.position/);
+  assert.doesNotMatch(orderSource, /orderTrail/);
+  const soldierStart = game.indexOf("function updateIndependentSoldier(");
+  const soldierEnd = game.indexOf("\nfunction ", soldierStart + 1);
+  assert.match(game.slice(soldierStart, soldierEnd), /desired=u\.userData\.manualTarget\.clone\(\)/);
+  assert.doesNotMatch(game.slice(soldierStart, soldierEnd), /manualColumnDestination|recordManualColumnTrail/);
 });
 
 test("CH group members keep independently patrolling around their pivot", () => {
@@ -72,7 +100,7 @@ test("CH group members keep independently patrolling around their pivot", () => 
   assert.match(patrolSource, /unit\.userData\.groupPatrolGoal=/);
   assert.match(patrolSource, /INDEPENDENT_GROUP_PATROL_PAUSE_MAX/);
   assert.match(patrolSource, /expiresAt:totalTime\+INDEPENDENT_GROUP_PATROL_DURATION\+rand\(\)/);
-  assert.match(patrolSource, /INDEPENDENT_GROUP_PATROL_RADIUS/);
+  assert.match(patrolSource, /independentGroupPatrolRadii\(grid\)/);
   assert.match(patrolSource, /occupied\.push\(member\.position\)/);
   assert.doesNotMatch(patrolSource, /anchor\.patrolGoal=/);
   const patrolUpdateStart = game.indexOf("function updateIndependentGroupPatrol(");
@@ -82,38 +110,228 @@ test("CH group members keep independently patrolling around their pivot", () => 
   const soldierEnd = game.indexOf("\nfunction ", soldierStart + 1);
   const soldierSource = game.slice(soldierStart, soldierEnd);
   assert.match(soldierSource, /updateIndependentGroupPatrol\(u,patrolAllies,dt\)/);
-  assert.match(soldierSource, /recordManualColumnTrail\(u\)/);
+  assert.doesNotMatch(soldierSource, /recordManualColumnTrail\(u\)/);
   assert.doesNotMatch(soldierSource, /orderHoldPosition/);
   assert.match(soldierSource, /navigationPhysicalPathClear\(u\.position,desired,u\)/);
-  assert.match(soldierSource, /steerStraightTowards\(u,desired/);
+  assert.match(soldierSource, /manualOrderTravelGuidance\(u,desired,patrolAllies,speed\)/);
+  assert.match(soldierSource, /steerStraightTowards\(u,guidance\?\.target\?\?desired/);
   assert.doesNotMatch(soldierSource, /manualMoving=false;u\.userData\.manualTarget=null;u\.userData\.velocity\.set\(0,0,0\)/);
 });
 
-test("a CH resumes patrol after reaching its recorded trail slot", () => {
-  const unit = new THREE.Group(), trailSlot = new THREE.Vector3(4, 0, 2), finalSlot = new THREE.Vector3(8, 0, 2);
+test("a straying CH discards its outward patrol goal and chooses an interior tile", () => {
+  const unit = new THREE.Group();
+  unit.position.set(3.7, 0, 0);
+  unit.userData = { alive: true, companyId: 1, groupPatrolGoal: { x: 4, y: 0, z: 0, revision: 1, expiresAt: 10 } };
+  const anchor = { position: new THREE.Vector3(), patrolHome: new THREE.Vector3() };
+  const candidates = new Map([["outer", { x: 4, z: 0 }], ["inner", { x: 1.5, z: 0 }]]);
+  const context = vm.createContext({
+    THREE, GROUND_Y: 0, CH_PATROL_COHESION_RADIUS: 2.4, INDEPENDENT_GROUP_PATROL_RADIUS: 3.2,
+    INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65, INDEPENDENT_GROUP_PATROL_SEPARATION: .72,
+    INDEPENDENT_GROUP_PATROL_DURATION: 4, INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65,
+    INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16, totalTime: 0, rand: () => .5,
+    ensureCompanyLayout: () => [{ groupIndex: 1, soldiers: [unit] }], ensureCompanyAnchor: () => anchor,
+    ensureNavigationGrid: () => ({ revision: 1, cells: candidates, blocked: new Set(), cellSize: { x: 1, z: 1 } }),
+    navigationPointPhysicallyBlocked: () => false, walkableSupportHeightAt: () => 0,
+    choosePatrolGoal: ({ candidates: options }) => options[0] ?? null
+  });
+  const start = game.indexOf("function independentGroupPatrolRadii(");
+  const end = game.indexOf("function updateIndependentGroupPatrol(", start);
+  vm.runInContext(game.slice(start, end), context);
+  assert.equal(context.independentGroupPatrolTarget(unit, []).x, 0);
+  assert.equal(unit.userData.groupPatrolGoal, null);
+  unit.position.x = 3.59;
+  assert.equal(context.independentGroupPatrolTarget(unit, []).x, 1.5);
+  assert.equal(unit.userData.groupPatrolGoal.x, 1.5);
+});
+
+test("seven CH have enough nearby tiles to keep patrolling after an order", () => {
+  for(const tileSize of [2, 8]){
+    const unit = new THREE.Group();
+    unit.userData = { alive: true, companyId: 1 };
+    const occupiedTiles = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1]];
+    const members = [unit, ...occupiedTiles.map(([column, row]) => {
+      const member = new THREE.Group();
+      member.position.set(column * tileSize, 0, row * tileSize);
+      member.userData = { alive: true, companyId: 1 };
+      return member;
+    })];
+    const cells = new Map();
+    for(const [column, row] of [[0, 0], ...occupiedTiles, [-1, 1], [1, -1]]){
+      cells.set(`${column}:${row}`, { x: column * tileSize, z: row * tileSize });
+    }
+    let candidateCount = 0;
+    const context = vm.createContext({
+      THREE, GROUND_Y: 0, CH_PATROL_COHESION_RADIUS: 2.4, INDEPENDENT_GROUP_PATROL_RADIUS: 3.2,
+      INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65, INDEPENDENT_GROUP_PATROL_SEPARATION: .72,
+      INDEPENDENT_GROUP_PATROL_DURATION: 4, INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65,
+      INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16, totalTime: 0, rand: () => 0,
+      ensureCompanyLayout: () => [{ groupIndex: 1, soldiers: members }],
+      ensureCompanyAnchor: () => ({ position: new THREE.Vector3(), patrolHome: new THREE.Vector3() }),
+      ensureNavigationGrid: () => ({ revision: 1, cells, blocked: new Set(), cellSize: { x: tileSize, z: tileSize } }),
+      navigationPointPhysicallyBlocked: () => false, walkableSupportHeightAt: () => 0,
+      choosePatrolGoal: options => { candidateCount = options.candidates.length; return choosePatrolGoal(options); }
+    });
+    const start = game.indexOf("function independentGroupPatrolRadii(");
+    const end = game.indexOf("function updateIndependentGroupPatrol(", start);
+    vm.runInContext(game.slice(start, end), context);
+    for(const member of members){
+      const goal = context.independentGroupPatrolTarget(member, members);
+      assert.ok(candidateCount >= members.length, `${tileSize}-unit tiles offered only ${candidateCount} patrol cells`);
+      assert.ok(goal.distanceTo(member.position) > .8, `${tileSize}-unit tiles returned a CH's current position`);
+    }
+  }
+});
+
+test("a CH moves from its current position to its own destination, then patrols independently", () => {
+  const unit = new THREE.Group(), startPoint = new THREE.Vector3(4, 0, 2), finalSlot = new THREE.Vector3(8, 0, 2);
   const leader = new THREE.Group();
-  leader.position.copy(finalSlot);
-  leader.userData = { companyId: 1, manualFinalTarget: finalSlot.clone() };
-  unit.position.copy(trailSlot);
+  leader.position.set(0, 0, 0);
+  leader.userData = { companyId: 1, manualMoving: true };
+  unit.position.copy(startPoint);
   unit.userData = { alive: true, companyId: 1, manualMoving: true, manualTarget: finalSlot.clone(), manualFinalTarget: finalSlot.clone(), velocity: new THREE.Vector3() };
-  const anchor = { moving: true, orderTrail: [new THREE.Vector3()], orderTrailComplete: false, patrolGoal: null };
-  let patrolCalls = 0;
+  const anchor = { moving: true, patrolGoal: null };
+  let patrolCalls = 0, steeredFrom, steeredTo;
   const context = vm.createContext({
     THREE, NAVIGATION_WAYPOINT_REACHED: .22, SOLDIER_COMBAT_STATE, SERVANT_MODE, soldierCombatState,
-    shouldRegroupPlayerGroup: () => false, manualColumnDestination: () => trailSlot.clone(),
+    shouldRegroupPlayerGroup: () => false,
     ensureCompanyAnchor: () => anchor, livingCompanyMembers: () => [leader, unit], updateIndependentGroupPatrol: () => patrolCalls++,
+    actorSteerAcceleration: (_unit, acceleration) => acceleration, editorActorMoveScale: () => 1,
+    navigationPhysicalPathClear: () => true, steerStraightTowards: (actor, destination) => { steeredFrom = actor.position.clone(); steeredTo = destination.clone(); }, steerTowards: () => {},
+    smoothAngle: (_current, target) => target
+  });
+  const start = game.indexOf("function updateIndependentSoldier("), end = game.indexOf("\nfunction ", start + 1);
+  vm.runInContext(game.slice(start, end), context);
+  context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
+  assert.equal(steeredFrom.x, startPoint.x);
+  assert.equal(steeredTo.x, finalSlot.x);
+  assert.equal(unit.userData.manualMoving, true);
+  unit.position.copy(finalSlot);
+  context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
+  assert.equal(unit.userData.manualMoving, false);
+  assert.equal(leader.userData.manualMoving, true);
+  context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
+  assert.equal(patrolCalls, 1);
+});
+
+test("ordered CH steer around nearby allies without changing their destinations", () => {
+  const context = vm.createContext({ THREE, unitCollisionRadius: () => .29, navigationPhysicalPathClear: () => true });
+  const start = game.indexOf("function manualOrderTravelGuidance("), end = game.indexOf("function updateIndependentSoldier(", start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(game.slice(start, end), context);
+  const destination = new THREE.Vector3(8, 0, 0);
+  const first = new THREE.Group(), second = new THREE.Group();
+  first.position.set(0, 0, 0);second.position.set(1, 0, 0);
+  first.userData = { alive: true, companyId: 1, manualTarget: destination.clone() };
+  second.userData = { alive: true, companyId: 1, manualTarget: destination.clone() };
+  assert.equal(context.manualOrderTravelGuidance(first, destination, []).target.x, destination.x);
+  const firstGuidance = context.manualOrderTravelGuidance(first, destination, [second], 3.9), firstTarget = firstGuidance.target;
+  assert.ok(Math.abs(firstTarget.z) > .3, "a CH should sidestep before reaching its ally's collider");
+  assert.ok(firstGuidance.speedScale < 1, "a CH should slow while steering past a close ally");
+  assert.equal(destination.z, 0, "avoidance must not change the assigned destination");
+  second.position.set(.15, 0, 0);
+  const secondTarget = context.manualOrderTravelGuidance(second, destination, [first]).target;
+  assert.ok(firstTarget.z * secondTarget.z < 0, "neighbors in the same lane should pick opposite sides");
+  second.position.set(-1, 0, 0);
+  assert.equal(context.manualOrderTravelGuidance(first, destination, [second]).target.x, destination.x, "an ally behind should not pull CH backward");
+  first.position.set(-1, 0, 0);second.position.set(1, 0, 0);
+  first.userData.manualMoving = true;second.userData.manualMoving = true;
+  first.userData.manualTarget = new THREE.Vector3(2, 0, 0);
+  second.userData.manualTarget = new THREE.Vector3(-2, 0, 0);
+  const opposingFirst = context.manualOrderTravelGuidance(first, first.userData.manualTarget, [second], 3.9).target;
+  const opposingSecond = context.manualOrderTravelGuidance(second, second.userData.manualTarget, [first], 3.9).target;
+  assert.ok(opposingFirst.z * opposingSecond.z < 0, "head-on CH should pass on opposite world-space sides");
+});
+
+test("an ordered CH passes a nearby ally without triggering collision correction", () => {
+  const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle, unitCollisionRadius: () => .29, navigationPhysicalPathClear: () => true });
+  const spacingStart = game.indexOf("function manualOrderTravelGuidance("), spacingEnd = game.indexOf("function updateIndependentSoldier(", spacingStart);
+  const steeringStart = game.indexOf("function steerStraightTowards("), steeringEnd = game.indexOf("function steerTowards(", steeringStart);
+  vm.runInContext(game.slice(spacingStart, spacingEnd), context);
+  vm.runInContext(game.slice(steeringStart, steeringEnd), context);
+  const moving = new THREE.Group(), waiting = new THREE.Group(), destination = new THREE.Vector3(5, 0, 0);
+  moving.position.set(0, 0, 0);waiting.position.set(1.2, 0, 0);
+  moving.userData = { alive: true, actorArchetypeId: "ch2", velocity: new THREE.Vector3() };
+  waiting.userData = { alive: true };
+  let closest = Infinity, closestFrame = -1, closestPosition = null;
+  for(let frame = 0; frame < 120; frame++){
+    const guidance = context.manualOrderTravelGuidance(moving, destination, [waiting], 3.9);
+    context.steerStraightTowards(moving, guidance.target, 3.9 * guidance.speedScale, 5.1, 1 / 60);
+    const separation = moving.position.distanceTo(waiting.position);
+    if(separation < closest){closest = separation;closestFrame = frame;closestPosition = moving.position.clone();}
+  }
+  assert.ok(closest > .55, `CH crossed the ally's space at ${closest.toFixed(2)} units in frame ${closestFrame} (${closestPosition.x.toFixed(2)}, ${closestPosition.z.toFixed(2)})`);
+  assert.ok(moving.position.x > 2, "avoidance must still make progress toward the destination");
+});
+
+test("two ordered CH keep space on converging paths", () => {
+  const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle, unitCollisionRadius: () => .29, navigationPhysicalPathClear: () => true });
+  const spacingStart = game.indexOf("function manualOrderTravelGuidance("), spacingEnd = game.indexOf("function updateIndependentSoldier(", spacingStart);
+  const steeringStart = game.indexOf("function steerStraightTowards("), steeringEnd = game.indexOf("function steerTowards(", steeringStart);
+  vm.runInContext(game.slice(spacingStart, spacingEnd), context);
+  vm.runInContext(game.slice(steeringStart, steeringEnd), context);
+  const first = new THREE.Group(), second = new THREE.Group();
+  first.position.set(-1, 0, -.45);second.position.set(0, 0, .45);
+  const firstDestination = new THREE.Vector3(5, 0, 0), secondDestination = new THREE.Vector3(4.32, 0, 0);
+  first.userData = { alive: true, actorArchetypeId: "ch2", manualMoving: true, manualTarget: firstDestination, moveSpeed: 3.9, velocity: new THREE.Vector3() };
+  second.userData = { alive: true, actorArchetypeId: "ch2", manualMoving: true, manualTarget: secondDestination, moveSpeed: 3.9, velocity: new THREE.Vector3() };
+  let closest = Infinity;
+  for(let frame = 0; frame < 180; frame++){
+    for(const [unit, destination, ally] of [[first, firstDestination, second], [second, secondDestination, first]]){
+      const guidance = context.manualOrderTravelGuidance(unit, destination, [ally], 3.9);
+      context.steerStraightTowards(unit, guidance.target, 3.9 * guidance.speedScale, 5.1, 1 / 60);
+    }
+    closest = Math.min(closest, first.position.distanceTo(second.position));
+  }
+  assert.ok(closest > .55, `converging CH entered each other's space at ${closest.toFixed(2)} units`);
+  assert.ok(first.position.x > 2 && second.position.x > 2, "both CH should keep advancing independently");
+});
+
+test("ordered CH maintain a compact moving group while avoiding overlaps", () => {
+  const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle, unitCollisionRadius: () => .29, navigationPhysicalPathClear: () => true });
+  const spacingStart = game.indexOf("function manualOrderTravelGuidance("), spacingEnd = game.indexOf("function updateIndependentSoldier(", spacingStart);
+  const steeringStart = game.indexOf("function steerStraightTowards("), steeringEnd = game.indexOf("function steerTowards(", steeringStart);
+  vm.runInContext(game.slice(spacingStart, spacingEnd), context);
+  vm.runInContext(game.slice(steeringStart, steeringEnd), context);
+  const units = Array.from({ length: 5 }, (_, index) => {
+    const unit = new THREE.Group();
+    unit.position.set(-index * .68, 0, 0);
+    unit.userData = { alive: true, actorArchetypeId: "ch2", manualMoving: true, manualTarget: new THREE.Vector3(6 - index * .68, 0, 0), moveSpeed: 3.9, velocity: new THREE.Vector3() };
+    return unit;
+  });
+  let spread = 0, closest = Infinity;
+  for(let frame = 0; frame < 90; frame++){
+    for(const [index, unit] of units.entries()){
+      const destination = unit.userData.manualTarget;
+      const guidance = context.manualOrderTravelGuidance(unit, destination, units, 3.9);
+      context.steerStraightTowards(unit, guidance.target, 3.9 * guidance.speedScale, 5.1, 1 / 60);
+    }
+    spread = Math.max(...units.map(unit => unit.position.x)) - Math.min(...units.map(unit => unit.position.x));
+    for(let first = 0; first < units.length; first++)for(let second = first + 1; second < units.length; second++)closest = Math.min(closest, units[first].position.distanceTo(units[second].position));
+  }
+  assert.ok(spread < 4, `CH stretched ${spread.toFixed(2)} units apart on a shared order`);
+  assert.ok(closest > .55, `CH overlapped while travelling in a group at ${closest.toFixed(2)} units`);
+});
+
+test("a CH near the pivot keeps moving until it reaches its own destination", () => {
+  const unit = new THREE.Group(), pivot = new THREE.Vector3(.3, 0, 0), finalSlot = new THREE.Vector3(4, 0, 0);
+  unit.position.set(1.5, 0, 0);
+  unit.userData = { alive: true, companyId: 1, manualMoving: true, manualTarget: finalSlot.clone(), manualFinalTarget: finalSlot.clone(), velocity: new THREE.Vector3() };
+  const anchor = { moving: true, patrolHome: pivot, patrolGoal: null };
+  let patrolCalls = 0;
+  const context = vm.createContext({
+    THREE, NAVIGATION_WAYPOINT_REACHED: .22, CH_PATROL_COHESION_RADIUS: 2.4,
+    SOLDIER_COMBAT_STATE, SERVANT_MODE, soldierCombatState,
+    shouldRegroupPlayerGroup: () => false,
+    ensureCompanyAnchor: () => anchor, updateIndependentGroupPatrol: () => patrolCalls++,
     actorSteerAcceleration: (_unit, acceleration) => acceleration, editorActorMoveScale: () => 1,
     navigationPhysicalPathClear: () => true, steerStraightTowards: () => {}, steerTowards: () => {},
     smoothAngle: (_current, target) => target
   });
   const start = game.indexOf("function updateIndependentSoldier("), end = game.indexOf("\nfunction ", start + 1);
-  const trailStart = game.indexOf("function recordManualColumnTrail("), trailEnd = game.indexOf("function independentGroupPatrolTarget(", trailStart);
-  vm.runInContext(game.slice(trailStart, trailEnd), context);
   vm.runInContext(game.slice(start, end), context);
   context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
   assert.equal(unit.userData.manualMoving, true);
-  context.recordManualColumnTrail(leader);
-  assert.equal(anchor.orderTrailComplete, true);
+  unit.position.copy(finalSlot);
   context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
   assert.equal(unit.userData.manualMoving, false);
   context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
@@ -122,7 +340,7 @@ test("a CH resumes patrol after reaching its recorded trail slot", () => {
 
 test("patrol keeps CH and EN close to their own group", () => {
   assert.match(game, /CH_PATROL_COHESION_RADIUS=2\.4/);
-  assert.match(game, /patrolCohesionTarget\(\{unit:unit\.position,center:pivot,desired:patrolTarget,radius:CH_PATROL_COHESION_RADIUS\}\)/);
+  assert.match(game, /patrolCohesionTarget\(\{unit:unit\.position,center:pivot,desired:patrolTarget,radius:independentGroupPatrolRadii\(\)\.cohesion\}\)/);
   const enemyPatrolStart = game.indexOf("function enemyRoamDestination(");
   const enemyPatrolEnd = game.indexOf("function peacefulPatrolDestination(", enemyPatrolStart);
   const enemyPatrolSource = game.slice(enemyPatrolStart, enemyPatrolEnd);

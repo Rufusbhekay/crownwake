@@ -2458,7 +2458,6 @@ function issueCompanyOrder(point){
     if(celebrationWinnerFaction==="player")clearFactionCelebration();
     anchor.position.copy(center).setY(GROUND_Y);anchor.orderTarget=new THREE.Vector3(cell.x,GROUND_Y,cell.z);anchor.patrolHome=anchor.orderTarget.clone();anchor.patrolGoal=null;anchor.moving=true;
     const forward=anchor.forward.clone().setY(0).normalize();
-    anchor.orderTrail=[members[0]?.position.clone()??center.clone()];anchor.orderForward=forward.clone();anchor.orderTrailComplete=false;
     members.forEach((member,index)=>{
       const offset=compactGroupColumnOffset(index),destination=anchor.orderTarget.clone().addScaledVector(forward,offset.forward);
       destination.y=member.position.y;resetDuel(member);clearBuildingAttackAssignments(member);member.userData.holdPosition=null;member.userData.peacefulPatrolGoal=null;member.userData.groupPatrolGoal=null;member.userData.groupPatrolPauseUntil=0;member.userData.celebrating=false;member.userData.manualTarget=destination;member.userData.manualFinalTarget=destination.clone();member.userData.manualMoving=true;member.userData.navigationPath=null;member.userData.navigationYield=null;
@@ -2923,7 +2922,6 @@ function clearPeacefulPatrols(){
 function updatePeacefulPatrol(unit,allies,dt){
   const desired=peacefulPatrolDestination(unit,allies),distance=unit.position.distanceTo(desired),speed=distance>.08?actorPatrolSpeed(unit):0;
   steerTowards(unit,desired,speed,actorSteerAcceleration(unit,5.4),dt,{goalKey:`peaceful-patrol:${unit.id}`});
-  if(speed>0){const facing=desired.clone().sub(unit.position);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),10,dt);}
 }
 function clearBuildingAttackSlot(unit){
   const reservation=unit?.userData?.buildingAttackSlot;if(!reservation)return;
@@ -3452,13 +3450,14 @@ function navigationTargetActor(unit){return unit.userData.lockedTarget??unit.use
 function steerStraightTowards(unit,desired,maxSpeed,acceleration,dt){
   const delta=desired.clone().sub(unit.position);delta.y=0;
   const distance=delta.length(), speed=arrivalSpeed(distance,maxSpeed),frontConstrained=Boolean(unit.userData?.actorArchetypeId&&!unit.userData?.isMaster);
-  let desiredVelocity=new THREE.Vector3();
+  let desiredVelocity=new THREE.Vector3(),alignment=1;
   if(speed>0&&frontConstrained){
-    const heading=Math.atan2(delta.x,delta.z);unit.rotation.y=smoothAngle(unit.rotation.y,heading,12,dt);
-    const forward=new THREE.Vector3(Math.sin(unit.rotation.y),0,Math.cos(unit.rotation.y)),alignment=Math.max(0,forward.dot(delta)/distance);
-    desiredVelocity=forward.multiplyScalar(speed*alignment);
+    const heading=Math.atan2(delta.x,delta.z);unit.rotation.y=smoothAngle(unit.rotation.y,heading,6,dt);
+    const forward=new THREE.Vector3(Math.sin(unit.rotation.y),0,Math.cos(unit.rotation.y));alignment=Math.max(0,forward.dot(delta)/distance);
+    const turnSpeed=Math.max(0,(alignment-.5)*2);
+    desiredVelocity=forward.multiplyScalar(speed*turnSpeed);
   }else if(speed>0)desiredVelocity=delta.multiplyScalar(speed/distance);
-  const velocity=unit.userData.velocity??=new THREE.Vector3(), change=desiredVelocity.sub(velocity), maxChange=acceleration*dt;
+  const velocity=unit.userData.velocity??=new THREE.Vector3(), change=desiredVelocity.sub(velocity), maxChange=acceleration*(frontConstrained&&alignment<.8?3:1)*dt;
   if(change.length()>maxChange)change.setLength(maxChange);
   velocity.add(change);unit.position.addScaledVector(velocity,dt);
   if(!frontConstrained&&velocity.lengthSq()>.03)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(velocity.x,velocity.z),10,dt);
@@ -3836,37 +3835,19 @@ function independentGroupRegroupTarget(unit){
   return anchor.position.clone().addScaledVector(lateral,offset.lateral).addScaledVector(forward,offset.forward).setY(unit.position.y);
 }
 function compactGroupColumnOffset(index){const rank=Math.max(0,Math.floor(index));return {lateral:0,forward:rank===0?0:-rank*INDEPENDENT_GROUP_COLUMN_GAP}}
-function manualColumnTrailPoint(trail,distance,forward){
-  if(!trail?.length)return null;
-  let remaining=Math.max(0,distance);
-  for(let index=trail.length-1;index>0;index--){
-    const end=trail[index],start=trail[index-1],length=end.distanceTo(start);
-    if(length<.001)continue;
-    if(remaining<=length)return end.clone().lerp(start,remaining/length);
-    remaining-=length;
-  }
-  return trail[0].clone().addScaledVector(forward,-remaining);
-}
-function manualColumnDestination(unit){
-  const companyId=unit.userData.companyId,anchor=ensureCompanyAnchor(companyId),members=livingCompanyMembers(companyId),index=members.indexOf(unit);
-  if(!anchor.moving||index<=0)return unit.userData.manualTarget?.clone()??unit.position.clone();
-  const forward=anchor.forward.clone().setY(0);if(forward.lengthSq()<.001)forward.set(0,0,-1);else forward.normalize();
-  return (manualColumnTrailPoint(anchor.orderTrail,index*INDEPENDENT_GROUP_COLUMN_GAP,anchor.orderForward??forward)??unit.userData.manualFinalTarget??unit.userData.manualTarget??unit.position).clone().setY(unit.position.y);
-}
-function recordManualColumnTrail(unit){
-  const companyId=unit.userData.companyId,anchor=ensureCompanyAnchor(companyId),leader=livingCompanyMembers(companyId)[0];
-  if(!anchor.moving||leader!==unit)return;
-  const trail=anchor.orderTrail??(anchor.orderTrail=[unit.position.clone()]),last=trail[trail.length-1];
-  if(last.distanceToSquared(unit.position)>=.08*.08)trail.push(unit.position.clone());
-  if(unit.userData.manualFinalTarget&&unit.position.distanceTo(unit.userData.manualFinalTarget)<NAVIGATION_WAYPOINT_REACHED)anchor.orderTrailComplete=true;
+function independentGroupPatrolRadii(grid=ensureNavigationGrid()){
+  const patrol=Math.max(INDEPENDENT_GROUP_PATROL_RADIUS,Math.hypot(grid.cellSize.x,grid.cellSize.z)+.1);
+  return {patrol,cohesion:Math.max(CH_PATROL_COHESION_RADIUS,patrol+.4)};
 }
 function independentGroupPatrolTarget(unit,allies){
   const company=ensureCompanyLayout().find(item=>item.groupIndex===unit.userData.companyId),members=company?.soldiers.filter(member=>member.userData.alive)??[];
   if(!company||!members.length)return unit.position.clone();
-  const anchor=ensureCompanyAnchor(company.groupIndex),pivot=(anchor.patrolHome??anchor.orderTarget??anchor.position).clone().setY(GROUND_Y),previousGoal=unit.userData.groupPatrolGoal;
+  const grid=ensureNavigationGrid(),{patrol:patrolRadius,cohesion:cohesionRadius}=independentGroupPatrolRadii(grid),anchor=ensureCompanyAnchor(company.groupIndex),pivot=(anchor.patrolHome??anchor.orderTarget??anchor.position).clone().setY(GROUND_Y);
   anchor.patrolHome??=pivot.clone();
-  if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>CH_PATROL_COHESION_RADIUS){unit.userData.groupPatrolPauseUntil=0;return pivot.setY(unit.position.y);}
-  const grid=ensureNavigationGrid(),arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
+  if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>cohesionRadius){unit.userData.groupPatrolGoal=null;unit.userData.groupPatrolPauseUntil=0;return pivot.setY(unit.position.y);}
+  if(unit.userData.groupPatrolGoal&&Math.hypot(unit.userData.groupPatrolGoal.x-pivot.x,unit.userData.groupPatrolGoal.z-pivot.z)>patrolRadius)unit.userData.groupPatrolGoal=null;
+  const previousGoal=unit.userData.groupPatrolGoal;
+  const arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
   const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
   if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
   if(arrivedAtGoal&&!unit.userData.groupPatrolPauseUntil){unit.userData.groupPatrolPauseUntil=totalTime+rand()*INDEPENDENT_GROUP_PATROL_PAUSE_MAX;return unit.position.clone();}
@@ -3879,7 +3860,8 @@ function independentGroupPatrolTarget(unit,allies){
     const memberGoal=member.userData.groupPatrolGoal;
     if(memberGoal?.revision===grid.revision)occupied.push(memberGoal);
   }
-  const candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=INDEPENDENT_GROUP_PATROL_RADIUS).map(([,cell])=>cell);
+  const minimumStep=Math.min(grid.cellSize.x,grid.cellSize.z)*.4;
+  const candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=patrolRadius&&Math.hypot(cell.x-unit.position.x,cell.z-unit.position.z)>minimumStep).map(([,cell])=>cell);
   const patrolGoal=choosePatrolGoal({origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:INDEPENDENT_GROUP_PATROL_SEPARATION});
   if(!patrolGoal)return pivot.setY(unit.position.y);
   const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
@@ -3887,9 +3869,36 @@ function independentGroupPatrolTarget(unit,allies){
   return new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
 }
 function updateIndependentGroupPatrol(unit,allies,dt){
-  const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:CH_PATROL_COHESION_RADIUS}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
+  const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:independentGroupPatrolRadii().cohesion}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
   steerTowards(unit,desired,speed,actorSteerAcceleration(unit,5.4),dt,{goalKey:`group-patrol:${unit.userData.companyId}`});
-  if(speed>0){const facing=desired.clone().sub(unit.position);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),10,dt);}
+}
+function manualOrderTravelGuidance(unit,destination,allies,travelSpeed){
+  const forward=destination.clone().sub(unit.position).setY(0),distance=forward.length();
+  if(distance<.6)return {target:destination,speedScale:1};
+  forward.divideScalar(distance);
+  const lateral=new THREE.Vector3(-forward.z,0,forward.x);
+  let sidestep=0,speedScale=1;
+  for(const ally of allies){
+    if(ally===unit||!ally.userData?.alive)continue;
+    const relative=ally.position.clone().sub(unit.position).setY(0),ahead=relative.dot(forward),side=relative.dot(lateral);
+    const collisionClearance=unitCollisionRadius(unit)+unitCollisionRadius(ally),clearance=Math.max(1,collisionClearance+.25);
+    if(ahead<-.25||ahead>3.2||Math.abs(side)>=clearance)continue;
+    let allyAlignment=1;
+    if(ally.userData.manualMoving&&ally.userData.manualTarget){
+      const allyForward=ally.userData.manualTarget.clone().sub(ally.position).setY(0);
+      if(allyForward.lengthSq()>.001)allyAlignment=allyForward.normalize().dot(forward);
+      if(allyAlignment>.995&&(ally.userData.moveSpeed??travelSpeed)>=travelSpeed-.2&&ahead>collisionClearance+.05)continue;
+    }
+    const direction=Math.abs(side)>.05?-Math.sign(side):allyAlignment<-.5?-1:unit.id<ally.id?-1:1;
+    sidestep+=direction*(clearance-Math.abs(side)+.18)*(1-Math.max(0,ahead)/3.2);
+    if(ahead>0&&ahead<1.6)speedScale=Math.min(speedScale,Math.max(.3,(ahead-.2)/1.4));
+  }
+  if(Math.abs(sidestep)<.01)return {target:destination,speedScale:1};
+  const lookahead=unit.position.clone().addScaledVector(forward,Math.min(distance,.8));
+  const offset=Math.max(-1.2,Math.min(1.2,sidestep)),candidate=lookahead.clone().addScaledVector(lateral,offset);
+  if(navigationPhysicalPathClear(unit.position,candidate,unit))return {target:candidate,speedScale};
+  candidate.copy(lookahead).addScaledVector(lateral,-offset);
+  return navigationPhysicalPathClear(unit.position,candidate,unit)?{target:candidate,speedScale}:{target:destination,speedScale:1};
 }
 function updateIndependentSoldier(u,{combat,enemyInSight,raidTarget,foe,waitingDuel,peacefulPatrol=false,patrolAllies=[],dt}){
   if(!u?.userData?.alive)return;
@@ -3911,24 +3920,24 @@ function updateIndependentSoldier(u,{combat,enemyInSight,raidTarget,foe,waitingD
   }else if(waitingDuel){
     desired=duelWaitingPoint(u,waitingDuel);
   }else if(u.userData.manualMoving&&u.userData.manualTarget){
-    desired=u.userData.manualFinalTarget?manualColumnDestination(u):u.userData.manualTarget.clone();
+    desired=u.userData.manualTarget.clone();
   }else if(regroupTarget){
     desired=regroupTarget;
   }
   if(combatState===SOLDIER_COMBAT_STATE.NEUTRAL&&!foe&&!waitingDuel&&!u.userData.manualMoving&&!regroupTarget)desired=u.position.clone();
-  const manualFinal=u.userData.manualMoving?u.userData.manualFinalTarget:null;
-  const reachedOrder=()=>u.position.distanceTo(manualFinal??desired)<(manualFinal?NAVIGATION_WAYPOINT_REACHED:.1)||!!manualFinal&&ensureCompanyAnchor(u.userData.companyId).orderTrailComplete&&u.position.distanceTo(desired)<NAVIGATION_WAYPOINT_REACHED;
+  const reachedOrder=()=>u.position.distanceTo(desired)<(u.userData.manualFinalTarget?NAVIGATION_WAYPOINT_REACHED:.1);
   const arrived=!foe&&reachedOrder();
   const speed=foe?duelMotion?.speed??2.45:waitingDuel?1.7:(u.userData.manualMoving||regroupTarget)&&!arrived?(u.userData.moveSpeed??2.65):0;
   const acceleration=actorSteerAcceleration(u,duelMotion?.acceleration??(foe?5.7:5.1));
   const moveScale=editorActorMoveScale(u);
-  if(u.userData.manualMoving&&!foe&&!waitingDuel&&navigationPhysicalPathClear(u.position,desired,u))steerStraightTowards(u,desired,speed*moveScale,acceleration*Math.sqrt(moveScale),dt);
+  const directOrder=u.userData.manualMoving&&!foe&&!waitingDuel&&navigationPhysicalPathClear(u.position,desired,u);
+  const guidance=directOrder&&patrolAllies.length?manualOrderTravelGuidance(u,desired,patrolAllies,speed):null;
+  if(directOrder)steerStraightTowards(u,guidance?.target??desired,speed*(guidance?.speedScale??1)*moveScale,acceleration*Math.sqrt(moveScale),dt);
   else steerTowards(u,desired,speed*moveScale,acceleration*Math.sqrt(moveScale),dt);
-  if(u.userData.manualMoving&&!foe&&!waitingDuel&&u.userData.manualFinalTarget)recordManualColumnTrail(u);
   if(u.userData.manualMoving&&!foe&&!waitingDuel&&reachedOrder()){
     u.userData.manualMoving=false;u.userData.manualTarget=null;u.userData.manualFinalTarget=null;u.userData.peacefulPatrolGoal=null;ensureCompanyAnchor(u.userData.companyId).patrolGoal=null;
   }
-  const faceTarget=foe?.position??(waitingDuel?.center??(speed>0?desired:null));
+  const faceTarget=foe?.position??waitingDuel?.center??null;
   if(faceTarget){const facing=faceTarget.clone().sub(u.position);if(facing.lengthSq()>.001)u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),12,dt)}
 }
 function activateFieldedPlayerCombat(){

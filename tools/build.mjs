@@ -1,10 +1,15 @@
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 await mkdir("vendor", { recursive: true });
+await mkdir("vendor/exporters", { recursive: true });
 await mkdir("vendor/loaders", { recursive: true });
 await mkdir("vendor/utils", { recursive: true });
 await copyFile("node_modules/three/build/three.module.js", "vendor/three.module.js");
 await copyFile("node_modules/three/build/three.core.js", "vendor/three.core.js");
 await copyFile("node_modules/three/examples/jsm/loaders/GLTFLoader.js", "vendor/loaders/GLTFLoader.js");
 await copyFile("node_modules/three/examples/jsm/utils/BufferGeometryUtils.js", "vendor/utils/BufferGeometryUtils.js");
+const skeletonUtils = await readFile("node_modules/three/examples/jsm/utils/SkeletonUtils.js", "utf8");
+await writeFile("vendor/utils/SkeletonUtils.js", skeletonUtils.replace("from 'three';", "from '../three.module.js';"));
+const gltfExporter = await readFile("node_modules/three/examples/jsm/exporters/GLTFExporter.js", "utf8");
+await writeFile("vendor/exporters/GLTFExporter.js", gltfExporter.replace("from 'three';", "from '../three.module.js';"));
 await copyFile("src/sim.js", "sim-runtime-20260724g.js");
-console.log("Vendored Three.js and generated the immutable simulation runtime.");
+console.log("Vendored Three.js, including the GLB exporter, and generated the immutable simulation runtime.");

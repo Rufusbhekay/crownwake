@@ -4,12 +4,13 @@ import { pathToFileURL } from "node:url";
 
 const root = resolve(".");
 const required = [
+  "Models/crownwake-swordsman-v02.glb", "src/character-animation.js", "src/base-materials.js", "vendor/utils/SkeletonUtils.js",
   "index.html", "logic.js", "game.js", "strings.js", "styles.css", "tools/serve.mjs", "tools/smoke-local.mjs",
-  "vendor/three.module.js", "vendor/three.core.js", "vendor/loaders/GLTFLoader.js", "vendor/utils/BufferGeometryUtils.js", "src/sim.js", "sim-runtime-20260724g.js", "design/plan.md", "design/gameplay-glossary.md",
+  "vendor/three.module.js", "vendor/three.core.js", "vendor/exporters/GLTFExporter.js", "vendor/loaders/GLTFLoader.js", "vendor/utils/BufferGeometryUtils.js", "src/sim.js", "sim-runtime-20260724g.js", "design/plan.md", "design/gameplay-glossary.md",
   "design/assets.csv", "design/thresholds.md",
   "assets/battle_music.m4a", "assets/move_confirm.mp3", "assets/conversion_rise.mp3",
   "assets/grass/sprite-grass-01.png", "assets/grass/sprite-grass-02.png", "assets/grass/sprite-grass-03.png", "assets/grass/sprite-grass-04.png",
-  "Models/CH_Mastert.glb", "Models/CH_Servant.glb", "Models/Enemy_master.glb", "Models/Enemy_Servant.glb", "Models/Forest_House_Fence_01.glb", "Models/Forest_House_Fence_02.glb", "Models/Forest_House_Fence_03.glb", "Models/Forest_House_Fence_04.glb", "CREDITS.md"
+  "Models/CH_Mastert.glb", "Models/CH_Servant.glb", "Models/CH_Model.glb", "Models/Crownwake_Base.glb", "Models/Enemy_master.glb", "Models/Enemy_Servant.glb", "Models/Forest_House_Fence_01.glb", "Models/Forest_House_Fence_02.glb", "Models/Forest_House_Fence_03.glb", "Models/Forest_House_Fence_04.glb", "CREDITS.md"
 ];
 for (const file of required) await access(resolve(root, file));
 const removedFoliageAssets = [
@@ -34,6 +35,10 @@ const gameSource = sources.find(([file]) => file === "game.js")[1];
 const styleSource = sources.find(([file]) => file === "styles.css")[1];
 const simulationSource = await readFile(resolve(root, "src/sim.js"), "utf8");
 const runtimeSimulationSource = await readFile(resolve(root, "sim-runtime-20260724g.js"), "utf8");
+const gltfExporterSource = await readFile(resolve(root, "vendor/exporters/GLTFExporter.js"), "utf8");
+if (!gltfExporterSource.includes("from '../three.module.js';")) {
+  throw new Error("The vendored GLB exporter must resolve Three.js from the vendor directory.");
+}
 if (runtimeSimulationSource !== simulationSource) {
   throw new Error("Deployed simulation runtime differs from the tested source module");
 }
@@ -48,6 +53,16 @@ for (const contract of [
   ['id="editor-context-panel"', "Level Editor must provide a contextual left panel"],
   ['id="editor-right-dock"', "Level Editor must provide a permanent right dock"],
   ['id="editor-inspector"', "Level Editor must provide a context-sensitive inspector"],
+  ['id="inspector-actor-section"', "Selecting CH or EN must expose actor-specific details"],
+  ['id="inspector-tile-section"', "Selecting Tile_bp must expose island tile settings"],
+  ['id="editor-tile-colour"', "Tile_bp must expose a material colour picker"],
+  ['id="editor-tile-rows"', "Tile_bp must expose an editable row count"],
+  ['id="editor-tile-columns"', "Tile_bp must expose an editable column count"],
+  ['data-actor-property="maxHp"', "Actor Details must expose health"],
+  ['data-actor-property="attack"', "Actor Details must expose attack damage"],
+  ['data-actor-property="moveSpeed"', "Actor Details must expose movement speed"],
+  ['data-actor-property="acceleration"', "Actor Details must expose acceleration"],
+  ['data-actor-property="patrolSpeed"', "Actor Details must expose patrol speed"],
   ['id="world-outliner-search"', "World Outliner must provide search"],
   ['id="editor-context-select"', "Editor tool rail must expose Select context"],
   ['id="editor-context-assets"', "Editor tool rail must expose a dedicated Assets context"],
@@ -60,6 +75,15 @@ for (const contract of [
 ]) {
   if (!indexSource.includes(contract[0])) throw new Error(contract[1]);
 }
+if (!["ch1","ch2","ch3"].every(id => indexSource.includes(`id="starting-${id}-count"`))) {
+  throw new Error("Settings must expose separate CH1, CH2 and swordsman reserves");
+}
+if (!indexSource.includes('id="settings-apply"')) {
+  throw new Error("Settings must expose an apply action for reserve changes");
+}
+if (indexSource.includes('id="deployment-options"') || indexSource.includes("data-deployment-batch")) {
+  throw new Error("The deployment HUD must not expose batch multiplier controls");
+}
 for (const contract of [
   ['const EDITOR_LAYOUT_STORAGE_KEY="crownwake-editor-layout-v1"', "Editor dock layout must persist locally"],
   ['function setEditorContext(context)', "Editor must switch one active left-tool context"],
@@ -67,10 +91,80 @@ for (const contract of [
   ['function toggleEditorViewportMaximize()', "Tab must maximize the viewport"],
   ['function saveEditorSession()', "Editor must expose a save action without leaving playtest"],
   ['function updateEditorInspector()', "Inspector must respond to editor context and selection"],
+  ['function updateEditorActorInspector()', "Actor Details must synchronize from the selected character"],
+  ['function selectedEditorActorProfile()', "Actor Details must resolve both placed actors and Content Browser actor archetypes"],
+  ['const libraryProfile=selectedEditorActorProfile()', "Content Browser actor selection must feed the Details inspector"],
+  ['input.disabled=!libraryProfile', "Content Browser CH and EN Blueprint defaults must be editable"],
+  ['function applyEditorActorInput(input)', "Actor Details edits must update the selected character"],
+  ['function actorBlueprintProfile(archetypeId,faction)', "CH and EN Blueprint defaults must apply to new characters"],
+  ['frontConstrained=Boolean(unit.userData?.actorArchetypeId&&!unit.userData?.isMaster)', "CH and EN must travel in their front-radar direction"],
+  ['function editorActorMoveScale(unit)', "Editable actor speed must affect character movement"],
+  ['function actorPatrolSpeed(unit)', "Patrol speed must override the master speed while units search"],
+  ['function actorSteerAcceleration(unit,baseAcceleration)', "Actor acceleration must control steering responsiveness"],
+  ['const ACTOR_ARCHETYPES=Object.freeze({', "Character tiers must use one shared archetype specification"],
+  ['const ACTOR_SPEED_BOOST=1.5;', "All CH and EN movement must receive the requested fifty-percent boost"],
+  ['ch1:Object.freeze({id:"ch1",label:"CH1",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST', "CH1 must expose the boosted tier-one movement speed"],
+  ['en1:Object.freeze({id:"en1",label:"EN1",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST', "EN1 must match CH1 health, attack, and speed"],
+  ['ch2:Object.freeze({id:"ch2",label:"CH2",faction:"player",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST', "CH2 must retain its boosted higher-tier movement speed"],
+  ['en2:Object.freeze({id:"en2",label:"EN2",faction:"enemy",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST', "EN2 must match the boosted tier-two specification"],
+  ['archetypeId:object.userData.actorArchetypeId', "Saved actors must retain their character tier"],
+  ['record.actor={', "Actor gameplay variables must be serialized with the level"],
+  ['actor:record.actor', "Saved actor gameplay variables must be restored with the level"],
+  ['function setStartingChCounts()', "Settings must persist and apply separate CH1 and CH2 reserves"],
+  ['TILE_BP_ASSET_ID="blueprint:tile"', "Tile_bp must be registered as an editor blueprint asset"],
+  ['TOWN_HALL_BP_ASSET_ID="blueprint:town-hall"', "TownHall_bp must be registered as an editor blueprint asset"],
+  ['BARRACKS_BP_ASSET_ID="blueprint:barracks"', "Barracks_bp must be registered as an editor blueprint asset"],
+  ['function contentBrowserDuplicateSelectedBlueprint()', "Town and Barracks blueprint variations must support duplication"],
+  ['function contentBrowserCreateNewModel()', "The Content Browser must create reusable models from selected assets"],
+  ['function applyTileBlueprint(', "Tile_bp must apply material and subdivision settings to the island"],
+  ['function tileFloorGeometry(', "Tile_bp must rebuild tile surface subdivisions"],
+  ['const count=deploymentReserves[deploymentArchetypeId]', "A deployment click must place the selected CH group as one batch"],
+  ['makeUnit("player",deploymentArchetypeId)', "CH deployment must preserve the selected CH archetype"],
+  ['function independentGroupRegroupTarget(unit)', "Peaceful CH groups must return to a close formation"],
+  ['en3:Object.freeze({id:"en3",label:"EN 3"', "EN 3 must be registered as the splitting enemy archetype"],
+  ['en4:Object.freeze({id:"en4",label:"EN 4"', "EN 4 must be registered as the split child archetype"],
+  ['const child=makeUnit("enemy","en4");child.name="EN 4"', "EN 3 must create EN 4 children on death"],
+  ['function applyBuildingBlueprintSettings()', "Building blueprints must expose editable model and material defaults"],
+  ['function updateBarracksSpawners(dt)', "Barracks must spawn EN1 during gameplay"],
+  ['barracksSpawnInterval:8', "Barracks blueprints must default to an eight-second EN1 interval"],
+  ['function applyEditorActorMaterial()', "Enemy materials must be editable from Actor Details"],
+  ['function attackRaidBuilding(attacker,building,dt,contact=false)', "CH units must be able to damage raid buildings"],
+  ['const RAID_BUILDING_MAX_HP=480', "Town Hall and Barracks must have fifteen times EN3's base health"],
+  ['function raidBuildingDebris(building,count=4)', "Raid buildings must burst debris on each CH attack"],
+  ['width:4.625,height:.075', "Raid building health bars must be slim and two-and-a-half times their original width"],
+  ['const style=configuredProgressBar(building.userData.progressBarAssetId,BUILDING_PROGRESS_BAR_BP_ASSET_ID)', "Raid building health bars must use their selected progress-bar blueprint"],
+  ['function showRaidBuildingHealth(building,previousHealth=building.userData.hp)', "Raid building health bars must update from the damage event"],
+  ['data.visibleTimer=5', "Raid building health bars must remain visible for five seconds after damage"],
+  ['function enemyRoamDestination(unit,livingEnemySoldiers)', "Authored EN must keep independent patrol behavior"],
+  ['const freshBarracksEnemies=', "Fresh Barracks EN must be paired before normal EN"],
+  ['priorityWaiters:freshBarracksWaiters', "Fresh Barracks EN must claim waiting slots before normal waiters"],
+  ['function barracksAnchorDestination(unit,livingEnemySoldiers)', "Unpaired Barracks EN must stay near a selected EN"],
+  ['barracksEnemyCanClaimDuel({', "Barracks EN must only claim distant duels during their initial spawn check"],
+  ['deploymentReserves=configuredDeploymentReserves()', "Level resets must use all three current CH reserve settings"],
+  ['function deploymentPreviewCells()', "Armed deployment must enumerate the full island preview"],
+  ['function activeGameplayGridSpec()', "A placed Base_bp must define the shared gameplay grid"],
+  ['navigationGrid.cellSize=gridSpec.cellSize', "Navigation must adopt the authored Base_bp tile size"],
+  ['snapNavigationCell(point,grid.cellSize,grid.offset)', "Deployment must snap to the same authored grid as navigation"],
+  ['function updateCommandGridGlow()', "Hovered deployment tiles must keep a distinct glow"],
   ['world-outliner-search', "World Outliner search must be wired"],
   ['Conifer ${variant.label}', "World Outliner must dynamically group conifer types"]
 ]) {
   if (!gameSource.includes(contract[0])) throw new Error(contract[1]);
+}
+const contentBrowserActorSelectionSource = gameSource.slice(
+  gameSource.indexOf("function selectedEditorActorProfile()"),
+  gameSource.indexOf("function updateEditorActorInspector()")
+);
+if (!contentBrowserActorSelectionSource.includes("contentBrowserSelection.size!==1") ||
+    !contentBrowserActorSelectionSource.includes('/^character:(ch|en)([2-5])?$/')) {
+  throw new Error("Actor Details must accept the supported CH and EN Content Browser selections");
+}
+const selectContentBrowserAssetSource = gameSource.slice(
+  gameSource.indexOf("function selectContentBrowserAsset("),
+  gameSource.indexOf("function makeContentBrowserAssetCard(")
+);
+if (!selectContentBrowserAssetSource.includes("selectEditorObject(null)")) {
+  throw new Error("Selecting a Content Browser actor must refresh the shared Details inspector");
 }
 const restoreSnapshotSource = gameSource.slice(
   gameSource.indexOf("function restoreEditorSnapshot(snapshot)"),
@@ -94,7 +188,7 @@ if (!removeEditorObjectSource.includes("detachEditorActorFromCombat(object)")) {
   throw new Error("Deleting an editor actor must remove it from combat rosters");
 }
 const startSource = gameSource.slice(gameSource.indexOf("function start()"), gameSource.indexOf('$("begin").onclick'));
-if (!startSource.includes("removeUnplacedEnemyActors()")) {
+if (!startSource.includes("removeUnplacedEnemyActors({prepareBarracksInteriors:true})")) {
   throw new Error("Starting play must purge enemies that were not placed in the level editor");
 }
 for (const contract of [
@@ -232,7 +326,7 @@ for (const contract of [
   ['function updateTreeWind(delta)', "Tree movement must be updated by the render loop"],
   ['tree.userData.treeWind=', "Every procedural tree must retain an independent wind state"],
   ['function duplicateEditorSelection()', "Selected level assets must be duplicable"],
-  ['const sources=[...editorSelectedObjects].filter(object=>editorObjects.includes(object)&&!object.userData.editorProtected);if(!sources.length)return;', "Duplicate must operate on every selected non-protected level asset"],
+  ['const sources=[...editorSelectedObjects].filter(canDuplicateEditorObject);if(!sources.length)return;', "Duplicate must operate on every selected duplicable level asset"],
   ['for(const source of sources){', "Duplicate must iterate through the complete selected set"],
   ['const duplicate=addLevelAsset({...record,x:record.x+1.4,z:record.z+1.4});', "Duplicated assets must retain their serialized properties and appear at a common movable offset"],
   ['setEditorSelection(duplicates,duplicates.at(-1),duplicates.at(-1));', "Newly duplicated assets must remain selected as a group"],
@@ -259,8 +353,8 @@ if (!gameSource.includes('const WORLD_LOOK_STORAGE_KEY="crownwake-world-look-v1"
     !gameSource.includes('scene.fog.density=baseFogDensity*FOG_REFERENCE_CAMERA_DISTANCE/cameraDistance')) {
   throw new Error("World Look controls must persist and update the live renderer, lights, and camera-compensated fog");
 }
-if (!styleSource.includes('.editor-active .deployment-options,.editor-active .army-button{display:none!important}')) {
-  throw new Error("Deployment batch controls must be hidden in Level Editor mode");
+if (!styleSource.includes('.editor-active .army-button{display:none!important}')) {
+  throw new Error("The deployment reserve control must be hidden in Level Editor mode");
 }
 const grassCategoriesSource = gameSource.match(/const\s+GRASS_CLUSTER_CATEGORIES\s*=\s*\[([\s\S]*?)\];/)?.[1] ?? "";
 for (const removedCategory of ["small", "dense", "super-dense"]) {
@@ -274,10 +368,10 @@ if (/\bBUSH_|\bbush-sprite\b|\baddBushSprite\b|assets\/(?:foliage|grass)\/bush/i
 if (gameSource.includes("height*.82") || gameSource.includes("tipOffset")) {
   throw new Error("Pointed grass geometry must be replaced by the original square-ended silhouette");
 }
-if (!gameSource.includes("LEGACY_LEVEL_LAYOUT_VERSION=1,LEVEL_LAYOUT_VERSION=2") ||
+if (!gameSource.includes("LEGACY_LEVEL_LAYOUT_VERSION=1,LEVEL_LAYOUT_VERSION=4") ||
     !gameSource.includes('if(record.type==="grass-cluster"&&layout.version===LEGACY_LEVEL_LAYOUT_VERSION)continue;') ||
     !gameSource.includes('if(record.type==="bush"+"-sprite")continue;') ||
-    !gameSource.includes('if(layout.version===LEGACY_LEVEL_LAYOUT_VERSION)saveLevelLayout();')) {
+    !gameSource.includes('if(layout.version===LEGACY_LEVEL_LAYOUT_VERSION||migratedBaseModel)saveLevelLayout();')) {
   throw new Error("Legacy saved layouts must discard old foliage without removing other level assets");
 }
 if (!gameSource.includes('LEGACY_EDITOR_ASSET_LIBRARY_KEY="crownwake-editor-asset-library-v1",EDITOR_ASSET_LIBRARY_KEY="crownwake-editor-asset-library-v2"') ||
@@ -305,10 +399,10 @@ for (const contract of [
   ["function addWorldFloor(record={})", "The editable floor must have a dedicated creation path"],
   ['floor.userData.editorAssetType="world-floor"', "The floor must be selectable through the existing editor system"],
   ["floor.receiveShadow=true", "The editable floor must retain terrain shadows"],
-  ['if(record.type==="world-floor")return addWorldFloor(record);', "Saved floor transforms must restore with the level"],
+  ['if(record.type==="world-floor")return applySavedEditorMaterial(addWorldFloor(record),record);', "Saved floor transforms and material overrides must restore with the level"],
   ['return [sceneBranch,{id:"scene/ground",label:"GROUND"}];', "The World Outliner must expose the floor under the Scene Ground category"],
   ['function addPrimitiveCube({x,z,y=GROUND_Y,turn=0,rotation=null,scale=null})', "The editor must provide a reusable cube primitive"],
-  ['if(record.type==="primitive-cube")return addPrimitiveCube({x:record.x,y,z:record.z,turn,rotation,scale});', "Saved cube transforms must restore with the level"],
+  ['if(record.type==="primitive-cube")return applySavedEditorMaterial(addPrimitiveCube({x:record.x,y,z:record.z,turn,rotation,scale}),record);', "Saved cube transforms and material overrides must restore with the level"],
   ['{id:"terrain",label:"TERRAIN",icon:', "The asset library must expose a Terrain folder"],
   ['if(assetId==="primitive-cube")', "The Terrain cube must be placeable from the asset library"],
   ['if(type==="primitive-cube")return "CUBE";', "Cube primitives must be identified in the World Outliner"]

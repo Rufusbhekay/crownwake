@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DUEL_PHASE, DUEL_WAITING_DISTANCE, ENEMY_TARGET_REVIEW_INTERVAL, FACTION, FOLLOW_AWARENESS, OPENING_ENEMY_COUNT, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDeploySoldier, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatCinematicState, defeatRosterPlan, deploymentFootprintSupported, deploymentReserveAfterDeploy, difficultyEncounter, duelAttackHits, duelLungeDirection, duelMeetingPoint, duelPathFailureAction, editorPanVector, enemyTargetReviewDue, encounterResolutionState, enemyWaveApproachAngle, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, levelCameraFrame, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, normalizePracticeConfig, openingRingSpawn, particleBudgetAllows, persistentFragmentBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveDuelTurnId, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, scatteredPackOffset, separationVector, shouldEnemyEvade, shouldReleaseCombatCommitment, shouldRepositionFollower, shouldRetargetToCloserOpponent, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, walkableSurfaceCandidates, waveSizeFromRoll } from "../src/sim.js";
+import { DUEL_PHASE, DUEL_WAITING_DISTANCE, ENEMY_TARGET_REVIEW_INTERVAL, FACTION, FOLLOW_AWARENESS, OPENING_ENEMY_COUNT, PRACTICE_WAVE_INTERVAL, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, advanceRevival, allocateDuelWaitingSlots, applyLinearFriction, arrivalSpeed, battleApproachState, battleLaneOffset, cameraBaselineAfterDivision, canApplyAttackDamage, canDeploySoldier, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, chooseServantMode, claimRegion, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, counterattack, defeatCinematicState, defeatRosterPlan, deploymentFootprintSupported, deploymentReserveAfterDeploy, difficultyEncounter, duelAttackHits, duelLungeDirection, duelMeetingPoint, duelPathFailureAction, editorPanVector, enemyTargetReviewDue, encounterResolutionState, enemyWaveApproachAngle, environmentGrade, floorTileKeys, formationExpansionOffset, gameplayCameraDistanceScale, gridCellsWithinBounds, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isPlayerWaveDefeated, levelCameraFrame, lineOfSightBlocked, limitPointToRadius, makeCampaign, nextDuelTurn, normalizePracticeConfig, openingRingSpawn, particleBudgetAllows, persistentFragmentBudgetAllows, playerThreatScore, postRespawnResolution, practiceEnemyHealthMultiplier, practiceWaveInterval, practiceWaveSize, prioritizedOpponents, preserveLockedCombatants, recruitRevivalTiming, regenHealth, resolveBoxOverlap, resolveCircleBoxOverlap, resolveDuelTurnId, resolveEncounter, revivalBlinkIntensity, revivalProgressionState, scatteredPackOffset, separationVector, shouldEnemyEvade, shouldRegroupPlayerGroup, shouldReleaseCombatCommitment, shouldRepositionFollower, shouldRetargetToCloserOpponent, smoothAngle, snapTacticalCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPoint, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, swarmsHaveContact, tacticalCameraFrame, tacticalCellAction, tacticalCellBlocked, tacticalCommandScale, tacticalInputEnabled, tacticalOrderState, tacticalSelectionScope, unitCommanderProfile, walkableSurfaceCandidates, waveSizeFromRoll } from "../src/sim.js";
+import { allocatePrioritizedDuelWaitingSlots, barracksEnemyCanClaimDuel, chooseAvailableBarracksAnchorSlot, chooseBarracksAnchor, choosePatrolGoal, deploymentPreviewCellState, findNavigationPath, fittedGridSpec, isNavigationPlatformCube, navigationCellKey, navigationFootprintSupported, shouldClearStaleDuelState, snapNavigationCell, splitEnemyStats } from "../src/sim.js";
+import { celebrationWinner } from "../src/sim.js";
 
 test("level editor camera pan follows the screen-facing axes without faster diagonals", () => {
   assert.deepEqual(editorPanVector({ horizontal: 1, vertical: 0, distance: 5 }), { x: 5, z: 0 });
@@ -71,6 +73,28 @@ test("box collision resolves only the shallowest overlapping axis", () => {
     { x: 0, z: 0 }, { x: .25, z: .25 },
     { x: 1, z: 0 }, { x: .25, z: .25 }
   ), null);
+});
+
+test("circle collision keeps units outside a rotated building footprint", () => {
+  const correction = resolveCircleBoxOverlap({
+    point: { x: 1.7, z: 0 }, radius: .3,
+    box: { x: 0, z: 0 }, boxHalf: { x: 1.5, z: 1.5 }
+  });
+  assert.ok(correction);
+  assert.ok(Math.abs(correction.x - .1) < 1e-9);
+  assert.equal(correction.z, 0);
+
+  const rotated = resolveCircleBoxOverlap({
+    point: { x: 0, z: -1.7 }, radius: .3,
+    box: { x: 0, z: 0 }, boxHalf: { x: 1.5, z: 1.5 }, rotation: Math.PI / 2
+  });
+  assert.ok(rotated);
+  assert.ok(Math.abs(rotated.x) < 1e-9);
+  assert.ok(Math.abs(rotated.z + .1) < 1e-9);
+  assert.equal(resolveCircleBoxOverlap({
+    point: { x: 2, z: 0 }, radius: .3,
+    box: { x: 0, z: 0 }, boxHalf: { x: 1.5, z: 1.5 }
+  }), null);
 });
 
 test("servants attack only while the master is committed and within leash", () => {
@@ -156,6 +180,13 @@ test("a soldier keeps a duel only while both living soldiers lock each other", (
   assert.equal(canMaintainSoldierDuel({unitAlive:true,targetAlive:false,mutualLock:true}),false);
 });
 
+test("a targetless soldier clears stale duel state instead of remaining in approach", () => {
+  assert.equal(shouldClearStaleDuelState({hasTarget:false,duelPhase:DUEL_PHASE.APPROACH}),true);
+  assert.equal(shouldClearStaleDuelState({hasTarget:false,duelRole:"primary",duelTurnId:18}),true);
+  assert.equal(shouldClearStaleDuelState({hasTarget:true,duelPhase:DUEL_PHASE.APPROACH}),false);
+  assert.equal(shouldClearStaleDuelState({hasTarget:false}),false);
+});
+
 test("detection rings appear only for living soldiers in a mutual duel", () => {
   assert.equal(activeDuelRingState({unitAlive:true,targetAlive:true,mutualLock:true}),true);
   assert.equal(activeDuelRingState({unitAlive:true,targetAlive:true,mutualLock:false}),false);
@@ -197,6 +228,49 @@ test("free soldiers choose the closest available opponent pair", () => {
   );
   assert.equal(pair.left.id, "left-a");
   assert.equal(pair.right.id, "right-b");
+});
+
+test("Barracks EN claims globally only on spawn, then needs local contact", () => {
+  assert.equal(barracksEnemyCanClaimDuel({barracksSpawned:false,initialDuelCheck:false,distance:80}),true);
+  assert.equal(barracksEnemyCanClaimDuel({barracksSpawned:true,initialDuelCheck:true,distance:80}),true);
+  assert.equal(barracksEnemyCanClaimDuel({barracksSpawned:true,initialDuelCheck:false,distance:8}),true);
+  assert.equal(barracksEnemyCanClaimDuel({barracksSpawned:true,initialDuelCheck:false,distance:8.01}),false);
+});
+
+test("fresh Barracks EN claim waiter slots before ordinary waiters", () => {
+  const duel={id:"active-duel"};
+  const assignments=allocatePrioritizedDuelWaitingSlots({
+    priorityWaiters:["fresh-barracks-en"],
+    waiters:["nearby-en","fresh-barracks-en"],
+    duels:[duel],
+    preferredDuel:()=>null,
+    distanceBetween:waiter=>waiter==="nearby-en"?1:8
+  });
+  assert.equal(assignments.get("fresh-barracks-en"),duel);
+  assert.equal(assignments.has("nearby-en"),false);
+});
+
+test("Barracks EN choose one random EN anchor when they have no duel role", () => {
+  const first={id:"first"},second={id:"second"},third={id:"third"};
+  assert.equal(chooseBarracksAnchor({candidates:[first,second,third],roll:.68}),third);
+  assert.equal(chooseBarracksAnchor({candidates:[],roll:.5}),null);
+});
+
+test("Barracks EN reserve distinct open slots around their anchor", () => {
+  assert.equal(chooseAvailableBarracksAnchorSlot({slots:[3,4,5],occupiedSlots:[3],preferredSlot:4}),4);
+  assert.equal(chooseAvailableBarracksAnchorSlot({slots:[3,4,5],occupiedSlots:[3,4],preferredSlot:4}),5);
+  assert.equal(chooseAvailableBarracksAnchorSlot({slots:[3,4],occupiedSlots:[3,4]}),null);
+});
+
+test("independent EN patrol goals avoid their last destination and nearby EN", () => {
+  const goal=choosePatrolGoal({
+    origin:{x:0,z:0},
+    candidates:[{x:0,z:0},{x:4,z:0},{x:8,z:0},{x:8,z:3}],
+    recentGoal:{x:4,z:0},
+    occupied:[{x:8,z:0}],
+    roll:0
+  });
+  assert.deepEqual(goal,{x:8,z:3});
 });
 
 test("a duel meets halfway between its own two opponents", () => {
@@ -268,13 +342,38 @@ test("practice session runs ten waves across three size bands", () => {
   assert.deepEqual([0,.5,.999].map(practiceWaveInterval),[5,6,7]);
 });
 
-test("custom practice settings clamp the starting army, opening enemies, and ten wave sizes", () => {
-  const settings=normalizePracticeConfig({playerSoldiers:0,startingEnemies:99,waveCounts:[0,99,4],waveDelay:12.5});
-  assert.equal(settings.playerSoldiers,1);
+test("custom practice settings keep separate CH1, CH2 and swordsman reserves", () => {
+  assert.deepEqual(
+    (({ch1Soldiers,ch2Soldiers,playerSoldiers})=>({ch1Soldiers,ch2Soldiers,playerSoldiers}))(normalizePracticeConfig()),
+    {ch1Soldiers:7,ch2Soldiers:7,playerSoldiers:19}
+  );
+  const settings=normalizePracticeConfig({ch1Soldiers:0,ch2Soldiers:99,startingEnemies:99,waveCounts:[0,99,4],waveDelay:12.5});
+  assert.equal(settings.ch1Soldiers,0);
+  assert.equal(settings.ch2Soldiers,99);
+  assert.equal(settings.ch3Soldiers,5);
+  assert.equal(settings.playerSoldiers,104);
+  assert.equal(normalizePracticeConfig({ch3Soldiers:0}).ch3Soldiers,0);
+  assert.equal(normalizePracticeConfig({ch3Soldiers:8}).ch3Soldiers,8);
   assert.equal(settings.startingEnemies,24);
   assert.deepEqual(settings.waveCounts.slice(0,4),[0,24,4,5]);
   assert.equal(settings.waveCounts.length,10);
   assert.equal(settings.waveDelay,12.5);
+  assert.deepEqual(
+    (({ch1Soldiers,ch2Soldiers,playerSoldiers})=>({ch1Soldiers,ch2Soldiers,playerSoldiers}))(normalizePracticeConfig({playerSoldiers:137})),
+    {ch1Soldiers:69,ch2Soldiers:68,playerSoldiers:142}
+  );
+});
+
+test("CH groups regroup only after combat with no competing objective", () => {
+  assert.equal(shouldRegroupPlayerGroup(),true);
+  for(const blockedState of [
+    {combat:true},
+    {enemyInSight:true},
+    {targetAlive:true},
+    {waitingSlot:true},
+    {manualOrder:true},
+    {raidTarget:true}
+  ])assert.equal(shouldRegroupPlayerGroup(blockedState),false);
 });
 
 test("opening encounter places enemies in a loose, deterministic scatter within its protected radius", () => {
@@ -486,6 +585,44 @@ test("capped companies grow deeper without reusing formation slots", () => {
   assert.ok(Math.max(...thirtySix.map(offset=>offset.groupIndex))>Math.max(...twentyFour.map(offset=>offset.groupIndex)));
 });
 
+test("deployment preview covers the full island with fine placement cells", () => {
+  const cells=gridCellsWithinBounds({minX:-32,maxX:32,minZ:-32,maxZ:32,cellSize:3,offset:0});
+  assert.equal(cells.length,441);
+  assert.deepEqual(cells[0],{x:-30,z:-30});
+  assert.deepEqual(cells.at(-1),{x:30,z:30});
+});
+
+test("an authored grid fills scaled bounds without unused edge space", () => {
+  const spec=fittedGridSpec({minX:-32,maxX:32,minZ:-16,maxZ:16,columns:64,rows:16});
+  assert.deepEqual(spec.cellSize,{x:1,z:2});
+  assert.deepEqual(spec.offset,{x:-31.5,z:-15});
+  const cells=gridCellsWithinBounds({...spec.bounds,cellSize:spec.cellSize,offset:spec.offset});
+  assert.equal(cells.length,64*16);
+  assert.deepEqual(cells[0],{x:-31.5,z:-15});
+  assert.deepEqual(cells.at(-1),{x:31.5,z:15});
+  assert.equal(cells[0].x-spec.cellSize.x*.5,-32);
+  assert.equal(cells.at(-1).x+spec.cellSize.x*.5,32);
+});
+
+test("navigation snaps and routes on the authored rectangular grid", () => {
+  const cellSize={x:2,z:1},offset={x:1,z:.5};
+  assert.deepEqual(snapNavigationCell({x:4.2,z:1.2},cellSize,offset),{x:5,z:1.5});
+  const cells=[{x:1,z:.5},{x:3,z:.5},{x:5,z:.5},{x:5,z:1.5}],walkable=new Set(cells.map(navigationCellKey));
+  const route=findNavigationPath({start:{x:1,z:.5},goal:{x:5,z:1.5},walkable,cellSize,offset});
+  assert.deepEqual(route.cells,[{x:3,z:.5},{x:5,z:.5},{x:5,z:1.5}]);
+});
+
+test("deployment preview permits every supported cell except enemy-occupied cells", () => {
+  assert.equal(deploymentPreviewCellState({ supported: true, edge: true, enemyOccupied: false }), "available");
+  assert.equal(deploymentPreviewCellState({ supported: true, edge: false, enemyOccupied: false }), "available");
+  assert.equal(deploymentPreviewCellState({ supported: true, edge: true, enemyOccupied: true }), "blocked");
+});
+
+test("split EN children inherit half of their parent's health and damage", () => {
+  assert.deepEqual(splitEnemyStats({ maxHp: 32, attack: 10 }), { maxHp: 16, attack: 5 });
+  assert.deepEqual(splitEnemyStats({ maxHp: 1, attack: .5 }), { maxHp: .5, attack: .5 });
+});
+
 test("tactical command tiles cover exactly four terrain squares", () => {
   assert.deepEqual(snapTacticalCell({x:2.65,z:-3.71},3.6,1.8),{x:1.8,z:-5.4});
   assert.deepEqual(snapTacticalCell({x:4.9,z:1.2},3.6,1.8),{x:5.4,z:1.8});
@@ -671,8 +808,9 @@ test("two failed path windows trigger a clean target reacquisition", () => {
   assert.equal(progressing.relock,false);assert.equal(progressing.failures,0);
 });
 
-test("a brief path stall reroutes without releasing a living mutual duel", () => {
+test("a blocked mutual duel reroutes once before releasing both units", () => {
   assert.equal(duelPathFailureAction({relock:true,mutualLock:true,targetAlive:true,targetOnFloor:true}),"reroute");
+  assert.equal(duelPathFailureAction({relock:true,mutualLock:true,targetAlive:true,targetOnFloor:true,recoveryAttempts:1}),"release");
   assert.equal(duelPathFailureAction({relock:true,mutualLock:false,targetAlive:true,targetOnFloor:true}),"release");
   assert.equal(duelPathFailureAction({relock:false,mutualLock:true,targetAlive:true,targetOnFloor:true}),"continue");
   assert.equal(duelPathFailureAction({relock:true,mutualLock:true,targetAlive:false,targetOnFloor:true}),"release");
@@ -778,6 +916,27 @@ test("locked soldiers choose a clear side route around a blocking commander", ()
   });
   assert.ok(detour);assert.ok(detour.x>0);
   assert.equal(chooseLocalDetour({start:{x:0,z:0},goal:{x:0,z:-4},obstacles:[]}),null);
+});
+
+test("navigation paths persist around authored blockers without cutting blocked corners", () => {
+  const walkable=new Set();
+  for(let x=-3;x<=3;x++)for(let z=-3;z<=3;z++)walkable.add(navigationCellKey({x,z}));
+  const blocked=new Set([{x:0,z:-1},{x:0,z:0},{x:0,z:1}].map(navigationCellKey));
+  const route=findNavigationPath({start:{x:-2,z:0},goal:{x:2,z:0},walkable,blocked,cellSize:1});
+  assert.ok(route);
+  assert.deepEqual(route.cells.at(-1),{x:2,z:0});
+  assert.ok(route.cells.some(cell=>Math.abs(cell.z)>=2));
+  assert.ok(route.cells.every(cell=>!blocked.has(navigationCellKey(cell))));
+
+  const cornerWalkable=new Set([{x:0,z:0},{x:1,z:0},{x:0,z:1},{x:1,z:1}].map(navigationCellKey));
+  const cornerBlocked=new Set([{x:1,z:0},{x:0,z:1}].map(navigationCellKey));
+  assert.equal(findNavigationPath({start:{x:0,z:0},goal:{x:1,z:1},walkable:cornerWalkable,blocked:cornerBlocked,cellSize:1}),null);
+});
+
+test("broad legacy floor cubes stay walkable while authored cubes block navigation", () => {
+  assert.equal(isNavigationPlatformCube({walkableSurface:"cube",scale:{x:64,y:1,z:64}}),true);
+  assert.equal(isNavigationPlatformCube({walkableSurface:"cube",navigationBlocks:true,scale:{x:64,y:1,z:64}}),false);
+  assert.equal(isNavigationPlatformCube({walkableSurface:"cube",scale:{x:1,y:4,z:1}}),false);
 });
 
 test("combat camera includes free living enemies, not only locked duelists", () => {
@@ -900,6 +1059,13 @@ test("deployment requires floor support across the visible command tile", () => 
   assert.equal(deploymentFootprintSupported({ x: 8, z: 0, size: 2 }, supported), false);
 });
 
+test("navigation requires support beneath an actor's full footprint", () => {
+  const supported = point => Math.abs(point.x) <= 4 && Math.abs(point.z) <= 4 ? 0 : null;
+  assert.equal(navigationFootprintSupported({ x: 0, z: 0, halfX: .25, halfZ: .2 }, supported), true);
+  assert.equal(navigationFootprintSupported({ x: 3.9, z: 0, halfX: .25, halfZ: .2 }, supported), false);
+  assert.equal(navigationFootprintSupported({ x: 0, z: 3.9, halfX: .25, halfZ: .2 }, supported), false);
+});
+
 test("deployment raycasts every walkable level surface but never actors or props", () => {
   const island={id:"island",parent:{},userData:{walkableSurface:"island"}};
   const scaledCube={id:"cube",parent:{},userData:{walkableSurface:"cube"}};
@@ -940,13 +1106,13 @@ test("a group can divide only above twelve soldiers and stays balanced", () => {
 });
 
 test("duel state visibly approaches, lunges, and recovers", () => {
-  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .12, dt: .1 }), {
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, strikeDistance: .12, dt: .1 }), {
     phase: DUEL_PHASE.LUNGE, timer: .48, strike: false
   });
-  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .5, strikeDistance: 1.35, strikeRange: 1.15, dt: .1 }), {
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, strikeDistance: 1.35, strikeRange: 1.15, dt: .1 }), {
     phase: DUEL_PHASE.LUNGE, timer: .42, strike: false
   });
-  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, distance: .3, strikeDistance: 1.48, strikeRange: 1.15, dt: .1 }), {
+  assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.APPROACH, timer: 0, strikeDistance: 1.48, strikeRange: 1.15, dt: .1 }), {
     phase: DUEL_PHASE.LUNGE, timer: .42, strike: false
   });
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.LUNGE, timer: .3, distance: .7, strikeDistance: 1.2, strikeRange: 1.15, dt: .11 }), {
@@ -964,6 +1130,17 @@ test("duel state visibly approaches, lunges, and recovers", () => {
   assert.deepEqual(advanceDuelState({ phase: DUEL_PHASE.RECOVER, timer: .05, distance: 1.7, dt: .06 }), {
     phase: DUEL_PHASE.APPROACH, timer: 0, strike: false
   });
+});
+
+test("duel approach waits for its live opponent rather than a stale point", () => {
+  assert.deepEqual(advanceDuelState({
+    phase: DUEL_PHASE.APPROACH,
+    timer: 0,
+    distance: .12,
+    strikeDistance: 3,
+    strikeRange: 1.15,
+    dt: .1
+  }), { phase: DUEL_PHASE.APPROACH, timer: 0, strike: false });
 });
 
 test("a lunge keeps its committed combat side after crossing its opponent", () => {
@@ -995,6 +1172,17 @@ test("combat animation squashes into attacks and rebounds from damage", () => {
   const damage=combatVisualPose({attack:0,damage:1});
   assert.ok(damage.scaleX>1);
   assert.ok(damage.lift>0);
+});
+
+test("winner celebrations jump and require an actual faction victory", () => {
+  const celebration=combatVisualPose({celebration:Math.PI*.5});
+  assert.ok(celebration.lift>=.4);
+  assert.ok(celebration.scaleX>1);
+  assert.equal(combatVisualPose({celebration:Math.PI*.5,reducedMotion:true}).lift,0);
+  assert.equal(celebrationWinner({livingPlayerCount:3,livingEnemyCount:0,playerReserveCount:0,deploymentStarted:true}),"player");
+  assert.equal(celebrationWinner({livingPlayerCount:0,livingEnemyCount:3,playerReserveCount:1,deploymentStarted:true}),null);
+  assert.equal(celebrationWinner({livingPlayerCount:0,livingEnemyCount:3,playerReserveCount:0,deploymentStarted:false}),null);
+  assert.equal(celebrationWinner({livingPlayerCount:0,livingEnemyCount:3,playerReserveCount:0,deploymentStarted:true}),"enemy");
 });
 
 test("recruit revival lasts roughly five to six seconds", () => {

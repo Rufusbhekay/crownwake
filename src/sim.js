@@ -11,12 +11,18 @@ export function levelCameraFrame(frame, { minScale = .32, maxScale = 3 } = {}) {
   return {
     x: frame.x,
     z: frame.z,
-    scale: Math.min(maxScale, Math.max(minScale, frame.scale))
+    scale: Math.min(maxScale, Math.max(minScale, frame.scale)),
+    ...(Array.isArray(frame.rotation) && frame.rotation.length === 3 && frame.rotation.every(Number.isFinite)
+      ? { rotation: frame.rotation.slice() } : {})
   };
 }
 
 export function canMaintainSoldierDuel({ unitAlive, targetAlive, mutualLock }) {
   return Boolean(unitAlive && targetAlive && mutualLock);
+}
+
+export function shouldClearStaleDuelState({ hasTarget = false, duelPhase = null, duelRole = null, duelTurnId = null, lungeAxis = null } = {}) {
+  return !hasTarget && (duelPhase != null || duelRole != null || duelTurnId != null || lungeAxis != null);
 }
 
 // Detection alone is intentionally not enough to mark a unit visually. A ring
@@ -69,6 +75,26 @@ export function allocateDuelWaitingSlots(waiters, duels, preferredDuel, distance
   return assignments;
 }
 
+export function allocatePrioritizedDuelWaitingSlots({
+  priorityWaiters = [],
+  waiters = [],
+  duels = [],
+  preferredDuel = () => null,
+  distanceBetween = () => Infinity
+} = {}) {
+  const priority = [...new Set((Array.isArray(priorityWaiters) ? priorityWaiters : []).filter(Boolean))];
+  const allWaiters = Array.isArray(waiters) ? waiters : [];
+  const allDuels = Array.isArray(duels) ? duels : [];
+  const assignments = allocateDuelWaitingSlots(priority, allDuels, preferredDuel, distanceBetween);
+  const claimedDuels = new Set(assignments.values());
+  const remainingWaiters = allWaiters.filter(waiter => !assignments.has(waiter) && !priority.includes(waiter));
+  const remainingDuels = allDuels.filter(duel => !claimedDuels.has(duel));
+  for (const [waiter, duel] of allocateDuelWaitingSlots(remainingWaiters, remainingDuels, preferredDuel, distanceBetween)) {
+    assignments.set(waiter, duel);
+  }
+  return assignments;
+}
+
 export function chooseNearestAvailablePair(sideA, sideB, distanceBetween = (left, right) => Math.hypot(left.x - right.x, left.z - right.z)) {
   let best = null;
   let bestDistance = Infinity;
@@ -80,6 +106,46 @@ export function chooseNearestAvailablePair(sideA, sideB, distanceBetween = (left
     }
   }
   return best;
+}
+
+export function chooseBarracksAnchor({ candidates = [], roll = 0 } = {}) {
+  const validCandidates = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+  if (!validCandidates.length) return null;
+  const boundedRoll = Math.min(.999999, Math.max(0, Number.isFinite(roll) ? roll : 0));
+  return validCandidates[Math.floor(boundedRoll * validCandidates.length)];
+}
+
+export function chooseAvailableBarracksAnchorSlot({ slots = [], occupiedSlots = [], preferredSlot = null } = {}) {
+  const validSlots = [...new Set((Array.isArray(slots) ? slots : []).filter(slot => Number.isInteger(slot) && slot >= 0))];
+  const occupied = new Set((Array.isArray(occupiedSlots) ? occupiedSlots : []).filter(slot => Number.isInteger(slot) && slot >= 0));
+  if (Number.isInteger(preferredSlot) && validSlots.includes(preferredSlot) && !occupied.has(preferredSlot)) return preferredSlot;
+  return validSlots.find(slot => !occupied.has(slot)) ?? null;
+}
+
+export function barracksEnemyCanClaimDuel({ barracksSpawned = false, initialDuelCheck = false, distance = Infinity, detectionRadius = 8 } = {}) {
+  return !barracksSpawned || initialDuelCheck || distance <= detectionRadius;
+}
+
+export function choosePatrolGoal({
+  origin,
+  candidates = [],
+  recentGoal = null,
+  occupied = [],
+  roll = 0,
+  minimumTravelDistance = 3,
+  separation = 2
+} = {}) {
+  const validCandidates = candidates.filter(candidate => Number.isFinite(candidate?.x) && Number.isFinite(candidate?.z));
+  if (!validCandidates.length) return null;
+  const distanceBetween = (first, second) => Math.hypot(first.x - second.x, first.z - second.z);
+  const separatedCandidates = validCandidates.filter(candidate =>
+    (!recentGoal || distanceBetween(candidate, recentGoal) >= separation) &&
+    occupied.every(point => distanceBetween(candidate, point) >= separation)
+  );
+  const distantCandidates = separatedCandidates.filter(candidate => !origin || distanceBetween(candidate, origin) >= minimumTravelDistance);
+  const options = distantCandidates.length ? distantCandidates : separatedCandidates.length ? separatedCandidates : validCandidates;
+  const boundedRoll = Math.min(.999999, Math.max(0, roll));
+  return options[Math.floor(boundedRoll * options.length)];
 }
 
 export function duelMeetingPoint(left, right) {
@@ -314,6 +380,32 @@ export function resolveBoxOverlap(a, aHalf, b, bHalf) {
   return { ax: 0, az: -direction * overlapZ * .5, bx: 0, bz: direction * overlapZ * .5 };
 }
 
+export function resolveCircleBoxOverlap({ point, radius, box, boxHalf, rotation = 0 }) {
+  const cosine = Math.cos(rotation), sine = Math.sin(rotation);
+  const offsetX = point.x - box.x, offsetZ = point.z - box.z;
+  const localX = cosine * offsetX - sine * offsetZ;
+  const localZ = sine * offsetX + cosine * offsetZ;
+  const closestX = Math.max(-boxHalf.x, Math.min(boxHalf.x, localX));
+  const closestZ = Math.max(-boxHalf.z, Math.min(boxHalf.z, localZ));
+  const separationX = localX - closestX, separationZ = localZ - closestZ;
+  const separation = Math.hypot(separationX, separationZ);
+  let correctionX = 0, correctionZ = 0;
+  if (separation > 1e-6) {
+    const overlap = radius - separation;
+    if (overlap <= 0) return null;
+    correctionX = separationX / separation * overlap;
+    correctionZ = separationZ / separation * overlap;
+  } else {
+    const depthX = boxHalf.x - Math.abs(localX), depthZ = boxHalf.z - Math.abs(localZ);
+    if (depthX < depthZ) correctionX = (localX < 0 ? -1 : 1) * (depthX + radius);
+    else correctionZ = (localZ < 0 ? -1 : 1) * (depthZ + radius);
+  }
+  return {
+    x: cosine * correctionX + sine * correctionZ,
+    z: -sine * correctionX + cosine * correctionZ
+  };
+}
+
 export function chooseServantMode({ combat, masterRetreating, distanceToMaster, attackLeash, locked = false }) {
   return locked || (combat && !masterRetreating && distanceToMaster <= attackLeash)
     ? SERVANT_MODE.ATTACK
@@ -424,6 +516,213 @@ export function snapTacticalCell(point, cellSize = 1.8, offset = 0) {
   };
 }
 
+function gridAxisValue(value, axis, fallback) {
+  const candidate = typeof value === "object" && value !== null ? Number(value[axis]) : Number(value);
+  return Number.isFinite(candidate) ? candidate : fallback;
+}
+
+function gridCellAxes(cellSize = 1) {
+  return {
+    x: gridAxisValue(cellSize, "x", 1),
+    z: gridAxisValue(cellSize, "z", 1)
+  };
+}
+
+function gridOffsetAxes(offset = 0) {
+  return {
+    x: gridAxisValue(offset, "x", 0),
+    z: gridAxisValue(offset, "z", 0)
+  };
+}
+
+export function fittedGridSpec({ minX, maxX, minZ, maxZ, columns = 1, rows = 1 } = {}) {
+  if (![minX, maxX, minZ, maxZ, columns, rows].every(Number.isFinite) || minX >= maxX || minZ >= maxZ) return null;
+  const safeColumns = Math.max(1, Math.floor(columns));
+  const safeRows = Math.max(1, Math.floor(rows));
+  const cellSize = { x: (maxX - minX) / safeColumns, z: (maxZ - minZ) / safeRows };
+  const offset = { x: minX + cellSize.x * .5, z: minZ + cellSize.z * .5 };
+  return {
+    columns: safeColumns,
+    rows: safeRows,
+    cellSize,
+    offset,
+    bounds: {
+      minX: offset.x,
+      maxX: maxX - cellSize.x * .5,
+      minZ: offset.z,
+      maxZ: maxZ - cellSize.z * .5
+    }
+  };
+}
+
+export function gridCellsWithinBounds({ minX, maxX, minZ, maxZ, cellSize = 1, offset = 0 } = {}) {
+  const size = gridCellAxes(cellSize), origin = gridOffsetAxes(offset);
+  if (![minX, maxX, minZ, maxZ, size.x, size.z, origin.x, origin.z].every(Number.isFinite) || size.x <= 0 || size.z <= 0 || minX > maxX || minZ > maxZ) return [];
+  const startX = Math.ceil((minX - origin.x) / size.x) * size.x + origin.x;
+  const endX = Math.floor((maxX - origin.x) / size.x) * size.x + origin.x;
+  const startZ = Math.ceil((minZ - origin.z) / size.z) * size.z + origin.z;
+  const endZ = Math.floor((maxZ - origin.z) / size.z) * size.z + origin.z;
+  const cells = [];
+  for (let x = startX; x <= endX + 1e-9; x += size.x) {
+    for (let z = startZ; z <= endZ + 1e-9; z += size.z) {
+      cells.push({ x: Number(x.toFixed(6)), z: Number(z.toFixed(6)) });
+    }
+  }
+  return cells;
+}
+
+export function navigationCellKey({ x, z } = {}) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return "";
+  return `${Number(x.toFixed(6))}:${Number(z.toFixed(6))}`;
+}
+
+export function snapNavigationCell(point, cellSize = 1, offset = 0) {
+  const size = gridCellAxes(cellSize), origin = gridOffsetAxes(offset);
+  if (!point || ![point.x, point.z, size.x, size.z, origin.x, origin.z].every(Number.isFinite) || size.x <= 0 || size.z <= 0) return null;
+  return {
+    x: Number((Math.round((point.x - origin.x) / size.x) * size.x + origin.x).toFixed(6)),
+    z: Number((Math.round((point.z - origin.z) / size.z) * size.z + origin.z).toFixed(6))
+  };
+}
+
+export function isNavigationPlatformCube({ walkableSurface, navigationBlocks = false, scale } = {}) {
+  if (walkableSurface !== "cube" || navigationBlocks === true) return false;
+  const horizontalX = Math.abs(Number(scale?.x));
+  const horizontalZ = Math.abs(Number(scale?.z));
+  const vertical = Math.abs(Number(scale?.y));
+  if (![horizontalX, horizontalZ, vertical].every(Number.isFinite)) return false;
+  const shorterHorizontalSpan = Math.min(horizontalX, horizontalZ);
+  return shorterHorizontalSpan >= 2 && vertical <= Math.max(.28, shorterHorizontalSpan * .2);
+}
+
+function nearestNavigableCell({ point, walkable, blocked, cellSize, offset, maxRadius }) {
+  const origin = snapNavigationCell(point, cellSize, offset);
+  const size = gridCellAxes(cellSize);
+  if (!origin || !(walkable instanceof Set) || !(blocked instanceof Set)) return null;
+  const isNavigable = cell => {
+    const key = navigationCellKey(cell);
+    return Boolean(key) && walkable.has(key) && !blocked.has(key);
+  };
+  if (isNavigable(origin)) return origin;
+  const safeRadius = Math.max(0, Math.floor(Number.isFinite(maxRadius) ? maxRadius : 0));
+  for (let radius = 1; radius <= safeRadius; radius++) {
+    const candidates = [];
+    for (let column = -radius; column <= radius; column++) {
+      for (let row = -radius; row <= radius; row++) {
+        if (Math.max(Math.abs(column), Math.abs(row)) !== radius) continue;
+        candidates.push({ x: origin.x + column * size.x, z: origin.z + row * size.z });
+      }
+    }
+    candidates.sort((first, second) => {
+      const firstDistance = (first.x - point.x) ** 2 + (first.z - point.z) ** 2;
+      const secondDistance = (second.x - point.x) ** 2 + (second.z - point.z) ** 2;
+      return firstDistance - secondDistance;
+    });
+    const candidate = candidates.find(isNavigable);
+    if (candidate) return candidate;
+  }
+  return null;
+}
+
+export function findNavigationPath({
+  start,
+  goal,
+  walkable,
+  blocked = new Set(),
+  dynamicCosts = new Map(),
+  cellSize = 1,
+  offset = 0,
+  maxVisited = 8192,
+  nearestCellRadius = 5
+} = {}) {
+  const size = gridCellAxes(cellSize);
+  if (!(walkable instanceof Set) || !(blocked instanceof Set) || !Number.isFinite(size.x) || !Number.isFinite(size.z) || size.x <= 0 || size.z <= 0) return null;
+  const startCell = nearestNavigableCell({ point: start, walkable, blocked, cellSize, offset, maxRadius: nearestCellRadius });
+  const goalCell = nearestNavigableCell({ point: goal, walkable, blocked, cellSize, offset, maxRadius: nearestCellRadius });
+  if (!startCell || !goalCell) return null;
+  const startKey = navigationCellKey(startCell), goalKey = navigationCellKey(goalCell);
+  if (startKey === goalKey) return { cells: [], start: startCell, goal: goalCell, visited: 1 };
+  const isNavigable = cell => {
+    const key = navigationCellKey(cell);
+    return Boolean(key) && walkable.has(key) && !blocked.has(key);
+  };
+  const distanceUnit = Math.min(size.x, size.z);
+  const heuristic = cell => Math.hypot(cell.x - goalCell.x, cell.z - goalCell.z) / distanceUnit;
+  const frontier = [];
+  const pushFrontier = node => {
+    frontier.push(node);
+    let childIndex = frontier.length - 1;
+    while (childIndex > 0) {
+      const parentIndex = Math.floor((childIndex - 1) / 2);
+      if (frontier[parentIndex].priority <= node.priority) break;
+      frontier[childIndex] = frontier[parentIndex];
+      childIndex = parentIndex;
+    }
+    frontier[childIndex] = node;
+  };
+  const popFrontier = () => {
+    if (!frontier.length) return null;
+    const first = frontier[0], last = frontier.pop();
+    if (!frontier.length || !last) return first;
+    let parentIndex = 0;
+    while (true) {
+      const leftIndex = parentIndex * 2 + 1, rightIndex = leftIndex + 1;
+      if (leftIndex >= frontier.length) break;
+      const smallestChild = rightIndex < frontier.length && frontier[rightIndex].priority < frontier[leftIndex].priority ? rightIndex : leftIndex;
+      if (frontier[smallestChild].priority >= last.priority) break;
+      frontier[parentIndex] = frontier[smallestChild];
+      parentIndex = smallestChild;
+    }
+    frontier[parentIndex] = last;
+    return first;
+  };
+  const cameFrom = new Map(), costByKey = new Map([[startKey, 0]]), cellByKey = new Map([[startKey, startCell]]);
+  pushFrontier({ key: startKey, cell: startCell, cost: 0, priority: heuristic(startCell) });
+  const neighbourOffsets = [
+    { column: -1, row: 0 }, { column: 1, row: 0 },
+    { column: 0, row: -1 }, { column: 0, row: 1 },
+    { column: -1, row: -1 }, { column: 1, row: -1 },
+    { column: -1, row: 1 }, { column: 1, row: 1 }
+  ];
+  let visited = 0;
+  while (frontier.length && visited < Math.max(1, Math.floor(maxVisited))) {
+    const current = popFrontier();
+    if (!current || current.cost !== costByKey.get(current.key)) continue;
+    visited++;
+    if (current.key === goalKey) {
+      const cells = [];
+      let cursorKey = goalKey;
+      while (cursorKey !== startKey) {
+        const cell = cellByKey.get(cursorKey);
+        if (!cell) return null;
+        cells.push(cell);
+        cursorKey = cameFrom.get(cursorKey);
+        if (!cursorKey) return null;
+      }
+      cells.reverse();
+      return { cells, start: startCell, goal: goalCell, visited };
+    }
+    for (const offsetCell of neighbourOffsets) {
+      const moveX = offsetCell.column * size.x, moveZ = offsetCell.row * size.z;
+      const neighbour = { x: current.cell.x + moveX, z: current.cell.z + moveZ };
+      if (!isNavigable(neighbour)) continue;
+      if (offsetCell.column && offsetCell.row) {
+        const horizontal = { x: current.cell.x + moveX, z: current.cell.z };
+        const vertical = { x: current.cell.x, z: current.cell.z + moveZ };
+        if (!isNavigable(horizontal) || !isNavigable(vertical)) continue;
+      }
+      const neighbourKey = navigationCellKey(neighbour), trafficCost = Math.max(0, Number(dynamicCosts?.get?.(neighbourKey)) || 0);
+      const nextCost = current.cost + Math.hypot(moveX, moveZ) / distanceUnit + trafficCost;
+      if (nextCost >= (costByKey.get(neighbourKey) ?? Infinity)) continue;
+      costByKey.set(neighbourKey, nextCost);
+      cameFrom.set(neighbourKey, current.key);
+      cellByKey.set(neighbourKey, neighbour);
+      pushFrontier({ key: neighbourKey, cell: neighbour, cost: nextCost, priority: nextCost + heuristic(neighbour) });
+    }
+  }
+  return null;
+}
+
 export function tacticalCellBlocked({ cell, actors, excludedIds = [], cellSize = 3.6, offset = 1.8 }) {
   const excluded = new Set(excludedIds);
   return actors.some(actor => {
@@ -529,17 +828,25 @@ export function companyDivisionPlan(soldierCount, threshold = 12) {
   };
 }
 
-export function combatVisualPose({ attack = 0, damage = 0, reducedMotion = false }) {
+export function combatVisualPose({ attack = 0, damage = 0, celebration = 0, reducedMotion = false }) {
   if (reducedMotion) return { scaleX: 1, scaleY: 1, scaleZ: 1, forward: 0, lift: 0 };
   const attackPulse = Math.sin(Math.PI * .5 * Math.max(0, Math.min(1, attack)));
   const damagePulse = Math.sin(Math.PI * .5 * Math.max(0, Math.min(1, damage)));
+  const celebrationRise = Math.max(0, Math.sin(celebration));
+  const celebrationLanding = Math.max(0, -Math.sin(celebration));
   return {
-    scaleX: 1 + attackPulse * .08 + damagePulse * .16,
-    scaleY: 1 + attackPulse * .05 - damagePulse * .12,
-    scaleZ: 1 - attackPulse * .2 + damagePulse * .14,
+    scaleX: 1 + attackPulse * .08 + damagePulse * .16 + celebrationRise * .09 + celebrationLanding * .12,
+    scaleY: 1 + attackPulse * .05 - damagePulse * .12 + celebrationRise * .04 - celebrationLanding * .14,
+    scaleZ: 1 - attackPulse * .2 + damagePulse * .14 + celebrationRise * .09 + celebrationLanding * .12,
     forward: attackPulse * .42,
-    lift: damagePulse * .1
+    lift: damagePulse * .1 + celebrationRise * .42
   };
+}
+
+export function characterAnimationIntent({ hasAnimationClips = false, moving = false, attacking = false } = {}) {
+  if (!hasAnimationClips) return null;
+  if (attacking) return "attack";
+  return moving ? "walk" : "idle";
 }
 
 export function chooseCommanderBlockerIndex({ commander, target, soldiers, lookAhead = 2.4, corridorHalfWidth = .72, threatRadius = 1.25 }) {
@@ -624,12 +931,9 @@ export function resolveDuelTurnId({ unitId, targetId, unitTurnId, targetTurnId }
   return Math.min(unitId, targetId);
 }
 
-export function advanceDuelState({ phase, timer, distance, strikeDistance = Infinity, strikeRange = 1.15, dt }) {
+export function advanceDuelState({ phase, timer, strikeDistance = Infinity, strikeRange = 1.15, dt }) {
   if (phase === DUEL_PHASE.APPROACH) {
-    if (distance <= .16) return { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false };
-    // A pair that has already met does not need to settle onto its invisible
-    // face-off marker first. Arm the lunge immediately and let the existing
-    // stand-off distance prevent overlap.
+    if (strikeDistance <= .16) return { phase: DUEL_PHASE.LUNGE, timer: .48, strike: false };
     if (strikeDistance <= strikeRange + .4) return { phase: DUEL_PHASE.LUNGE, timer: .42, strike: false };
     return { phase, timer: 0, strike: false };
   }
@@ -665,6 +969,17 @@ export function shouldReleaseCombatCommitment(combat, livingEnemyCount) {
   return !combat || livingEnemyCount === 0;
 }
 
+export function shouldRegroupPlayerGroup({
+  combat = false,
+  enemyInSight = false,
+  targetAlive = false,
+  waitingSlot = false,
+  manualOrder = false,
+  raidTarget = false
+} = {}) {
+  return !combat && !enemyInSight && !targetAlive && !waitingSlot && !manualOrder && !raidTarget;
+}
+
 export const SOLDIER_HEALTH_WIDGET_DURATION = 3.2;
 export const SOLDIER_REGEN_DELAY = 1.2;
 export const SOLDIER_REGEN_DURATION = 10;
@@ -688,6 +1003,15 @@ export function soldierRegenHealth({
 
 export function isPlayerWaveDefeated(livingPlayerCount) {
   return Math.max(0, Number(livingPlayerCount) || 0) === 0;
+}
+
+export function celebrationWinner({ livingPlayerCount = 0, livingEnemyCount = 0, playerReserveCount = 0, deploymentStarted = false } = {}) {
+  const players = Math.max(0, Number(livingPlayerCount) || 0);
+  const enemies = Math.max(0, Number(livingEnemyCount) || 0);
+  const reserve = Math.max(0, Number(playerReserveCount) || 0);
+  if (players > 0 && enemies === 0) return "player";
+  if (deploymentStarted && reserve === 0 && players === 0 && enemies > 0) return "enemy";
+  return null;
 }
 
 export function advanceLaggingHealthBar({ current, lag, hold, visibleTimer, regenerating = false, dt }) {
@@ -806,10 +1130,10 @@ export function advancePathFailure({ previousDistance, distance, timer, failures
   return { previousDistance: distance, timer: 0, failures: nextFailures, relock: nextFailures >= maxFailures };
 }
 
-export function duelPathFailureAction({ relock, mutualLock, targetAlive, targetOnFloor }) {
+export function duelPathFailureAction({ relock, mutualLock, targetAlive, targetOnFloor, recoveryAttempts = 0, maxRecoveryAttempts = 1 }) {
   if (!targetAlive || !targetOnFloor) return "release";
   if (!relock) return "continue";
-  return mutualLock ? "reroute" : "release";
+  return mutualLock && recoveryAttempts < maxRecoveryAttempts ? "reroute" : "release";
 }
 
 export const ENEMY_TARGET_REVIEW_INTERVAL = 1;
@@ -907,19 +1231,31 @@ export function canDeploySoldier(reserve, amount = 1) {
   return Number.isFinite(reserve) && Math.floor(reserve) >= safeAmount;
 }
 
-export function deploymentFootprintSupported({ x, z, size }, supportAt) {
-  if (![x, z, size].every(Number.isFinite) || size <= 0 || typeof supportAt !== "function") return false;
-  const inset = size * .48;
+export function navigationFootprintSupported({ x, z, halfX = 0, halfZ = 0 } = {}, supportAt) {
+  if (![x, z, halfX, halfZ].every(Number.isFinite) || halfX < 0 || halfZ < 0 || typeof supportAt !== "function") return false;
   return [
     { x, z },
-    { x: x - inset, z: z - inset },
-    { x: x + inset, z: z - inset },
-    { x: x + inset, z: z + inset },
-    { x: x - inset, z: z + inset }
+    { x: x - halfX, z: z - halfZ },
+    { x: x + halfX, z: z - halfZ },
+    { x: x + halfX, z: z + halfZ },
+    { x: x - halfX, z: z + halfZ }
   ].every(point => {
     const support = supportAt(point);
     return support !== null && support !== undefined;
   });
+}
+
+export function deploymentFootprintSupported({ x, z, size }, supportAt) {
+  if (![x, z, size].every(Number.isFinite) || size <= 0) return false;
+  const inset = size * .48;
+  return navigationFootprintSupported({ x, z, halfX: inset, halfZ: inset }, supportAt);
+}
+
+export function deploymentPreviewCellState({ supported = false, edge = false, enemyOccupied = false } = {}) {
+  // Preview and gameplay must agree: any supported tile is a valid CH
+  // deployment point unless an EN is physically occupying it. `edge` remains
+  // part of the input for compatibility with existing callers.
+  return supported && !enemyOccupied ? "available" : "blocked";
 }
 
 export function walkableSurfaceCandidates(objects) {
@@ -932,15 +1268,30 @@ export function deploymentReserveAfterDeploy(reserve, amount = 1) {
   return Math.max(0, Math.floor(Number.isFinite(reserve) ? reserve : 0) - safeAmount);
 }
 
-export function normalizePracticeConfig({ playerSoldiers, startingEnemies, waveCounts, waveDelay } = {}) {
+export function splitEnemyStats({ maxHp = 0, attack = 0 } = {}) {
+  return {
+    maxHp: Math.max(.5, Number(maxHp) * .5),
+    attack: Math.max(.5, Number(attack) * .5)
+  };
+}
+
+export function normalizePracticeConfig({ playerSoldiers, ch1Soldiers, ch2Soldiers, ch3Soldiers, startingEnemies, waveCounts, waveDelay } = {}) {
   const integer = (value, fallback, min, max) => {
     const parsed = Number(value);
     const safeValue = Number.isFinite(parsed) ? parsed : fallback;
     return Math.min(max, Math.max(min, Math.floor(safeValue)));
   };
+  const legacyTotal = integer(playerSoldiers, 14, 0, 999);
+  const legacyProvided = playerSoldiers !== undefined && playerSoldiers !== null && playerSoldiers !== "";
+  const ch1 = integer(ch1Soldiers, legacyProvided ? Math.ceil(legacyTotal / 2) : 7, 0, 999);
+  const ch2 = integer(ch2Soldiers, legacyProvided ? Math.floor(legacyTotal / 2) : 7, 0, 999);
+  const ch3 = integer(ch3Soldiers, 5, 0, 999);
   const delay = Number(waveDelay);
   return {
-    playerSoldiers: integer(playerSoldiers, 7, 1, 36),
+    ch1Soldiers: ch1,
+    ch2Soldiers: ch2,
+    ch3Soldiers: ch3,
+    playerSoldiers: ch1 + ch2 + ch3,
     startingEnemies: integer(startingEnemies, OPENING_ENEMY_COUNT, 1, 24),
     waveCounts: Array.from({ length: 10 }, (_, index) => integer(waveCounts?.[index], DEFAULT_PRACTICE_WAVE_COUNTS[index], 0, 24)),
     waveDelay: Number.isFinite(delay) ? Math.min(60, Math.max(0, delay)) : DEFAULT_PRACTICE_WAVE_DELAY
@@ -1228,6 +1579,7 @@ export function actorDebugSnapshot({
   let action = "idle";
   if (!alive) action = "down";
   else if ((data.damageAnim ?? 0) > .2 || (data.hitPulse ?? 0) > .2) action = "stunned";
+  else if (data.celebrating) action = "celebrating";
   else if (locked && targetAlive) action = duelPhase === DUEL_PHASE.LUNGE || (data.attackAnim ?? 0) > .1 ? "attacking" : "seeking";
   else if (combat && (data.manualMoving || data.seekingTarget)) action = "seeking";
   else if ((data.manualMoving || (data.velocity?.lengthSq?.() ?? 0) > .01) && !data.lockedTarget) action = "moving";

@@ -1,9 +1,13 @@
 const baseUrl = process.env.CROWNWAKE_URL ?? "http://127.0.0.1:4173";
 const checks = [
+  ["/Models/crownwake-swordsman-v02.glb", "model/gltf-binary"],
+  ["/src/character-animation.js", "text/javascript"],
+  ["/vendor/utils/SkeletonUtils.js", "text/javascript"],
   ["/", "text/html"],
   ["/game.js", "text/javascript"],
   ["/sim-runtime-20260724g.js", "text/javascript"],
-  ["/Models/CH_Servant.glb", "model/gltf-binary"],
+  ["/Models/CH_Model.glb", "model/gltf-binary"],
+  ["/Models/Crownwake_Base.glb", "model/gltf-binary"],
   ["/Models/Forest_House_Fence_01.glb", "model/gltf-binary"],
   ["/Models/Forest_House_Fence_02.glb", "model/gltf-binary"],
   ["/Models/Forest_House_Fence_03.glb", "model/gltf-binary"],

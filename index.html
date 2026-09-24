@@ -10,6 +10,7 @@
 </head>
 <body>
   <canvas id="game" aria-label="Crownwake 3D game"></canvas>
+  <div id="placed-hud-layer" aria-label="Placed level HUD controls"></div>
   <section id="title-screen" class="screen">
     <div class="title-mark"><span></span><i></i><span></span></div>
     <p class="kicker">A TINY TALE OF CONQUEST</p>
@@ -30,12 +31,6 @@
         <button id="settings" class="quiet settings-button" aria-label="Settings">&#9881;</button>
         <button id="exit" class="quiet exit-button">EXIT</button>
         <button id="debug" class="quiet hidden" aria-label="Toggle AI monitor">MONITOR</button>
-        <div id="deployment-options" class="deployment-options" aria-label="Deployment size">
-          <button type="button" data-deployment-batch="1" aria-pressed="true">×1</button>
-          <button type="button" data-deployment-batch="2" aria-pressed="false">×2</button>
-          <button type="button" data-deployment-batch="4" aria-pressed="false">×4</button>
-        </div>
-        <button id="companies" class="army-button" aria-label="View my companies"><i class="soldier-cube"></i><strong><span id="army-button-count">4</span></strong></button>
       </div>
     </div>
     <div id="commander-vitals">
@@ -43,7 +38,7 @@
     </div>
     <button id="divide-company" class="divide-company hidden"></button>
     <div id="pause-state" class="hidden" aria-live="polite"></div>
-    <div id="objective"></div>
+    <div id="objective-dock"><div id="objective"></div><div class="deployment-buttons" aria-label="Deploy CH groups"><button id="companies" type="button" class="army-button" data-deployment-archetype="ch1" aria-label="Deploy CH1 group" aria-pressed="false"><i class="soldier-cube ch1"></i><small>CH1</small><strong><span id="army-button-count">7</span></strong></button><button id="companies-ch2" type="button" class="army-button" data-deployment-archetype="ch2" aria-label="Deploy CH2 group" aria-pressed="false"><i class="soldier-cube ch2"></i><small>CH2</small><strong><span id="army-button-count-ch2">7</span></strong></button><button id="companies-ch3" type="button" class="army-button" data-deployment-archetype="ch3" aria-label="Deploy CH Swordsman group" aria-pressed="false"><svg class="soldier-sword" viewBox="0 0 24 28" aria-hidden="true"><path d="M13 2 16 6 10 20 7 19Z" fill="#e8ca77" stroke="#8e7138"/><path d="m5 17 9 4M8 20l-2 5" fill="none" stroke="#4b5359" stroke-width="3"/></svg><small>CH SWORD</small><strong><span id="army-button-count-ch3">5</span></strong></button></div></div>
     <div id="toast" aria-live="polite"></div>
     <div id="mobile-command"></div>
     <div id="map-panel" class="hidden">
@@ -73,11 +68,44 @@
         <div class="settings-row"><span>AUDIO</span><button id="settings-audio" class="quiet">SOUND ON</button></div>
         <div class="settings-row"><span>LEVEL EDITOR</span><button id="level-editor" class="quiet">OPEN EDITOR</button></div>
         <div class="settings-section">
+          <div class="settings-label"><span>STARTING CH</span><small>GROUP RESERVES</small></div>
+          <label class="number-setting"><span>CH1 soldiers available</span><input id="starting-ch1-count" type="number" min="0" max="999" step="1" inputmode="numeric" value="7" aria-label="Starting CH1 soldiers"></label>
+          <label class="number-setting"><span>CH2 soldiers available</span><input id="starting-ch2-count" type="number" min="0" max="999" step="1" inputmode="numeric" value="7" aria-label="Starting CH2 soldiers"></label>
+          <label class="number-setting"><span>CH Swordsmen available</span><input id="starting-ch3-count" type="number" min="0" max="999" step="1" inputmode="numeric" value="5" aria-label="Starting CH Swordsmen"></label>
+        </div>
+        <div class="settings-section">
           <div class="settings-label"><span>GAME SPEED</span><strong id="speed-value">1Ã—</strong></div>
           <input id="speed" type="range" min="0" max="5" step="1" value="2" aria-label="Game speed">
           <div class="speed-labels"><span>0.5</span><span>0.75</span><span>1</span><span>1.25</span><span>1.5</span><span>2</span></div>
         </div>
+        <div class="settings-section unit-ring-settings">
+          <div class="settings-label"><span>UNIT RINGS</span><small>LIVE CH + EN MARKERS</small></div>
+          <p class="settings-help">Changes apply immediately and are saved on this device.</p>
+          <div class="ring-settings-grid">
+            <fieldset class="ring-settings-group"><legend>OUTER RING</legend>
+              <label class="ring-colour-setting"><span>Colour</span><input id="ring-outer-color" type="color" value="#f7f2e4" aria-label="Outer ring colour"></label>
+              <label class="ring-number-setting"><span>Size</span><input id="ring-outer-size" type="number" min="0.3" max="5" step="0.01" inputmode="decimal" aria-label="Outer ring size"></label>
+              <label class="ring-number-setting"><span>Thickness</span><input id="ring-outer-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Outer ring thickness"></label>
+              <label class="ring-number-setting"><span>Height</span><input id="ring-outer-height" type="number" min="0" max="0.2" step="0.005" inputmode="decimal" aria-label="Outer ring height"></label>
+            </fieldset>
+            <fieldset class="ring-settings-group"><legend>INNER RING</legend>
+              <label class="ring-colour-setting"><span>Colour</span><input id="ring-inner-color" type="color" value="#f7f2e4" aria-label="Inner ring colour"></label>
+              <label class="ring-number-setting"><span>Size</span><input id="ring-inner-size" type="number" min="0.1" max="5" step="0.01" inputmode="decimal" aria-label="Inner ring size"></label>
+              <label class="ring-number-setting"><span>Thickness</span><input id="ring-inner-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Inner ring thickness"></label>
+              <label class="ring-number-setting"><span>Height</span><input id="ring-inner-height" type="number" min="0" max="0.35" step="0.005" inputmode="decimal" aria-label="Inner ring height"></label>
+            </fieldset>
+          </div>
+          <fieldset class="ring-settings-group radar-settings"><legend>FRONT RADAR</legend>
+            <div class="radar-colours"><label class="ring-colour-setting"><span>CH colour</span><input id="ring-ch-radar-color" type="color" value="#e53935" aria-label="CH front radar colour"></label><label class="ring-colour-setting"><span>EN colour</span><input id="ring-en-radar-color" type="color" value="#ffcf22" aria-label="EN front radar colour"></label></div>
+            <label class="ring-number-setting"><span>Height</span><input id="ring-radar-height" type="number" min="0" max="0.2" step="0.005" inputmode="decimal" aria-label="Front radar height"></label>
+            <label class="ring-number-setting"><span>Thickness</span><input id="ring-radar-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Front radar thickness"></label>
+            <label class="ring-number-setting"><span>Radius</span><input id="ring-radar-radius" type="number" min="0.1" max="8" step="0.01" inputmode="decimal" aria-label="Front radar radius"></label>
+            <label class="radar-size-setting"><span>Size <strong id="ring-radar-size-value">34%</strong></span><input id="ring-radar-size" type="range" min="5" max="100" step="1" value="34" aria-label="Front radar size"></label>
+            <small>100% is a semi-circle.</small>
+          </fieldset>
+        </div>
         <div class="settings-footer">
+          <button id="settings-apply" class="quiet settings-apply hidden">APPLY</button>
           <button id="settings-exit" class="quiet exit-button">EXIT</button>
           <button id="settings-cancel" class="quiet">CANCEL</button>
         </div>
@@ -112,17 +140,119 @@
         </section>
       </aside>
       <button id="editor-left-resizer" class="editor-resizer editor-left-resizer" type="button" tabindex="-1" aria-label="Resize left editor panel"></button>
-      <main id="editor-viewport-frame" class="editor-viewport-frame" aria-label="3D level viewport"></main>
+      <main id="editor-viewport-frame" class="editor-viewport-frame" aria-label="3D level viewport">
+        <div id="editor-viewport-actions" class="editor-viewport-actions hidden" role="toolbar" aria-label="Selected level object actions">
+          <button id="editor-viewport-duplicate" type="button" title="Duplicate selected actor or level mesh"><span aria-hidden="true">&#8862;</span> DUPLICATE</button>
+          <button id="editor-viewport-delete" class="danger" type="button" title="Remove selected actor or level mesh"><span aria-hidden="true">&#10005;</span> DELETE</button>
+        </div>
+        <section id="editor-delete-confirm" class="editor-delete-confirm hidden" role="dialog" aria-modal="true" aria-labelledby="editor-delete-title">
+          <div class="editor-delete-card">
+            <h2 id="editor-delete-title">DELETE?</h2>
+            <p id="editor-delete-copy">Remove this asset?</p>
+            <div><button id="editor-delete-cancel" class="small">CANCEL</button><button id="editor-delete-confirm-button" class="small danger">DELETE</button></div>
+          </div>
+        </section>
+      </main>
       <button id="editor-right-resizer" class="editor-resizer editor-right-resizer" type="button" tabindex="-1" aria-label="Resize right editor panel"></button>
       <aside id="editor-right-dock" class="editor-right-dock">
         <div id="editor-outliner-slot" class="editor-outliner-slot"></div>
         <section id="editor-inspector" class="editor-inspector" aria-label="Inspector">
           <div class="editor-dock-heading"><small>DETAILS</small><strong id="editor-inspector-title">NOTHING SELECTED</strong></div>
           <details id="inspector-transform-section" class="hidden" open><summary>TRANSFORM</summary><div id="editor-transform-slot"></div></details>
+          <details id="inspector-material-section" class="hidden" open>
+            <summary>MATERIAL</summary>
+            <div id="editor-material-panel" class="editor-material-panel">
+              <label class="editor-material-slot"><span>MATERIAL</span><select id="editor-material-slot" aria-label="Selected asset material slot"></select></label>
+              <label><span>COLOUR</span><input id="editor-material-colour" type="color" value="#ffffff" aria-label="Selected asset material colour"></label>
+              <div class="editor-material-swatches-heading"><span>SAVED SWATCHES</span><button id="editor-material-save-swatch" type="button" aria-label="Save current material colour as a swatch" title="Save colour swatch">+</button></div>
+              <div id="editor-material-swatches" class="editor-material-swatches" aria-label="Saved material colour swatches"></div>
+            </div>
+          </details>
+          <details id="inspector-model-section" class="hidden" open>
+            <summary>MODEL</summary>
+            <div id="editor-model-panel" class="editor-model-panel">
+              <div class="editor-time-rd-identity"><span>3D</span><div><small>CONTENT BROWSER MODEL</small><strong id="editor-model-name">MODEL</strong></div></div>
+              <div class="editor-model-scale">
+                <span>MODEL SCALE <button id="editor-model-scale-lock" class="editor-scale-lock" type="button" aria-pressed="true" aria-label="Unlock proportional model scale" title="Unlock proportional model scale">&#128274;</button></span>
+                <label>X <input data-model-scale="0" type="number" min="0.02" max="20" step="0.05" value="1"></label>
+                <label>Y <input data-model-scale="1" type="number" min="0.02" max="20" step="0.05" value="1"></label>
+                <label>Z <input data-model-scale="2" type="number" min="0.02" max="20" step="0.05" value="1"></label>
+              </div>
+              <p>This scale is shared by every character and Blueprint that uses this model.</p>
+            </div>
+          </details>
+          <details id="inspector-actor-section" class="hidden" open>
+            <summary>ACTOR</summary>
+            <div id="editor-actor-panel" class="editor-actor-panel">
+              <div class="editor-actor-identity"><span id="editor-actor-faction">CH1</span><div><small>CHARACTER ACTOR</small><strong id="editor-actor-name">CH1</strong></div></div>
+              <label><span>HEALTH</span><input data-actor-property="maxHp" type="number" min="1" max="500" step="1" value="32"></label>
+               <label><span>ATTACK DAMAGE</span><input data-actor-property="attack" type="number" min="0.5" max="200" step="0.5" value="10"></label>
+               <label><span>SPEED</span><input data-actor-property="moveSpeed" type="number" min="0.25" max="15" step="0.05" value="3.975" aria-label="Actor master movement speed"></label>
+               <label><span>ACCELERATION</span><input data-actor-property="acceleration" type="number" min="0.5" max="30" step="0.1" value="5.4" aria-label="Actor movement acceleration"></label>
+               <label><span>PATROL SPEED</span><input data-actor-property="patrolSpeed" type="number" min="0.25" max="15" step="0.05" value="3.975" aria-label="Actor patrol movement speed"></label>
+               <label><span>MODEL</span><select id="editor-actor-model" aria-label="Actor model"></select></label>
+              <label class="editor-actor-material"><span>MATERIAL COLOUR</span><input id="editor-actor-material" type="color" value="#f2a40c" aria-label="Enemy actor material colour"></label>
+              <label><span>PROGRESS BAR</span><select id="editor-actor-progress-bar" aria-label="Actor progress bar"></select></label>
+              <label><span>HEALTH BAR OFFSET</span><input id="editor-actor-health-bar-offset" type="number" min="0" max="12" step="0.05" value="0.2" aria-label="Actor health bar vertical offset"></label>
+              <fieldset id="editor-actor-ring-controls" class="editor-actor-ring-controls">
+                <legend>RING CONTROLS</legend>
+                <p>Shared live marker style for every CH and EN.</p>
+                <div class="editor-ring-groups">
+                  <section><h4>OUTER RING</h4><label class="editor-ring-colour"><span>COLOUR</span><input id="editor-ring-outer-color" type="color" value="#f7f2e4" aria-label="Outer ring colour"></label><label><span>SIZE</span><input id="editor-ring-outer-size" type="number" min="0.3" max="5" step="0.01" inputmode="decimal" aria-label="Outer ring size"></label><label><span>THICKNESS</span><input id="editor-ring-outer-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Outer ring thickness"></label><label><span>HEIGHT</span><input id="editor-ring-outer-height" type="number" min="0" max="0.2" step="0.005" inputmode="decimal" aria-label="Outer ring height"></label></section>
+                  <section><h4>INNER RING</h4><label class="editor-ring-colour"><span>COLOUR</span><input id="editor-ring-inner-color" type="color" value="#f7f2e4" aria-label="Inner ring colour"></label><label><span>SIZE</span><input id="editor-ring-inner-size" type="number" min="0.1" max="5" step="0.01" inputmode="decimal" aria-label="Inner ring size"></label><label><span>THICKNESS</span><input id="editor-ring-inner-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Inner ring thickness"></label><label><span>HEIGHT</span><input id="editor-ring-inner-height" type="number" min="0" max="0.35" step="0.005" inputmode="decimal" aria-label="Inner ring height"></label></section>
+                </div>
+                <section class="editor-ring-radar"><h4>FRONT RADAR</h4><div class="editor-ring-groups"><label class="editor-ring-colour"><span>CH COLOUR</span><input id="editor-ring-ch-radar-color" type="color" value="#e53935" aria-label="CH front radar colour"></label><label class="editor-ring-colour"><span>EN COLOUR</span><input id="editor-ring-en-radar-color" type="color" value="#ffcf22" aria-label="EN front radar colour"></label></div><label><span>HEIGHT</span><input id="editor-ring-radar-height" type="number" min="0" max="0.2" step="0.005" inputmode="decimal" aria-label="Front radar height"></label><label><span>THICKNESS</span><input id="editor-ring-radar-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Front radar thickness"></label><label><span>RADIUS</span><input id="editor-ring-radar-radius" type="number" min="0.1" max="8" step="0.01" inputmode="decimal" aria-label="Front radar radius"></label><label class="editor-ring-radar-size"><span>SIZE <strong id="editor-ring-radar-size-value">34%</strong></span><input id="editor-ring-radar-size" type="range" min="5" max="100" step="1" value="34" aria-label="Front radar size"></label><small>100% is a semi-circle.</small></section>
+              </fieldset>
+            </div>
+           </details>
+          <details id="inspector-hud-section" class="hidden" open>
+            <summary>HUD WIDGET</summary>
+            <div id="editor-hud-panel" class="editor-hud-panel">
+              <div class="editor-time-rd-identity"><span id="editor-hud-faction">EN1</span><div><small>PLACEABLE HUD CONTROL</small><strong id="editor-hud-name">HUD WIDGET</strong></div></div>
+              <label><span>VISIBLE</span><input id="editor-hud-visible" type="checkbox" checked aria-label="HUD widget visible"></label>
+              <label><span>HUD SIZE</span><input id="editor-hud-size" type="number" min="0.5" max="2.5" step="0.05" value="1" aria-label="HUD widget size"></label>
+              <label><span>BLOCK X</span><input id="editor-hud-layout-x" type="number" min="0" max="100" step="1" value="50" aria-label="HUD block horizontal position"></label>
+              <label><span>BLOCK Y</span><input id="editor-hud-layout-y" type="number" min="0" max="100" step="1" value="10" aria-label="HUD block vertical position"></label>
+              <label id="editor-hud-text-setting"><span>TEXT</span><input id="editor-hud-text" type="text" maxlength="80" value="BREAK THE RIVAL CROWN" aria-label="HUD text"></label>
+              <label id="editor-hud-spawn-count-setting"><span>ENEMIES TO SPAWN</span><input id="editor-hud-spawn-count" type="number" min="1" max="99" step="1" value="5" aria-label="Enemies to spawn per HUD click"></label>
+              <p>Drag this block around the editor grid, or set its block position here. CH uses its matching deployment reserve; EN spawns this configured amount at its world proxy.</p>
+            </div>
+          </details>
+          <details id="inspector-building-section" class="hidden" open>
+            <summary>BUILDING BLUEPRINT</summary>
+            <div class="editor-building-panel">
+              <div class="editor-time-rd-identity"><span>BP</span><div><small>LEVEL BLUEPRINT</small><strong id="editor-building-name">BUILDING BLUEPRINT</strong></div></div>
+              <label><span>MODEL</span><select id="editor-building-model" aria-label="Building blueprint model"></select></label>
+              <label class="editor-building-material"><span>MATERIAL COLOUR</span><input id="editor-building-material" type="color" value="#d8ddcc" aria-label="Building blueprint material colour"></label>
+              <label><span>HEALTH</span><input id="editor-building-health" type="number" min="1" max="99999" step="1" value="480" aria-label="Building health"></label>
+              <label><span>PROGRESS BAR</span><select id="editor-building-progress-bar" aria-label="Building progress bar"></select></label>
+              <label><span>HEALTH BAR OFFSET</span><input id="editor-building-health-bar-offset" type="number" min="0" max="12" step="0.05" value="1.12" aria-label="Building health bar vertical offset"></label>
+              <label id="editor-barracks-spawn-setting"><span>EN1 SPAWN <output id="editor-barracks-spawn-output">8s</output></span><input id="editor-barracks-spawn-interval" type="range" min="5" max="10" step="1" value="8" aria-label="Barracks EN1 spawn interval"></label>
+              <p>Choose any available model asset from the Content Browser. The material colour tints the selected building model.</p>
+            </div>
+          </details>
+          <details id="inspector-progress-bar-section" class="hidden" open>
+            <summary>PROGRESS BAR BLUEPRINT</summary>
+            <div class="editor-progress-bar-panel">
+              <div class="editor-time-rd-identity"><span>PB</span><div><small>UI BLUEPRINT</small><strong id="editor-progress-bar-name">PROGRESS BAR</strong></div></div>
+              <label><span>BACKGROUND</span><input id="editor-progress-bar-background" type="color" value="#000000" aria-label="Progress bar background colour"></label>
+              <label><span>MAIN</span><input id="editor-progress-bar-main" type="color" value="#ef6d78" aria-label="Progress bar main colour"></label>
+              <label class="editor-progress-bar-number"><span>WIDTH</span><input id="editor-progress-bar-width" type="number" min="0.2" max="12" step="0.05" value="4.625" aria-label="Progress bar width"></label>
+              <label class="editor-progress-bar-number"><span>HEIGHT</span><input id="editor-progress-bar-height" type="number" min="0.02" max="0.5" step="0.005" value="0.075" aria-label="Progress bar height"></label>
+            </div>
+          </details>
+          <details id="inspector-tile-section" class="hidden" open>
+            <summary>TILE SPAWNER</summary>
+            <div class="editor-tile-panel">
+              <div class="editor-time-rd-identity"><span>BP</span><div><small>LEVEL BLUEPRINT</small><strong id="editor-tile-name">Tile_bp</strong></div></div>
+              <label class="editor-tile-colour"><span id="editor-tile-colour-label">MATERIAL COLOUR</span><input id="editor-tile-colour" type="color" value="#78866c" aria-label="Island tile material colour"></label>
+              <div class="editor-tile-dimensions"><label><span>ROWS</span><input id="editor-tile-rows" type="number" min="1" max="64" step="1" value="5"></label><label><span>COLUMNS</span><input id="editor-tile-columns" type="number" min="1" max="64" step="1" value="5"></label><label><span>TILE SIZE</span><input id="editor-tile-size" type="number" min="1" max="32" step="0.1" value="8"></label></div>
+              <p id="editor-tile-help">Drag Tile_bp into the level. Rows and columns set the number of equal boxes; tile size sets every box edge.</p>
+            </div>
+          </details>
           <details id="inspector-camera-section" class="hidden" open><summary>CAMERA</summary><div class="camera-inspector-controls"><label><span>CAMERA ZOOM <output data-world-look-output="cameraZoom">1&times;</output></span><input data-world-look-setting="cameraZoom" type="range" min="0.6" max="1.8" step="0.05" value="1"></label></div></details>
           <details id="inspector-foliage-section" class="hidden"><summary>FOLIAGE</summary><div id="editor-foliage-slot"></div></details>
           <details id="inspector-environment-section" class="hidden" open><summary>ENVIRONMENT</summary><div id="editor-environment-slot"></div></details>
-          <div id="editor-confirm-slot"></div>
         </section>
         <button id="editor-right-collapse" class="editor-dock-collapse" type="button" aria-label="Collapse right dock" aria-pressed="false">&#8250;</button>
       </aside>
@@ -151,6 +281,7 @@
       </section>
       <button id="editor-duplicate" class="editor-tool" disabled title="Duplicate selected asset"><span aria-hidden="true">&#8862;</span> DUPLICATE</button>
       <button id="editor-delete" class="editor-tool editor-delete" disabled><span aria-hidden="true">&#10005;</span> DELETE</button>
+      <button id="editor-show-navigation" class="editor-tool" type="button" aria-pressed="false" title="Show walkable and blocked navigation cells">SHOW NAV</button>
       <button id="editor-done" class="editor-tool editor-done">PLAYTEST</button>
     </div>
     <aside id="world-look-panel" class="world-look-panel hidden" aria-label="Lighting and post-processing controls">
@@ -187,17 +318,17 @@
       <div class="editor-panel-heading"><small>SELECTED ASSET</small><strong>TRANSFORM</strong></div>
       <div class="editor-transform-fields">
         <span>LOCATION</span>
-        <label>X <input data-transform-property="position" data-transform-axis="x" type="number" step="0.1" value="0" disabled></label>
-        <label>Y <input data-transform-property="position" data-transform-axis="y" type="number" step="0.1" value="0" disabled></label>
-        <label>Z <input data-transform-property="position" data-transform-axis="z" type="number" step="0.1" value="0" disabled></label>
+        <div class="editor-transform-axis"><label for="editor-transform-location-x">X</label><div class="editor-transform-number"><input id="editor-transform-location-x" data-transform-property="position" data-transform-axis="x" type="number" step="0.1" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Location X adjustment"><button type="button" data-transform-step="1" aria-label="Increase location X" title="Increase location X" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease location X" title="Decrease location X" disabled>&#9660;</button></span></div></div>
+        <div class="editor-transform-axis"><label for="editor-transform-location-y">Y</label><div class="editor-transform-number"><input id="editor-transform-location-y" data-transform-property="position" data-transform-axis="y" type="number" step="0.1" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Location Y adjustment"><button type="button" data-transform-step="1" aria-label="Increase location Y" title="Increase location Y" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease location Y" title="Decrease location Y" disabled>&#9660;</button></span></div></div>
+        <div class="editor-transform-axis"><label for="editor-transform-location-z">Z</label><div class="editor-transform-number"><input id="editor-transform-location-z" data-transform-property="position" data-transform-axis="z" type="number" step="0.1" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Location Z adjustment"><button type="button" data-transform-step="1" aria-label="Increase location Z" title="Increase location Z" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease location Z" title="Decrease location Z" disabled>&#9660;</button></span></div></div>
         <span>ROTATION</span>
-        <label>X <input data-transform-property="rotation" data-transform-axis="x" type="number" step="1" value="0" disabled></label>
-        <label>Y <input data-transform-property="rotation" data-transform-axis="y" type="number" step="1" value="0" disabled></label>
-        <label>Z <input data-transform-property="rotation" data-transform-axis="z" type="number" step="1" value="0" disabled></label>
+        <div class="editor-transform-axis"><label for="editor-transform-rotation-x">X</label><div class="editor-transform-number"><input id="editor-transform-rotation-x" data-transform-property="rotation" data-transform-axis="x" type="number" step="1" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Rotation X adjustment"><button type="button" data-transform-step="1" aria-label="Increase rotation X" title="Increase rotation X" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease rotation X" title="Decrease rotation X" disabled>&#9660;</button></span></div></div>
+        <div class="editor-transform-axis"><label for="editor-transform-rotation-y">Y</label><div class="editor-transform-number"><input id="editor-transform-rotation-y" data-transform-property="rotation" data-transform-axis="y" type="number" step="1" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Rotation Y adjustment"><button type="button" data-transform-step="1" aria-label="Increase rotation Y" title="Increase rotation Y" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease rotation Y" title="Decrease rotation Y" disabled>&#9660;</button></span></div></div>
+        <div class="editor-transform-axis"><label for="editor-transform-rotation-z">Z</label><div class="editor-transform-number"><input id="editor-transform-rotation-z" data-transform-property="rotation" data-transform-axis="z" type="number" step="1" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Rotation Z adjustment"><button type="button" data-transform-step="1" aria-label="Increase rotation Z" title="Increase rotation Z" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease rotation Z" title="Decrease rotation Z" disabled>&#9660;</button></span></div></div>
         <span class="scale-heading">SCALE <button id="editor-scale-lock" class="editor-scale-lock" type="button" aria-pressed="true" aria-label="Unlock proportional scale" title="Lock proportional scale">&#128274;</button></span>
-        <label>X <input data-transform-property="scale" data-transform-axis="x" type="number" min="0.02" step="0.05" value="0" disabled></label>
-        <label>Y <input data-transform-property="scale" data-transform-axis="y" type="number" min="0.02" step="0.05" value="0" disabled></label>
-        <label>Z <input data-transform-property="scale" data-transform-axis="z" type="number" min="0.02" step="0.05" value="0" disabled></label>
+        <div class="editor-transform-axis"><label for="editor-transform-scale-x">X</label><div class="editor-transform-number"><input id="editor-transform-scale-x" data-transform-property="scale" data-transform-axis="x" type="number" min="0.02" step="0.05" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Scale X adjustment"><button type="button" data-transform-step="1" aria-label="Increase scale X" title="Increase scale X" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease scale X" title="Decrease scale X" disabled>&#9660;</button></span></div></div>
+        <div class="editor-transform-axis"><label for="editor-transform-scale-y">Y</label><div class="editor-transform-number"><input id="editor-transform-scale-y" data-transform-property="scale" data-transform-axis="y" type="number" min="0.02" step="0.05" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Scale Y adjustment"><button type="button" data-transform-step="1" aria-label="Increase scale Y" title="Increase scale Y" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease scale Y" title="Decrease scale Y" disabled>&#9660;</button></span></div></div>
+        <div class="editor-transform-axis"><label for="editor-transform-scale-z">Z</label><div class="editor-transform-number"><input id="editor-transform-scale-z" data-transform-property="scale" data-transform-axis="z" type="number" min="0.02" step="0.05" value="0" disabled><span class="editor-transform-stepper" role="group" aria-label="Scale Z adjustment"><button type="button" data-transform-step="1" aria-label="Increase scale Z" title="Increase scale Z" disabled>&#9650;</button><button type="button" data-transform-step="-1" aria-label="Decrease scale Z" title="Decrease scale Z" disabled>&#9660;</button></span></div></div>
       </div>
     </aside>
     <aside id="foliage-panel" class="foliage-panel hidden" aria-label="Foliage wind controls">
@@ -243,11 +374,16 @@
         <div><small>ASSET LIBRARY</small><h3 id="asset-panel-title">CONTENT BROWSER</h3></div>
         <div class="content-browser-header-actions" aria-label="Content Browser controls">
           <button id="content-browser-add" type="button" title="Create folder">+ ADD</button>
+          <button id="content-browser-import" type="button" title="Import GLB model">IMPORT</button>
+          <button id="content-browser-new-model" type="button" title="Create a model from the selected asset's current size" disabled>NEW MODEL</button>
+          <button id="content-browser-duplicate" type="button" title="Duplicate selected blueprint" aria-label="Duplicate selected blueprint" disabled>&#10697;</button>
+          <button id="content-browser-delete" class="content-browser-delete hidden" type="button" title="Delete selected Content Browser item" aria-label="Delete selected Content Browser item" disabled>&#10005;</button>
           <button id="content-browser-filter" type="button" title="Show all assets">ALL</button>
           <button id="content-browser-view" type="button" aria-pressed="false" title="Toggle asset view">&#9638;</button>
           <button id="content-browser-visibility" type="button" aria-pressed="true" title="Hide Content Browser">&#128065;</button>
         </div>
       </div>
+      <input id="content-browser-import-input" type="file" accept=".glb,model/gltf-binary" hidden>
       <div id="content-browser-breadcrumb" class="content-browser-breadcrumb" aria-label="Asset folder path"></div>
       <label class="content-browser-search"><span class="sr-only">Search current folder</span><input id="content-browser-search" type="search" placeholder="Search current folder"></label>
       <div class="content-browser-body">
@@ -260,13 +396,6 @@
       <button id="content-browser-resizer" class="content-browser-resizer" type="button" tabindex="-1" aria-label="Resize Content Browser"></button>
       <div id="content-browser-context-menu" class="content-browser-context-menu hidden" role="menu"></div>
     </aside>
-    <section id="editor-delete-confirm" class="editor-delete-confirm hidden" role="dialog" aria-modal="false" aria-labelledby="editor-delete-title">
-      <div class="editor-delete-card">
-        <h2 id="editor-delete-title">DELETE?</h2>
-        <p id="editor-delete-copy">Remove this asset?</p>
-        <div><button id="editor-delete-cancel" class="small">CANCEL</button><button id="editor-delete-confirm-button" class="small danger">DELETE</button></div>
-      </div>
-    </section>
     <div id="editor-status" class="editor-status hidden" aria-live="polite">Arrow keys or drag empty ground to explore.</div>
   </section>
   <div id="tap-marker" aria-hidden="true"></div>

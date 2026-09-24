@@ -148,6 +148,11 @@ export function choosePatrolGoal({
   return options[Math.floor(boundedRoll * options.length)];
 }
 
+export function patrolCohesionTarget({ unit, center, desired, radius = Infinity } = {}) {
+  if (!desired || !Number.isFinite(unit?.x) || !Number.isFinite(unit?.z) || !Number.isFinite(center?.x) || !Number.isFinite(center?.z)) return desired ?? null;
+  return Math.hypot(unit.x - center.x, unit.z - center.z) > radius ? { x: center.x, z: center.z } : desired;
+}
+
 export function duelMeetingPoint(left, right) {
   return {
     x: (left.x + right.x) * .5,

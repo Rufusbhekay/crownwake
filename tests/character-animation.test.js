@@ -54,26 +54,79 @@ test("ordered CH groups use a compact single-file travel column", () => {
   assert.equal(rear.lateral, 0);assert.equal(rear.forward, -2.72);
   const orderStart = game.indexOf("function issueCompanyOrder(");
   const orderEnd = game.indexOf("\nfunction ", orderStart + 1);
-  assert.match(game.slice(orderStart, orderEnd), /const offset=compactGroupColumnOffset\(index\)/);
+  const orderSource = game.slice(orderStart, orderEnd);
+  assert.match(orderSource, /const offset=compactGroupColumnOffset\(index\)/);
+  assert.match(orderSource, /member\.userData\.manualFinalTarget=destination\.clone\(\)/);
+  assert.match(orderSource, /anchor\.orderTrail=\[members\[0\]\?\.position\.clone\(\)\?\?center\.clone\(\)\]/);
+  const columnStart = game.indexOf("function manualColumnDestination(");
+  const columnEnd = game.indexOf("function independentGroupPatrolTarget(", columnStart);
+  const columnSource = game.slice(columnStart, columnEnd);
+  assert.match(columnSource, /manualColumnTrailPoint\(anchor\.orderTrail,index\*INDEPENDENT_GROUP_COLUMN_GAP/);
+  assert.doesNotMatch(columnSource, /members\[index-1\]\.position/);
 });
 
-test("CH group patrols share one moving target and resume immediately after an order", () => {
+test("CH group members keep independently patrolling around their pivot", () => {
   const patrolStart = game.indexOf("function independentGroupPatrolTarget(");
   const patrolEnd = game.indexOf("function updateIndependentGroupPatrol(", patrolStart);
   const patrolSource = game.slice(patrolStart, patrolEnd);
-  assert.match(patrolSource, /anchor\.patrolGoal=/);
-  assert.match(patrolSource, /anchor\.patrolHome=home\.clone\(\)\.setY\(GROUND_Y\)/);
+  assert.match(patrolSource, /unit\.userData\.groupPatrolGoal=/);
+  assert.match(patrolSource, /INDEPENDENT_GROUP_PATROL_PAUSE_MAX/);
+  assert.match(patrolSource, /expiresAt:totalTime\+INDEPENDENT_GROUP_PATROL_DURATION\+rand\(\)/);
   assert.match(patrolSource, /INDEPENDENT_GROUP_PATROL_RADIUS/);
-  assert.doesNotMatch(patrolSource, /expiresAt/);
-  assert.match(patrolSource, /compactGroupColumnOffset\(index\)/);
+  assert.match(patrolSource, /occupied\.push\(member\.position\)/);
+  assert.doesNotMatch(patrolSource, /anchor\.patrolGoal=/);
+  const patrolUpdateStart = game.indexOf("function updateIndependentGroupPatrol(");
+  const patrolUpdateEnd = game.indexOf("function updateIndependentSoldier(", patrolUpdateStart);
+  assert.match(game.slice(patrolUpdateStart, patrolUpdateEnd), /arrivalSpeed=Math\.min\(1,Math\.max\(\.24,distance\/\.58\)\)/);
   const soldierStart = game.indexOf("function updateIndependentSoldier(");
   const soldierEnd = game.indexOf("\nfunction ", soldierStart + 1);
   const soldierSource = game.slice(soldierStart, soldierEnd);
   assert.match(soldierSource, /updateIndependentGroupPatrol\(u,patrolAllies,dt\)/);
-  assert.match(soldierSource, /ensureCompanyAnchor\(u\.userData\.companyId\)\.patrolGoal=null/);
+  assert.match(soldierSource, /recordManualColumnTrail\(u\)/);
+  assert.doesNotMatch(soldierSource, /orderHoldPosition/);
   assert.match(soldierSource, /navigationPhysicalPathClear\(u\.position,desired,u\)/);
   assert.match(soldierSource, /steerStraightTowards\(u,desired/);
   assert.doesNotMatch(soldierSource, /manualMoving=false;u\.userData\.manualTarget=null;u\.userData\.velocity\.set\(0,0,0\)/);
+});
+
+test("a CH resumes patrol after reaching its recorded trail slot", () => {
+  const unit = new THREE.Group(), trailSlot = new THREE.Vector3(4, 0, 2), finalSlot = new THREE.Vector3(8, 0, 2);
+  const leader = new THREE.Group();
+  leader.position.copy(finalSlot);
+  leader.userData = { companyId: 1, manualFinalTarget: finalSlot.clone() };
+  unit.position.copy(trailSlot);
+  unit.userData = { alive: true, companyId: 1, manualMoving: true, manualTarget: finalSlot.clone(), manualFinalTarget: finalSlot.clone(), velocity: new THREE.Vector3() };
+  const anchor = { moving: true, orderTrail: [new THREE.Vector3()], orderTrailComplete: false, patrolGoal: null };
+  let patrolCalls = 0;
+  const context = vm.createContext({
+    THREE, NAVIGATION_WAYPOINT_REACHED: .22, SOLDIER_COMBAT_STATE, SERVANT_MODE, soldierCombatState,
+    shouldRegroupPlayerGroup: () => false, manualColumnDestination: () => trailSlot.clone(),
+    ensureCompanyAnchor: () => anchor, livingCompanyMembers: () => [leader, unit], updateIndependentGroupPatrol: () => patrolCalls++,
+    actorSteerAcceleration: (_unit, acceleration) => acceleration, editorActorMoveScale: () => 1,
+    navigationPhysicalPathClear: () => true, steerStraightTowards: () => {}, steerTowards: () => {},
+    smoothAngle: (_current, target) => target
+  });
+  const start = game.indexOf("function updateIndependentSoldier("), end = game.indexOf("\nfunction ", start + 1);
+  const trailStart = game.indexOf("function recordManualColumnTrail("), trailEnd = game.indexOf("function independentGroupPatrolTarget(", trailStart);
+  vm.runInContext(game.slice(trailStart, trailEnd), context);
+  vm.runInContext(game.slice(start, end), context);
+  context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
+  assert.equal(unit.userData.manualMoving, true);
+  context.recordManualColumnTrail(leader);
+  assert.equal(anchor.orderTrailComplete, true);
+  context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
+  assert.equal(unit.userData.manualMoving, false);
+  context.updateIndependentSoldier(unit, { combat: false, peacefulPatrol: true, dt: 1 / 60 });
+  assert.equal(patrolCalls, 1);
+});
+
+test("patrol keeps CH and EN close to their own group", () => {
+  assert.match(game, /CH_PATROL_COHESION_RADIUS=2\.4/);
+  assert.match(game, /patrolCohesionTarget\(\{unit:unit\.position,center:pivot,desired:patrolTarget,radius:CH_PATROL_COHESION_RADIUS\}\)/);
+  const enemyPatrolStart = game.indexOf("function enemyRoamDestination(");
+  const enemyPatrolEnd = game.indexOf("function peacefulPatrolDestination(", enemyPatrolStart);
+  const enemyPatrolSource = game.slice(enemyPatrolStart, enemyPatrolEnd);
+  assert.match(enemyPatrolSource, /anchorRadius:EN_PATROL_ANCHOR_RADIUS/);
 });
 
 test("CH and EN markers use raised white rings with a leading faction arc", () => {
@@ -263,7 +316,6 @@ function authoredCombatHarness() {
   });
   for (const [startName, endName] of [
     ["function livingPlayerUnits(", "function playerFocus("],
-    ["function resumePlayerCelebrationForThreat(", "function activatePlacedCharacterEncounter("],
     ["function activatePlacedCharacterEncounter(", "function detachActorFromCombat("],
     ["function activateFieldedPlayerCombat(", "function updateBattle("]
   ]) {

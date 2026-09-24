@@ -6,7 +6,7 @@ import { BASE_MATERIAL_PRESETS, applyBaseMaterial } from "./src/base-materials.j
 import { STR } from "./strings.js";
 import { DUEL_PHASE, DUEL_WAITING_DISTANCE, FACTION, FOLLOW_AWARENESS, SERVANT_MODE, SOLDIER_COMBAT_STATE, SOLDIER_HEALTH_WIDGET_DURATION, SOLDIER_REGEN_DELAY, SOLDIER_REGEN_DURATION, THREAT_FORMATION_SCALE, activeDuelRingState, actorCollisionProfile, actorDebugSnapshot, activeCombatantPoints, advanceDuelState, advanceFollowAwareness, advanceFormationSpread, advanceGroundFragment, advanceLaggingHealthBar, advancePathFailure, allocateDuelWaitingSlots, arrivalSpeed, battleApproachState, cameraBaselineAfterDivision, canApplyAttackDamage, canDivideCompany, canMaintainSoldierDuel, centeredPackOffset, chooseBalancedTargetIndex, chooseCommanderBlockerIndex, chooseCommanderTargetIndex, chooseHiddenSpawn, chooseLocalDetour, chooseNearestAvailablePair, combatVisualPose, commanderClearanceVector, commanderCombatProfile, commanderControlState, commanderFormationOffset, commanderRegenHealth, commanderTacticalWaypoint, companyCommandState, companyDivisionPlan, companyFormationOffset, companyLeaderMotion, defeatCinematicState, duelAttackHits, duelLungeDirection, duelPathFailureAction, editorPanVector, enemyWaveApproachAngle, environmentGrade, findNavigationPath, fittedGridSpec, formationExpansionOffset, gameplayCameraDistanceScale, gridCellsWithinBounds, hiddenWaveSpawn, hitKnockback, incomingWaveCameraState, isNavigationPlatformCube, isPlayerWaveDefeated, limitPointToRadius, lineOfSightBlocked, makeCampaign, navigationCellKey, nextDuelTurn, normalizePracticeConfig, particleBudgetAllows, persistentFragmentBudgetAllows, practiceEnemyHealthMultiplier, preserveLockedCombatants, resolveBoxOverlap, resolveCircleBoxOverlap, resolveDuelTurnId, separationVector, shouldRegroupPlayerGroup, shouldReleaseCombatCommitment, shouldRepositionFollower, smoothAngle, snapNavigationCell, soldierCombatState, soldierFragmentCount, soldierRegenHealth, soldierSpacingProfile, spawnPackOffset, standOffPursuitPoint, swarmTravelGroupCount, swarmTravelOffset, swarmTravelRadius, tacticalCameraFrame, tacticalCellAction, tacticalInputEnabled, tacticalSelectionScope, unitCommanderProfile } from "./sim-runtime-20260724g.js";
 import { ENEMY_TARGET_REVIEW_INTERVAL, canDeploySoldier, deploymentPreviewCellState, deploymentReserveAfterDeploy, enemyTargetReviewDue, levelCameraFrame, navigationFootprintSupported, scatteredPackOffset, shouldRetargetToCloserOpponent, splitEnemyStats, walkableSurfaceCandidates } from "./sim-runtime-20260724g.js";
-import { allocatePrioritizedDuelWaitingSlots, barracksEnemyCanClaimDuel, chooseAvailableBarracksAnchorSlot, chooseBarracksAnchor, choosePatrolGoal, shouldClearStaleDuelState } from "./sim-runtime-20260724g.js";
+import { allocatePrioritizedDuelWaitingSlots, barracksEnemyCanClaimDuel, chooseAvailableBarracksAnchorSlot, chooseBarracksAnchor, choosePatrolGoal, patrolCohesionTarget, shouldClearStaleDuelState } from "./sim-runtime-20260724g.js";
 import { celebrationWinner } from "./sim-runtime-20260724g.js";
 
 const $ = id => document.getElementById(id);
@@ -161,7 +161,7 @@ let selectedCompanyId=null,selectedCommander=null,commandHoverCell=null,wasComba
 let pendingStartingChCounts=configuredDeploymentReserves(),settingsStartingChDirty=false;
 const companyAnchors=new Map(),selectionVisuals=[];
 const editorCameraFocus=new THREE.Vector3(),editorKeys=new Set(),editorObjects=[],editorSelectedObjects=new Set(),editorFoliageObjects=new Set(),editorFoliagePaintSelection=new Set(),hudWidgetElements=new Map();
-const NAVIGATION_CELL_SIZE=1,NAVIGATION_AGENT_CLEARANCE=.36,NAVIGATION_WAYPOINT_REACHED=.22,NAVIGATION_GOAL_REPATH_DISTANCE=.72,NAVIGATION_YIELD_DURATION=.72,BARRACKS_ENEMY_DUEL_RADIUS=8,BARRACKS_ENEMY_ANCHOR_DISTANCE=1.45,BARRACKS_ENEMY_ANCHOR_SLOT_COUNT=8,BARRACKS_ENEMY_PATROL_MIN_DISTANCE=3.2,BARRACKS_ENEMY_PATROL_SEPARATION=2.1,PEACEFUL_PATROL_MIN_DISTANCE=3.2,PEACEFUL_PATROL_SEPARATION=2.1,PEACEFUL_PATROL_SPEED=1.35,PEACEFUL_PATROL_DURATION=4.5,INDEPENDENT_GROUP_COLUMN_GAP=.68,INDEPENDENT_GROUP_PATROL_SEPARATION=3.4,INDEPENDENT_GROUP_PATROL_RADIUS=3.2,INDEPENDENT_GROUP_ARRIVAL_DISTANCE=.24,BARRACKS_ENEMY_EXIT_DURATION=1.15,BARRACKS_ENEMY_DOORWAY_PROGRESS=.68,BARRACKS_ENEMY_SPAWN_INSIDE_MARKER="CROWNWAKE_EN_SPAWN_INSIDE",BARRACKS_ENEMY_SPAWN_EXIT_MARKER="CROWNWAKE_EN_SPAWN_EXIT",NAVIGATION_BLOCKING_TYPES=new Set(["primitive-cube","town-hall","barracks","archer-tower","forest-fence","imported-model"]),NAVIGATION_EDITOR_STATE_KEY="crownwake-navigation-overlay-v1";
+const NAVIGATION_CELL_SIZE=1,NAVIGATION_AGENT_CLEARANCE=.36,NAVIGATION_WAYPOINT_REACHED=.22,NAVIGATION_GOAL_REPATH_DISTANCE=.72,NAVIGATION_YIELD_DURATION=.72,BARRACKS_ENEMY_DUEL_RADIUS=8,BARRACKS_ENEMY_ANCHOR_DISTANCE=1.45,BARRACKS_ENEMY_ANCHOR_SLOT_COUNT=8,BARRACKS_ENEMY_PATROL_MIN_DISTANCE=3.2,BARRACKS_ENEMY_PATROL_SEPARATION=2.1,EN_PATROL_ANCHOR_RADIUS=2.6,PEACEFUL_PATROL_MIN_DISTANCE=3.2,PEACEFUL_PATROL_SEPARATION=2.1,PEACEFUL_PATROL_SPEED=1.35,PEACEFUL_PATROL_DURATION=4.5,INDEPENDENT_GROUP_COLUMN_GAP=.68,INDEPENDENT_GROUP_PATROL_SEPARATION=.72,INDEPENDENT_GROUP_PATROL_RADIUS=3.2,INDEPENDENT_GROUP_PATROL_MIN_DISTANCE=.65,INDEPENDENT_GROUP_PATROL_DURATION=4,INDEPENDENT_GROUP_PATROL_PAUSE_MAX=.65,CH_PATROL_COHESION_RADIUS=2.4,INDEPENDENT_GROUP_ARRIVAL_DISTANCE=.16,BARRACKS_ENEMY_EXIT_DURATION=1.15,BARRACKS_ENEMY_DOORWAY_PROGRESS=.68,BARRACKS_ENEMY_SPAWN_INSIDE_MARKER="CROWNWAKE_EN_SPAWN_INSIDE",BARRACKS_ENEMY_SPAWN_EXIT_MARKER="CROWNWAKE_EN_SPAWN_EXIT",NAVIGATION_BLOCKING_TYPES=new Set(["primitive-cube","town-hall","barracks","archer-tower","forest-fence","imported-model"]),NAVIGATION_EDITOR_STATE_KEY="crownwake-navigation-overlay-v1";
 const navigationGrid={dirty:true,revision:0,cells:new Map(),walkable:new Set(),blocked:new Set(),obstacles:[],cellSize:{x:NAVIGATION_CELL_SIZE,z:NAVIGATION_CELL_SIZE},offset:{x:0,z:0},source:null,baseCellsByIndex:new Map(),baseDimensions:null};
 const deploymentPreviewCache={revision:-1,cells:[]},deploymentPreviewRenderer={revision:-1,entries:[],entryByKey:new Map(),outline:null,enemyFill:null,hoverFill:null,hoverOutline:null,occupiedKeys:new Set(),fillGeometry:null};
 const navigationOverlay=new THREE.Group(),navigationBounds=new THREE.Box3(),navigationWorldScale=new THREE.Vector3(),navigationWorldPosition=new THREE.Vector3(),navigationLocalPoint=new THREE.Vector3(),navigationOverlayMatrix=new THREE.Object3D();
@@ -2437,7 +2437,7 @@ function deploySoldier(point){
     const offset=scatteredPackOffset(index,count,seed),unit=makeUnit("player",deploymentArchetypeId);
     unit.userData.companyId=deploymentGroupId(deploymentArchetypeId);unit.position.set(cell.x+offset.lateral*.48,surfaceY+ACTOR_FOOT_CLEARANCE,cell.z+offset.forward*.48);unit.userData.holdPosition=unit.position.clone();battle.add(unit);followers.push(unit);deployed.push(unit);
   }
-  const deployedArchetypeId=deploymentArchetypeId,groupId=deploymentGroupId(deployedArchetypeId),anchor=ensureCompanyAnchor(groupId);anchor.position.set(cell.x,GROUND_Y,cell.z);anchor.forward.set(0,0,-1);anchor.moving=false;
+  const deployedArchetypeId=deploymentArchetypeId,groupId=deploymentGroupId(deployedArchetypeId),anchor=ensureCompanyAnchor(groupId);anchor.position.set(cell.x,GROUND_Y,cell.z);anchor.patrolHome=anchor.position.clone();anchor.patrolGoal=null;anchor.forward.set(0,0,-1);anchor.moving=false;
   deploymentReserves[deploymentArchetypeId]=deploymentReserveAfterDeploy(deploymentReserves[deploymentArchetypeId],count);deploymentStarted=true;clearPeacefulPatrols();companyLayoutDirty=true;activatePlacedCharacterEncounter({engageImmediately:true});
   deploymentArchetypeId=null;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";commandHoverCell=null;refreshCommandGrid();updateDeploymentControl();
   updateStats();playSound("move");synthTone(520,.12,"sine",.022);showToast(`${deployedArchetypeId.toUpperCase()} GROUP DEPLOYED`,950);
@@ -2458,9 +2458,10 @@ function issueCompanyOrder(point){
     if(celebrationWinnerFaction==="player")clearFactionCelebration();
     anchor.position.copy(center).setY(GROUND_Y);anchor.orderTarget=new THREE.Vector3(cell.x,GROUND_Y,cell.z);anchor.patrolHome=anchor.orderTarget.clone();anchor.patrolGoal=null;anchor.moving=true;
     const forward=anchor.forward.clone().setY(0).normalize();
+    anchor.orderTrail=[members[0]?.position.clone()??center.clone()];anchor.orderForward=forward.clone();anchor.orderTrailComplete=false;
     members.forEach((member,index)=>{
       const offset=compactGroupColumnOffset(index),destination=anchor.orderTarget.clone().addScaledVector(forward,offset.forward);
-      destination.y=member.position.y;resetDuel(member);clearBuildingAttackAssignments(member);member.userData.holdPosition=null;member.userData.peacefulPatrolGoal=null;member.userData.celebrating=false;member.userData.manualTarget=destination;member.userData.manualMoving=true;member.userData.navigationPath=null;member.userData.navigationYield=null;
+      destination.y=member.position.y;resetDuel(member);clearBuildingAttackAssignments(member);member.userData.holdPosition=null;member.userData.peacefulPatrolGoal=null;member.userData.groupPatrolGoal=null;member.userData.groupPatrolPauseUntil=0;member.userData.celebrating=false;member.userData.manualTarget=destination;member.userData.manualFinalTarget=destination.clone();member.userData.manualMoving=true;member.userData.navigationPath=null;member.userData.navigationYield=null;
     });
     clearTacticalSelection();playSound("move");return true;
   }
@@ -2877,9 +2878,10 @@ function navigationYieldDesired(unit,desired,targetActor,routeKey){
   const point=new THREE.Vector3(detour.x,desired.y,detour.z);if(!navigationPointWalkable(point,unit)){unit.userData.navigationYield=null;return desired;}
   unit.userData.navigationYield={point,routeKey,expiresAt:totalTime+NAVIGATION_YIELD_DURATION};return point;
 }
-function roamingDestination(unit,peers,{goalProperty,minimumTravelDistance,separation,duration}){
+function roamingDestination(unit,peers,{goalProperty,minimumTravelDistance,separation,duration,anchor=null,anchorRadius=Infinity}){
   const grid=ensureNavigationGrid(),previousGoal=unit.userData[goalProperty];
-  const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&unit.position.distanceToSquared(previousGoal)>.32*.32&&!navigationPointPhysicallyBlocked(previousGoal,unit);
+  const goalInsideAnchor=!anchor||Math.hypot(previousGoal?.x-anchor.x,previousGoal?.z-anchor.z)<=anchorRadius;
+  const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&unit.position.distanceToSquared(previousGoal)>.32*.32&&goalInsideAnchor&&!navigationPointPhysicallyBlocked(previousGoal,unit);
   if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
   const occupied=[];
   for(const other of peers){
@@ -2888,7 +2890,7 @@ function roamingDestination(unit,peers,{goalProperty,minimumTravelDistance,separ
     const otherGoal=other.userData[goalProperty];
     if(otherGoal?.revision===grid.revision)occupied.push(otherGoal);
   }
-  const candidates=[...grid.cells].filter(([cellKey])=>!grid.blocked.has(cellKey)).map(([,cell])=>cell);
+  const candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&(!anchor||Math.hypot(cell.x-anchor.x,cell.z-anchor.z)<=anchorRadius)).map(([,cell])=>cell);
   const patrolGoal=choosePatrolGoal({
     origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),
     minimumTravelDistance,separation
@@ -2899,14 +2901,22 @@ function roamingDestination(unit,peers,{goalProperty,minimumTravelDistance,separ
   unit.userData.navigationPath=null;unit.userData.navigationYield=null;
   return new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
 }
-function enemyRoamDestination(unit,livingEnemySoldiers){return roamingDestination(unit,livingEnemySoldiers,{goalProperty:"enemyRoamGoal",minimumTravelDistance:BARRACKS_ENEMY_PATROL_MIN_DISTANCE,separation:BARRACKS_ENEMY_PATROL_SEPARATION,duration:6});}
+function patrolGroupCenter(units,fallback){
+  const members=units.filter(member=>member?.userData?.alive);
+  return members.length?members.reduce((sum,member)=>sum.add(member.position),new THREE.Vector3()).multiplyScalar(1/members.length):fallback.clone();
+}
+function enemyRoamDestination(unit,livingEnemySoldiers){
+  const anchor=enemyPackAnchor?.position??patrolGroupCenter(livingEnemySoldiers,unit.position);
+  return roamingDestination(unit,livingEnemySoldiers,{goalProperty:"enemyRoamGoal",minimumTravelDistance:BARRACKS_ENEMY_PATROL_MIN_DISTANCE,separation:BARRACKS_ENEMY_PATROL_SEPARATION,duration:6,anchor,anchorRadius:EN_PATROL_ANCHOR_RADIUS});
+}
 function peacefulPatrolDestination(unit,allies){return roamingDestination(unit,allies,{goalProperty:"peacefulPatrolGoal",minimumTravelDistance:PEACEFUL_PATROL_MIN_DISTANCE,separation:PEACEFUL_PATROL_SEPARATION,duration:PEACEFUL_PATROL_DURATION});}
 function peacefulPatrolActive(){return mode==="playing"&&!celebrationWinnerFaction&&!enemyRetreat;}
 function clearPeacefulPatrols(){
   for(const unit of [master,...followers,...enemyUnits]){
     if(!unit?.userData)continue;
     unit.userData.peacefulPatrolGoal=null;
-    if(unit.userData.navigationPath?.identity?.startsWith("peaceful-patrol:"))unit.userData.navigationPath=null;
+    unit.userData.groupPatrolGoal=null;unit.userData.groupPatrolPauseUntil=0;
+    if(unit.userData.navigationPath?.identity?.startsWith("peaceful-patrol:")||unit.userData.navigationPath?.identity?.startsWith("group-patrol:"))unit.userData.navigationPath=null;
     unit.userData.navigationYield=null;
   }
 }
@@ -3826,40 +3836,58 @@ function independentGroupRegroupTarget(unit){
   return anchor.position.clone().addScaledVector(lateral,offset.lateral).addScaledVector(forward,offset.forward).setY(unit.position.y);
 }
 function compactGroupColumnOffset(index){const rank=Math.max(0,Math.floor(index));return {lateral:0,forward:rank===0?0:-rank*INDEPENDENT_GROUP_COLUMN_GAP}}
+function manualColumnTrailPoint(trail,distance,forward){
+  if(!trail?.length)return null;
+  let remaining=Math.max(0,distance);
+  for(let index=trail.length-1;index>0;index--){
+    const end=trail[index],start=trail[index-1],length=end.distanceTo(start);
+    if(length<.001)continue;
+    if(remaining<=length)return end.clone().lerp(start,remaining/length);
+    remaining-=length;
+  }
+  return trail[0].clone().addScaledVector(forward,-remaining);
+}
+function manualColumnDestination(unit){
+  const companyId=unit.userData.companyId,anchor=ensureCompanyAnchor(companyId),members=livingCompanyMembers(companyId),index=members.indexOf(unit);
+  if(!anchor.moving||index<=0)return unit.userData.manualTarget?.clone()??unit.position.clone();
+  const forward=anchor.forward.clone().setY(0);if(forward.lengthSq()<.001)forward.set(0,0,-1);else forward.normalize();
+  return (manualColumnTrailPoint(anchor.orderTrail,index*INDEPENDENT_GROUP_COLUMN_GAP,anchor.orderForward??forward)??unit.userData.manualFinalTarget??unit.userData.manualTarget??unit.position).clone().setY(unit.position.y);
+}
+function recordManualColumnTrail(unit){
+  const companyId=unit.userData.companyId,anchor=ensureCompanyAnchor(companyId),leader=livingCompanyMembers(companyId)[0];
+  if(!anchor.moving||leader!==unit)return;
+  const trail=anchor.orderTrail??(anchor.orderTrail=[unit.position.clone()]),last=trail[trail.length-1];
+  if(last.distanceToSquared(unit.position)>=.08*.08)trail.push(unit.position.clone());
+  if(unit.userData.manualFinalTarget&&unit.position.distanceTo(unit.userData.manualFinalTarget)<NAVIGATION_WAYPOINT_REACHED)anchor.orderTrailComplete=true;
+}
 function independentGroupPatrolTarget(unit,allies){
   const company=ensureCompanyLayout().find(item=>item.groupIndex===unit.userData.companyId),members=company?.soldiers.filter(member=>member.userData.alive)??[];
   if(!company||!members.length)return unit.position.clone();
-  const anchor=ensureCompanyAnchor(company.groupIndex),center=companyCenter(company.groupIndex),home=anchor.patrolHome??anchor.orderTarget??anchor.position.clone(),previousGoal=anchor.patrolGoal;
-  const currentForward=anchor.forward.clone().setY(0);if(currentForward.lengthSq()<.001)currentForward.set(0,0,-1);else currentForward.normalize();
-  const groupSettledAtGoal=!!previousGoal&&members.every((member,index)=>{
-    const offset=compactGroupColumnOffset(index),slot=previousGoal.clone().addScaledVector(currentForward,offset.forward).setY(member.position.y);
-    return member.position.distanceToSquared(slot)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
-  });
-  const goalActive=previousGoal&&!groupSettledAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
-  if(!goalActive){
-    const grid=ensureNavigationGrid();
-    const occupied=[];
-    for(const ally of allies){
-      if(ally.userData.companyId===company.groupIndex)continue;
-      occupied.push(ally.position);
-      const allyGoal=ensureCompanyAnchor(ally.userData.companyId).patrolGoal;
-      if(allyGoal)occupied.push(allyGoal);
-    }
-    const candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-home.x,cell.z-home.z)<=INDEPENDENT_GROUP_PATROL_RADIUS).map(([,cell])=>cell);
-    const patrolGoal=choosePatrolGoal({origin:center,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:PEACEFUL_PATROL_MIN_DISTANCE,separation:INDEPENDENT_GROUP_PATROL_SEPARATION});
-    if(!patrolGoal)return unit.position.clone();
-    const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
-    anchor.patrolHome=home.clone().setY(GROUND_Y);anchor.patrolGoal=new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
-    const direction=new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z).sub(center).setY(0);
-    if(direction.lengthSq()>.001)anchor.forward.copy(direction.normalize());
+  const anchor=ensureCompanyAnchor(company.groupIndex),pivot=(anchor.patrolHome??anchor.orderTarget??anchor.position).clone().setY(GROUND_Y),previousGoal=unit.userData.groupPatrolGoal;
+  anchor.patrolHome??=pivot.clone();
+  if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>CH_PATROL_COHESION_RADIUS){unit.userData.groupPatrolPauseUntil=0;return pivot.setY(unit.position.y);}
+  const grid=ensureNavigationGrid(),arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
+  const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
+  if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
+  if(arrivedAtGoal&&!unit.userData.groupPatrolPauseUntil){unit.userData.groupPatrolPauseUntil=totalTime+rand()*INDEPENDENT_GROUP_PATROL_PAUSE_MAX;return unit.position.clone();}
+  if((unit.userData.groupPatrolPauseUntil??0)>totalTime)return unit.position.clone();
+  unit.userData.groupPatrolPauseUntil=0;
+  const occupied=[];
+  for(const member of members){
+    if(member===unit)continue;
+    occupied.push(member.position);
+    const memberGoal=member.userData.groupPatrolGoal;
+    if(memberGoal?.revision===grid.revision)occupied.push(memberGoal);
   }
-  const index=Math.max(0,members.indexOf(unit)),forward=anchor.forward.clone().setY(0);
-  if(forward.lengthSq()<.001)forward.set(0,0,-1);else forward.normalize();
-  const offset=compactGroupColumnOffset(index);
-  return anchor.position.clone().addScaledVector(forward,offset.forward).setY(unit.position.y);
+  const candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=INDEPENDENT_GROUP_PATROL_RADIUS).map(([,cell])=>cell);
+  const patrolGoal=choosePatrolGoal({origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:INDEPENDENT_GROUP_PATROL_SEPARATION});
+  if(!patrolGoal)return pivot.setY(unit.position.y);
+  const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
+  unit.userData.groupPatrolGoal={x:patrolGoal.x,y:goalY,z:patrolGoal.z,revision:grid.revision,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
+  return new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
 }
 function updateIndependentGroupPatrol(unit,allies,dt){
-  const desired=independentGroupPatrolTarget(unit,allies),distance=unit.position.distanceTo(desired),speed=distance>.08?actorPatrolSpeed(unit):0;
+  const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:CH_PATROL_COHESION_RADIUS}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
   steerTowards(unit,desired,speed,actorSteerAcceleration(unit,5.4),dt,{goalKey:`group-patrol:${unit.userData.companyId}`});
   if(speed>0){const facing=desired.clone().sub(unit.position);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),10,dt);}
 }
@@ -3883,19 +3911,22 @@ function updateIndependentSoldier(u,{combat,enemyInSight,raidTarget,foe,waitingD
   }else if(waitingDuel){
     desired=duelWaitingPoint(u,waitingDuel);
   }else if(u.userData.manualMoving&&u.userData.manualTarget){
-    desired=u.userData.manualTarget.clone();
+    desired=u.userData.manualFinalTarget?manualColumnDestination(u):u.userData.manualTarget.clone();
   }else if(regroupTarget){
     desired=regroupTarget;
   }
   if(combatState===SOLDIER_COMBAT_STATE.NEUTRAL&&!foe&&!waitingDuel&&!u.userData.manualMoving&&!regroupTarget)desired=u.position.clone();
-  const arrived=!foe&&u.position.distanceTo(desired)<.1;
+  const manualFinal=u.userData.manualMoving?u.userData.manualFinalTarget:null;
+  const reachedOrder=()=>u.position.distanceTo(manualFinal??desired)<(manualFinal?NAVIGATION_WAYPOINT_REACHED:.1)||!!manualFinal&&ensureCompanyAnchor(u.userData.companyId).orderTrailComplete&&u.position.distanceTo(desired)<NAVIGATION_WAYPOINT_REACHED;
+  const arrived=!foe&&reachedOrder();
   const speed=foe?duelMotion?.speed??2.45:waitingDuel?1.7:(u.userData.manualMoving||regroupTarget)&&!arrived?(u.userData.moveSpeed??2.65):0;
   const acceleration=actorSteerAcceleration(u,duelMotion?.acceleration??(foe?5.7:5.1));
   const moveScale=editorActorMoveScale(u);
   if(u.userData.manualMoving&&!foe&&!waitingDuel&&navigationPhysicalPathClear(u.position,desired,u))steerStraightTowards(u,desired,speed*moveScale,acceleration*Math.sqrt(moveScale),dt);
   else steerTowards(u,desired,speed*moveScale,acceleration*Math.sqrt(moveScale),dt);
-  if(u.userData.manualMoving&&!foe&&!waitingDuel&&u.position.distanceTo(desired)<.1){
-    u.userData.manualMoving=false;u.userData.manualTarget=null;u.userData.peacefulPatrolGoal=null;ensureCompanyAnchor(u.userData.companyId).patrolGoal=null;
+  if(u.userData.manualMoving&&!foe&&!waitingDuel&&u.userData.manualFinalTarget)recordManualColumnTrail(u);
+  if(u.userData.manualMoving&&!foe&&!waitingDuel&&reachedOrder()){
+    u.userData.manualMoving=false;u.userData.manualTarget=null;u.userData.manualFinalTarget=null;u.userData.peacefulPatrolGoal=null;ensureCompanyAnchor(u.userData.companyId).patrolGoal=null;
   }
   const faceTarget=foe?.position??(waitingDuel?.center??(speed>0?desired:null));
   if(faceTarget){const facing=faceTarget.clone().sub(u.position);if(facing.lengthSq()>.001)u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),12,dt)}

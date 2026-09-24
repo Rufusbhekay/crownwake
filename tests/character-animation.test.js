@@ -61,6 +61,59 @@ test("CH and EN brake and turn gradually rather than slide through a reversal", 
   }
 });
 
+test("paired CH and EN follow a sideways route instead of staring at a distant opponent", () => {
+  const waypoint = new THREE.Vector3(4, 0, 0);
+  const context = vm.createContext({
+    THREE, arrivalSpeed, smoothAngle, SOLDIER_COMBAT_STATE, SERVANT_MODE, soldierCombatState,
+    DUEL_PHASE: { APPROACH: "approach", LUNGE: "lunge", RECOVER: "recover" }, GROUND_Y: 0,
+    advanceDuelState: ({ phase, timer }) => ({ phase, timer, strike: false }),
+    duelLungeDirection: () => null,
+    standOffPursuitPoint: (_unit, opponent, distance) => ({ x: opponent.x, z: opponent.z - distance }),
+    shouldRegroupPlayerGroup: () => false,
+    duelPathNeedsRelock: () => false,
+    actorSteerAcceleration: (_unit, acceleration) => acceleration,
+    editorActorMoveScale: () => 1,
+    navigationPhysicalPathClear: () => false
+  });
+  for (const [startName, endName] of [
+    ["function steerStraightTowards(", "function steerTowards("],
+    ["function updateDuel(", "function activeTransientParticleCount("],
+    ["function updateIndependentSoldier(", "function activateFieldedPlayerCombat("]
+  ]) {
+    const start = game.indexOf(startName);
+    vm.runInContext(game.slice(start, game.indexOf(endName, start)), context);
+  }
+  context.steerTowards = (unit, _desired, speed, acceleration, dt) => context.steerStraightTowards(unit, waypoint, speed, acceleration, dt);
+  const unit = new THREE.Group(), opponent = new THREE.Group();
+  unit.userData = { alive: true, actorArchetypeId: "ch2", velocity: new THREE.Vector3() };
+  opponent.position.set(0, 0, 8);
+  opponent.userData = { alive: true };
+  for (let frame = 0; frame < 180; frame++) {
+    context.updateIndependentSoldier(unit, { combat: true, foe: opponent, dt: 1 / 60 });
+  }
+  assert.ok(unit.position.x > 2, `paired CH stalled at x=${unit.position.x.toFixed(2)}`);
+
+  const enemy = new THREE.Group();
+  enemy.userData = { alive: true, actorArchetypeId: "en1", lockedTarget: opponent, velocity: new THREE.Vector3() };
+  context.combat = true;
+  context.peacefulPatrol = false;
+  context.enemyPackAnchor = null;
+  context.enemyAssignments = new Map([[enemy, opponent]]);
+  context.enemyWaitingAssignments = new Map();
+  context.livingEnemies = context.livingEnemySoldiers = [enemy];
+  context.livingPlayerSoldiers = [opponent];
+  context.reviewEnemyDuelTarget = (_enemy, target) => target;
+  context.soldierSpacingProfile = () => ({ distance: 1, strength: 1 });
+  const enemyLoopStart = game.indexOf("  enemyUnits.forEach((u,i)=>{");
+  const enemyStart = game.indexOf("    const committed=", enemyLoopStart);
+  const enemyEnd = game.indexOf("\n  });", enemyStart);
+  vm.runInContext(`function updateEnemySoldierForTest(u,dt){${game.slice(enemyStart, enemyEnd)}\n}`, context);
+  for (let frame = 0; frame < 180; frame++) {
+    context.updateEnemySoldierForTest(enemy, 1 / 60);
+  }
+  assert.ok(enemy.position.x > 2, `paired EN stalled at x=${enemy.position.x.toFixed(2)}`);
+});
+
 test("CH orders and both factions' patrols rotate only once per frame", () => {
   const start = game.indexOf("function updateIndependentSoldier("), end = game.indexOf("\nfunction ", start + 1);
   assert.doesNotMatch(game.slice(start, end), /speed>0\?desired:null/);

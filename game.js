@@ -3597,7 +3597,6 @@ function updateDuel(unit,foe,dt){
     };
     if(!queueCharacterStrike(unit,()=>{if(unit.userData.lockedTarget===foe)strike()}))strike();
   }
-  const facing=foe.position.clone().sub(unit.position);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),14,dt);
   return {desired,speed,acceleration};
 }
 function activeTransientParticleCount(){let count=0;for(const particle of particles)if(particle.visible&&particle.userData.kind!=="shatter")count++;return count}
@@ -3938,7 +3937,7 @@ function updateIndependentSoldier(u,{combat,enemyInSight,raidTarget,foe,waitingD
     u.userData.manualMoving=false;u.userData.manualTarget=null;u.userData.manualFinalTarget=null;u.userData.peacefulPatrolGoal=null;ensureCompanyAnchor(u.userData.companyId).patrolGoal=null;
   }
   const faceTarget=foe?.position??waitingDuel?.center??null;
-  if(faceTarget){const facing=faceTarget.clone().sub(u.position);if(facing.lengthSq()>.001)u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),12,dt)}
+  if(faceTarget&&(!foe?.userData?.alive||u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15))){const facing=faceTarget.clone().sub(u.position);if(facing.lengthSq()>.001)u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),12,dt)}
 }
 function activateFieldedPlayerCombat(){
   if(deploymentStarted||!livingPlayerUnits().some(unit=>unit.parent===battle))return false;
@@ -4123,7 +4122,7 @@ function updateBattle(dt){
     const acceleration=actorSteerAcceleration(u,duelMotion?.acceleration??(combatState===SOLDIER_COMBAT_STATE.NEUTRAL?8.2:u.userData.mode===SERVANT_MODE.ATTACK?5.7:reposition?7.2:4.2));
     const spacingSpeed=spacingActive&&!reposition&&!foe?1.05:speed;
     steerTowards(u,desired,combatState===SOLDIER_COMBAT_STATE.NEUTRAL?0:reposition||foe||spacingActive?spacingSpeed:0,acceleration,dt);
-    if(foe?.userData.alive){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
+    if(foe?.userData.alive&&u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15)){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
     else if(waitingDuel){const facing=waitingDuel.center.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),10,dt)}
   });
   for(const company of companies){
@@ -4215,7 +4214,7 @@ function updateBattle(dt){
     const acceleration=actorSteerAcceleration(u,duelMotion?.acceleration??(combatState===SOLDIER_COMBAT_STATE.NEUTRAL?8.2:u.userData.mode===SERVANT_MODE.ATTACK?4.4:6.2));
     const moveScale=editorActorMoveScale(u);
     steerTowards(u,desired,speed*moveScale,acceleration*Math.sqrt(moveScale),dt);
-    if(foe?.userData.alive){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
+    if(foe?.userData.alive&&u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15)){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
     else if(waitingDuel){const facing=waitingDuel.center.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),10,dt)}
   });
   if(enemyRetreat){

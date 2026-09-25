@@ -23,13 +23,39 @@ test("CH and EN Blueprints expose shared ring controls in Actor Details", () => 
   assert.match(game, /function renderEditorActorRingControls\(enabled\)/);
   assert.match(game, /renderEditorActorRingControls\(Boolean\(libraryProfile\)\)/);
   assert.match(game, /updateEditorActorRingControls/);
+  for (const suffix of ["ch-outer-attack-color", "en-outer-attack-color", "ch-inner-attack-color", "en-inner-attack-color", "ch-radar-attack-color", "en-radar-attack-color"]) {
+    assert.match(index, new RegExp(`id="ring-${suffix}"`));
+    assert.match(index, new RegExp(`id="editor-ring-${suffix}"`));
+  }
 });
 
-test("CH and EN Actor Details expose native master, acceleration, and patrol movement controls", () => {
+test("older ring settings gain attack colours and custom choices normalize", () => {
+  const context = vm.createContext({ THREE });
+  const start = game.indexOf("function normalizeHexColour("), end = game.indexOf("function loadUnitRingSettings(", start);
+  vm.runInContext(game.slice(start, end), context);
+  const migrated = context.normalizeUnitRingSettings({ outerColor: "#123456" });
+  assert.equal(migrated.outerColor, "#123456");
+  assert.equal(migrated.playerOuterAttackColor, "#e32646");
+  assert.equal(migrated.enemyInnerAttackColor, "#ffbf24");
+  assert.equal(migrated.playerRadarAttackColor, "#ffffff");
+  const custom = context.normalizeUnitRingSettings({ playerOuterAttackColor: "#AaBbCc", enemyRadarAttackColor: "invalid" });
+  assert.equal(custom.playerOuterAttackColor, "#aabbcc");
+  assert.equal(custom.enemyRadarAttackColor, "#ffffff");
+});
+
+test("CH and EN Actor Details expose native patrol movement controls", () => {
   assert.match(index, /data-actor-property="moveSpeed"[^>]*type="number"/);
   assert.match(index, /data-actor-property="acceleration"[^>]*type="number"/);
   assert.match(index, /data-actor-property="patrolSpeed"[^>]*type="number"/);
+  assert.match(index, /data-actor-property="patrolSpacing"[^>]*type="number"/);
+  assert.match(index, /data-actor-property="patrolPauseMax"[^>]*type="number"/);
   assert.doesNotMatch(index, /data-actor-property="patrolSpeed"[^>]*type="range"/);
+});
+
+test("CH and EN Actor Details group related controls into inspector sections", () => {
+  for(const section of ["COMBAT STATS", "MOVEMENT", "APPEARANCE", "HEALTH DISPLAY"]){
+    assert.match(index, new RegExp(`<legend>${section}</legend>`));
+  }
 });
 
 test("Content Browser CH and EN Blueprints save movement defaults for new placements", () => {
@@ -58,6 +84,18 @@ test("CH and EN brake and turn gradually rather than slide through a reversal", 
       forwardSlip = Math.max(forwardSlip, unit.position.z);
     }
     assert.ok(forwardSlip < .25, `${actorArchetypeId} slid ${forwardSlip.toFixed(2)} units away`);
+  }
+});
+
+test("CH and EN shed sideways momentum when a waypoint changes direction", () => {
+  const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle });
+  const start = game.indexOf("function steerStraightTowards("), end = game.indexOf("function steerTowards(", start);
+  vm.runInContext(game.slice(start, end), context);
+  for(const actorArchetypeId of ["ch2", "en1"]){
+    const unit = new THREE.Group(), destination = new THREE.Vector3(10, 0, 0);
+    unit.userData = { actorArchetypeId, velocity: new THREE.Vector3(0, 0, 2.65) };
+    for(let frame = 0; frame < 18; frame++)context.steerStraightTowards(unit, destination, 2.65, 5.4, 1 / 60);
+    assert.ok(unit.position.z < .2, `${actorArchetypeId} slipped ${unit.position.z.toFixed(2)} units through its turn`);
   }
 });
 
@@ -150,11 +188,14 @@ test("CH group members keep independently patrolling around their pivot", () => 
   const patrolStart = game.indexOf("function independentGroupPatrolTarget(");
   const patrolEnd = game.indexOf("function updateIndependentGroupPatrol(", patrolStart);
   const patrolSource = game.slice(patrolStart, patrolEnd);
-  assert.match(patrolSource, /unit\.userData\.groupPatrolGoal=/);
-  assert.match(patrolSource, /INDEPENDENT_GROUP_PATROL_PAUSE_MAX/);
-  assert.match(patrolSource, /expiresAt:totalTime\+INDEPENDENT_GROUP_PATROL_DURATION\+rand\(\)/);
-  assert.match(patrolSource, /independentGroupPatrolRadii\(grid\)/);
-  assert.match(patrolSource, /occupied\.push\(member\.position\)/);
+  assert.match(patrolSource, /compactGroupPatrolTarget\(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil"\)/);
+  const compactStart=game.indexOf("function compactGroupPatrolTarget("),compactEnd=game.indexOf("function independentGroupPatrolTarget(",compactStart),compactSource=game.slice(compactStart,compactEnd);
+  assert.match(compactSource, /unit\.userData\[goalProperty\]=/);
+  assert.match(compactSource, /actorPatrolPauseMax\(unit\)/);
+  assert.match(compactSource, /separation:actorPatrolSpacing\(unit\)/);
+  assert.match(compactSource, /expiresAt:totalTime\+INDEPENDENT_GROUP_PATROL_DURATION\+rand\(\)/);
+  assert.match(compactSource, /independentGroupPatrolRadii\(grid\)/);
+  assert.match(compactSource, /occupied\.push\(member\.position\)/);
   assert.doesNotMatch(patrolSource, /anchor\.patrolGoal=/);
   const patrolUpdateStart = game.indexOf("function updateIndependentGroupPatrol(");
   const patrolUpdateEnd = game.indexOf("function updateIndependentSoldier(", patrolUpdateStart);
@@ -182,6 +223,7 @@ test("a straying CH discards its outward patrol goal and chooses an interior til
     INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65, INDEPENDENT_GROUP_PATROL_SEPARATION: .72,
     INDEPENDENT_GROUP_PATROL_DURATION: 4, INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65,
     INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16, totalTime: 0, rand: () => .5,
+    actorPatrolSpacing: () => .72, actorPatrolPauseMax: () => .65,
     ensureCompanyLayout: () => [{ groupIndex: 1, soldiers: [unit] }], ensureCompanyAnchor: () => anchor,
     ensureNavigationGrid: () => ({ revision: 1, cells: candidates, blocked: new Set(), cellSize: { x: 1, z: 1 } }),
     navigationPointPhysicallyBlocked: () => false, walkableSupportHeightAt: () => 0,
@@ -218,6 +260,7 @@ test("seven CH have enough nearby tiles to keep patrolling after an order", () =
       INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65, INDEPENDENT_GROUP_PATROL_SEPARATION: .72,
       INDEPENDENT_GROUP_PATROL_DURATION: 4, INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65,
       INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16, totalTime: 0, rand: () => 0,
+      actorPatrolSpacing: () => .72, actorPatrolPauseMax: () => .65,
       ensureCompanyLayout: () => [{ groupIndex: 1, soldiers: members }],
       ensureCompanyAnchor: () => ({ position: new THREE.Vector3(), patrolHome: new THREE.Vector3() }),
       ensureNavigationGrid: () => ({ revision: 1, cells, blocked: new Set(), cellSize: { x: tileSize, z: tileSize } }),
@@ -400,6 +443,33 @@ test("patrol keeps CH and EN close to their own group", () => {
   assert.match(enemyPatrolSource, /anchorRadius:EN_PATROL_ANCHOR_RADIUS/);
 });
 
+test("spawned EN packs share one random pivot and patrol compactly around it", () => {
+  assert.match(game, /function assignEnemyPatrolGroup\(units\)/);
+  assert.match(game, /assignEnemyPatrolGroup\(spawnedEnemies\)/);
+  const first = new THREE.Group(), second = new THREE.Group();
+  first.userData = { alive: true };second.userData = { alive: true };
+  const candidates = new Map([["near", { x: 2, z: 1 }], ["far", { x: 8, z: 7 }]]);
+  const context = vm.createContext({
+    THREE, GROUND_Y: 0, totalTime: 0, rand: () => .1,
+    ensureNavigationGrid: () => ({ revision: 1, cells: candidates, blocked: new Set(), cellSize: { x: 1, z: 1 } }),
+    walkableSupportHeightAt: () => 0, navigationPointPhysicallyBlocked: () => false,
+    INDEPENDENT_GROUP_PATROL_RADIUS: 3.2, INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65,
+    INDEPENDENT_GROUP_PATROL_SEPARATION: .72, INDEPENDENT_GROUP_PATROL_DURATION: 4,
+    INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65, INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16,
+    CH_PATROL_COHESION_RADIUS: 2.4, actorPatrolSpacing: () => .72, actorPatrolPauseMax: () => .65,
+    choosePatrolGoal: ({ candidates: options }) => options[0] ?? null
+  });
+  const start = game.indexOf("function independentGroupPatrolRadii("), end = game.indexOf("function updateIndependentGroupPatrol(", start);
+  vm.runInContext(game.slice(start, end), context);
+  const groupStart = game.indexOf("function assignEnemyPatrolGroup("), groupEnd = game.indexOf("function updateEnemyGroupPatrol(", groupStart);
+  vm.runInContext(game.slice(groupStart, groupEnd), context);
+  context.assignEnemyPatrolGroup([first, second]);
+  assert.equal(first.userData.enemyPatrolGroupId, second.userData.enemyPatrolGroupId);
+  assert.deepEqual(first.userData.enemyPatrolPivot.toArray(), [2, 0, 1]);
+  const target = context.enemyGroupPatrolTarget(first, [first, second]);
+  assert.ok(target.distanceTo(first.userData.enemyPatrolPivot) <= 3.2);
+});
+
 test("CH and EN markers use raised white rings with a leading faction arc", () => {
   assert.match(game, /const UNIT_RING_SETTINGS_KEY="crownwake-unit-ring-settings-v1"/);
   const player = new THREE.Group(), enemy = new THREE.Group(), secondEnemy = new THREE.Group();
@@ -408,7 +478,7 @@ test("CH and EN markers use raised white rings with a leading faction arc", () =
   secondEnemy.userData = { alive: true, faction: "enemy", editorMaterialColor: "#25c8e0", velocity: new THREE.Vector3(0, 0, 1) };
   const context = vm.createContext({
     THREE, SOLDIER_MARKER_LEAD_DISTANCE: .13, UNIT_RING_RADAR_GAP: .065, GROUND_Y: .015, totalTime: 1, reducedMotion: false,
-    unitRingSettings: { outerColor: "#f7f2e4", outerSize: .7605, outerThickness: .04125, outerHeight: .018, innerColor: "#f7f2e4", innerSize: .5915, innerThickness: .04125, innerHeight: .054, playerRadarColor: "#e53935", enemyRadarColor: "#ffcf22", radarHeight: .021, radarThickness: .04125, radarRadius: .86675, radarSize: 1.06 / Math.PI },
+    unitRingSettings: { outerColor: "#f7f2e4", playerOuterAttackColor: "#e32646", enemyOuterAttackColor: "#ffbf24", outerSize: .7605, outerThickness: .04125, outerHeight: .018, innerColor: "#f7f2e4", playerInnerAttackColor: "#e32646", enemyInnerAttackColor: "#ffbf24", innerSize: .5915, innerThickness: .04125, innerHeight: .054, playerRadarColor: "#e53935", enemyRadarColor: "#ffcf22", playerRadarAttackColor: "#ffffff", enemyRadarAttackColor: "#ffffff", radarHeight: .021, radarThickness: .04125, radarRadius: .86675, radarSize: 1.06 / Math.PI },
     master: player, followers: [], enemyUnits: [enemy, secondEnemy], activeDuelRingState,
     isBarracksDeparting: () => false
   });
@@ -460,6 +530,19 @@ test("CH and EN markers use raised white rings with a leading faction arc", () =
   context.reducedMotion=true;
   context.updateEncounterRings();
   assert.equal(player.userData.encounterRing.userData.outerMaterial.color.getHex(),0xe32646);
+  const originalSettings=context.unitRingSettings;
+  context.unitRingSettings={...originalSettings,playerOuterAttackColor:"#2468ac",enemyOuterAttackColor:"#b94020",playerInnerAttackColor:"#32a17c",enemyInnerAttackColor:"#a17432",playerRadarAttackColor:"#3040b0",enemyRadarAttackColor:"#c04070"};
+  for(const unit of [player,enemy])context.refreshEncounterRing(unit.userData.encounterRing);
+  context.updateEncounterRings();
+  assert.equal(player.userData.encounterRing.userData.outerMaterial.color.getHex(),0x2468ac);
+  assert.equal(enemy.userData.encounterRing.userData.outerMaterial.color.getHex(),0xb94020);
+  assert.equal(player.userData.encounterRing.userData.innerMaterial.color.getHex(),0x32a17c);
+  assert.equal(enemy.userData.encounterRing.userData.innerMaterial.color.getHex(),0xa17432);
+  assert.equal(player.userData.encounterRing.userData.directionMaterial.color.getHex(),0x3040b0);
+  assert.equal(enemy.userData.encounterRing.userData.directionMaterial.color.getHex(),0xc04070);
+  context.unitRingSettings=originalSettings;
+  for(const unit of [player,enemy])context.refreshEncounterRing(unit.userData.encounterRing);
+  context.updateEncounterRings();
   context.reducedMotion=false;
   context.unitRingSettings = { ...context.unitRingSettings, outerSize: .9, outerThickness: .06, innerSize: .65, innerThickness: .05, radarThickness: .08, radarRadius: 1.045, radarSize: 1 };
   context.refreshEncounterRing(player.userData.encounterRing);
@@ -547,6 +630,7 @@ test("unpaired swordsman honours click-to-move during neutral combat and peacefu
 test("EN Swordsman blueprint creates an enemy with the shared animated model", () => {
   const context = vm.createContext({
     COLORS: { amber: 0xffaa00 }, contentBrowserState: { actorModels: {} },
+    INDEPENDENT_GROUP_PATROL_SEPARATION: .72, INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65,
     SWORDSMAN_MODEL_ASSET_ID: "model:ch-swordsman", CHARACTER_MODEL_ASSET_ID: "model:ch",
     resolveContentBrowserModelId: (assetId, fallback) => assetId ?? fallback,
     contentBrowserAssetById: () => null, BASE_BP_ASSET_ID: "base", TILE_BP_ASSET_ID: "tile",
@@ -642,6 +726,35 @@ test("placed CH engages a Barracks EN only after its protected departure ends", 
   enemy.userData.barracksDeparture = null;
   context.activatePlacedCharacterEncounter();
   assert.equal(context.activeEncounter.aggro, true);
+});
+
+test("spawning EN ends CH celebration and immediately starts another encounter", () => {
+  const context=authoredCombatHarness(),player=new THREE.Group(),widget=new THREE.Group();let assigned=0;
+  player.userData={alive:true,faction:"player",celebrating:true};
+  context.followers.push(player);context.battle.add(player);
+  context.celebrationWinnerFaction="player";
+  context.activeEncounter={done:true,aggro:false};
+  widget.userData={hudVisible:true,hudSpawnCount:1};
+  context.hudWidgetArchetype=()=>({faction:"enemy",id:"en1",label:"EN1"});
+  context.normalizeHudWidgetSettings=()=>({spawnCount:1});
+  context.walkableSupportHeightAt=()=>0;context.rand=()=>0;
+  context.scatteredPackOffset=()=>({lateral:0,forward:0});
+  context.ACTOR_FOOT_CLEARANCE=.01;
+  context.assignEnemyPatrolGroup=units=>{assigned=units.length;};
+  context.makeUnit=()=>{const enemy=new THREE.Group();enemy.userData={alive:true,faction:"enemy"};return enemy;};
+  context.updateStats=()=>{};context.showToast=()=>{};
+  for(const [startName,endName] of [["function clearFactionCelebration(","function beginFactionCelebration("],["function spawnHudEnemies(","function ensureDefaultHudWidgets("]]){
+    const start=game.indexOf(startName),end=game.indexOf(endName,start);
+    vm.runInContext(game.slice(start,end),context);
+  }
+  assert.equal(context.spawnHudEnemies(widget),true);
+  assert.equal(context.celebrationWinnerFaction,null);
+  assert.equal(player.userData.celebrating,false);
+  assert.equal(context.enemyUnits.length,1);
+  assert.equal(assigned,1);
+  assert.equal(context.activeEncounter.done,false);
+  assert.equal(context.activeEncounter.aggro,true);
+  assert.equal(context.activeEncounter.forceSoldierEngagement,true);
 });
 
 function soldier(faction = "player") {

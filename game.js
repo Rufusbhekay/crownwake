@@ -113,10 +113,10 @@ function normalizeHudTextSettings(settings={}){
 }
 function isProgressBarBlueprint(assetId){return Boolean(PROGRESS_BAR_BLUEPRINTS[assetId])}
 function normalizeHexColour(value,fallback){return /^#[0-9a-f]{6}$/i.test(value??"")?value.toLowerCase():fallback}
-const UNIT_RING_RADAR_GAP=.065,DEFAULT_UNIT_RING_SETTINGS=Object.freeze({outerColor:"#f7f2e4",outerSize:.7605,outerThickness:.04125,outerHeight:.018,innerColor:"#f7f2e4",innerSize:.5915,innerThickness:.04125,innerHeight:.054,playerRadarColor:"#e53935",enemyRadarColor:"#ffcf22",radarHeight:.021,radarThickness:.04125,radarSize:1.06/Math.PI});
+const UNIT_RING_RADAR_GAP=.065,DEFAULT_UNIT_RING_SETTINGS=Object.freeze({outerColor:"#f7f2e4",playerOuterAttackColor:"#e32646",enemyOuterAttackColor:"#ffbf24",outerSize:.7605,outerThickness:.04125,outerHeight:.018,innerColor:"#f7f2e4",playerInnerAttackColor:"#e32646",enemyInnerAttackColor:"#ffbf24",innerSize:.5915,innerThickness:.04125,innerHeight:.054,playerRadarColor:"#e53935",enemyRadarColor:"#ffcf22",playerRadarAttackColor:"#ffffff",enemyRadarAttackColor:"#ffffff",radarHeight:.021,radarThickness:.04125,radarSize:1.06/Math.PI});
 function normalizeUnitRingSettings(settings={}){
   const source={...DEFAULT_UNIT_RING_SETTINGS,...settings},outerSize=THREE.MathUtils.clamp(Number(source.outerSize)||DEFAULT_UNIT_RING_SETTINGS.outerSize,.3,5),outerThickness=THREE.MathUtils.clamp(Number(source.outerThickness)||DEFAULT_UNIT_RING_SETTINGS.outerThickness,.012,Math.min(2,outerSize-.001)),innerSize=THREE.MathUtils.clamp(Number(source.innerSize)||DEFAULT_UNIT_RING_SETTINGS.innerSize,.1,5),innerThickness=THREE.MathUtils.clamp(Number(source.innerThickness)||DEFAULT_UNIT_RING_SETTINGS.innerThickness,.012,Math.min(2,innerSize-.001)),radarThickness=THREE.MathUtils.clamp(Number(source.radarThickness)||DEFAULT_UNIT_RING_SETTINGS.radarThickness,.012,2),requestedRadarRadius=Number(settings.radarRadius),radarRadius=Number.isFinite(requestedRadarRadius)&&requestedRadarRadius>0?THREE.MathUtils.clamp(requestedRadarRadius,radarThickness+.01,8):outerSize+UNIT_RING_RADAR_GAP+radarThickness;
-  return {outerVisible:source.outerVisible!==false,innerVisible:source.innerVisible!==false,radarVisible:source.radarVisible!==false,outerColor:normalizeHexColour(source.outerColor,DEFAULT_UNIT_RING_SETTINGS.outerColor),outerSize,outerThickness,outerHeight:THREE.MathUtils.clamp(Number(source.outerHeight)||0,0,.2),innerColor:normalizeHexColour(source.innerColor,DEFAULT_UNIT_RING_SETTINGS.innerColor),innerSize,innerThickness,innerHeight:THREE.MathUtils.clamp(Number(source.innerHeight)||0,0,.35),playerRadarColor:normalizeHexColour(source.playerRadarColor,DEFAULT_UNIT_RING_SETTINGS.playerRadarColor),enemyRadarColor:normalizeHexColour(source.enemyRadarColor,DEFAULT_UNIT_RING_SETTINGS.enemyRadarColor),radarHeight:THREE.MathUtils.clamp(Number(source.radarHeight)||0,0,.2),radarThickness,radarRadius,radarSize:THREE.MathUtils.clamp(Number(source.radarSize)||DEFAULT_UNIT_RING_SETTINGS.radarSize,.05,1)};
+  return {outerVisible:source.outerVisible!==false,innerVisible:source.innerVisible!==false,radarVisible:source.radarVisible!==false,outerColor:normalizeHexColour(source.outerColor,DEFAULT_UNIT_RING_SETTINGS.outerColor),playerOuterAttackColor:normalizeHexColour(source.playerOuterAttackColor,DEFAULT_UNIT_RING_SETTINGS.playerOuterAttackColor),enemyOuterAttackColor:normalizeHexColour(source.enemyOuterAttackColor,DEFAULT_UNIT_RING_SETTINGS.enemyOuterAttackColor),outerSize,outerThickness,outerHeight:THREE.MathUtils.clamp(Number(source.outerHeight)||0,0,.2),innerColor:normalizeHexColour(source.innerColor,DEFAULT_UNIT_RING_SETTINGS.innerColor),playerInnerAttackColor:normalizeHexColour(source.playerInnerAttackColor,DEFAULT_UNIT_RING_SETTINGS.playerInnerAttackColor),enemyInnerAttackColor:normalizeHexColour(source.enemyInnerAttackColor,DEFAULT_UNIT_RING_SETTINGS.enemyInnerAttackColor),innerSize,innerThickness,innerHeight:THREE.MathUtils.clamp(Number(source.innerHeight)||0,0,.35),playerRadarColor:normalizeHexColour(source.playerRadarColor,DEFAULT_UNIT_RING_SETTINGS.playerRadarColor),enemyRadarColor:normalizeHexColour(source.enemyRadarColor,DEFAULT_UNIT_RING_SETTINGS.enemyRadarColor),playerRadarAttackColor:normalizeHexColour(source.playerRadarAttackColor,DEFAULT_UNIT_RING_SETTINGS.playerRadarAttackColor),enemyRadarAttackColor:normalizeHexColour(source.enemyRadarAttackColor,DEFAULT_UNIT_RING_SETTINGS.enemyRadarAttackColor),radarHeight:THREE.MathUtils.clamp(Number(source.radarHeight)||0,0,.2),radarThickness,radarRadius,radarSize:THREE.MathUtils.clamp(Number(source.radarSize)||DEFAULT_UNIT_RING_SETTINGS.radarSize,.05,1)};
 }
 function loadUnitRingSettings(){try{return normalizeUnitRingSettings(JSON.parse(localStorage.getItem(UNIT_RING_SETTINGS_KEY)||"{}"))}catch{return normalizeUnitRingSettings()}}
 function normalizeHealthBarOffset(value,fallback){const offset=Number(value);return Number.isFinite(offset)?THREE.MathUtils.clamp(offset,0,12):fallback}
@@ -228,7 +228,7 @@ function normalizeImportedModelRecord(record){
 function normalizeActorBlueprintStats(settings){
   if(!settings||typeof settings!=="object")return {};
   const normalized={};
-  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15]]){
+  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15],["patrolSpacing",.1,5],["patrolPauseMax",0,2]]){
     const value=Number(settings[property]);if(Number.isFinite(value))normalized[property]=Math.min(maximum,Math.max(minimum,value));
   }
   return normalized;
@@ -445,10 +445,10 @@ function updateEncounterRings(){
     const pairId=paired?foe.id:null;
     if(data.pairId!==pairId){data.pairId=pairId;data.pairConfirmedAt=paired?totalTime:null;}
     if(!unit.visible||isBarracksDeparting(unit)){ring.visible=false;continue;}
-    const enemy=unit.userData.faction==="enemy",combatColor=enemy?"#ffbf24":"#e32646",color=paired?"#ffffff":enemy?unitRingSettings.enemyRadarColor:unitRingSettings.playerRadarColor;
+    const enemy=unit.userData.faction==="enemy",outerColor=paired?(enemy?unitRingSettings.enemyOuterAttackColor:unitRingSettings.playerOuterAttackColor):unitRingSettings.outerColor,innerColor=paired?(enemy?unitRingSettings.enemyInnerAttackColor:unitRingSettings.playerInnerAttackColor):unitRingSettings.innerColor,color=paired?(enemy?unitRingSettings.enemyRadarAttackColor:unitRingSettings.playerRadarAttackColor):(enemy?unitRingSettings.enemyRadarColor:unitRingSettings.playerRadarColor);
     const elapsed=paired?Math.max(0,totalTime-data.pairConfirmedAt):0,pulse=paired&&!reducedMotion?(1-Math.cos(Math.PI*2*elapsed))/2:0;
-    data.outerMaterial.color.set(paired?combatColor:unitRingSettings.outerColor).multiplyScalar(1+pulse*1.5);
-    data.innerMaterial.color.set(paired?combatColor:unitRingSettings.innerColor).multiplyScalar(1+pulse*1.5);
+    data.outerMaterial.color.set(outerColor).multiplyScalar(1+pulse*1.5);
+    data.innerMaterial.color.set(innerColor).multiplyScalar(1+pulse*1.5);
     data.outerMaterial.opacity=paired&&!reducedMotion?.5+.5*pulse:.9;data.innerMaterial.opacity=paired&&!reducedMotion?.5+.5*pulse:.9;
     data.outer.visible=unitRingSettings.outerVisible!==false;data.inner.visible=unitRingSettings.innerVisible!==false;data.direction.visible=unitRingSettings.radarVisible!==false;
     data.outer.scale.setScalar(1+pulse*.12);data.inner.scale.setScalar(1+pulse*.12);
@@ -1767,6 +1767,8 @@ function levelAssetRecord(object){
     moveSpeed:Number(object.userData.moveSpeed.toFixed(2)),
     acceleration:Number(actorAcceleration(object).toFixed(2)),
     patrolSpeed:Number(actorPatrolSpeed(object).toFixed(2)),
+    patrolSpacing:Number(actorPatrolSpacing(object).toFixed(2)),
+    patrolPauseMax:Number(actorPatrolPauseMax(object).toFixed(2)),
     modelAssetId:object.userData.modelAssetId,
     progressBarAssetId:object.userData.progressBarAssetId,
     healthBarOffset:object.userData.healthBarOffset
@@ -2500,16 +2502,16 @@ function makeMaster(faction="player") {
 }
 const ACTOR_SPEED_BOOST=1.5;
 const ACTOR_LEGACY_MOVE_SPEEDS=Object.freeze({ch1:2.65,ch2:3.18,ch3:2.65,en1:2.65,en2:3.18,en3:2.65,en4:2.65,en5:2.65});
-const ACTOR_DEFAULT_ACCELERATION=5.4,ACTOR_SPEED_INPUT_MAX=15,ACTOR_ACCELERATION_INPUT_MAX=30;
+const ACTOR_DEFAULT_ACCELERATION=5.4,ACTOR_SPEED_INPUT_MAX=15,ACTOR_ACCELERATION_INPUT_MAX=30,ACTOR_PATROL_SPACING_INPUT_MAX=5,ACTOR_PATROL_PAUSE_INPUT_MAX=2;
 const ACTOR_ARCHETYPES=Object.freeze({
-  ch1:Object.freeze({id:"ch1",label:"CH1",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,tint:null}),
-  ch3:Object.freeze({id:"ch3",label:"CH Swordsman",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,tint:null}),
-  en1:Object.freeze({id:"en1",label:"EN1",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,tint:COLORS.amber}),
-  ch2:Object.freeze({id:"ch2",label:"CH2",faction:"player",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,tint:0x171a1d}),
-  en2:Object.freeze({id:"en2",label:"EN2",faction:"enemy",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,tint:0xd84b55}),
-  en3:Object.freeze({id:"en3",label:"EN 3",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,tint:0xbe63e6}),
-  en4:Object.freeze({id:"en4",label:"EN 4",faction:"enemy",maxHp:16,attack:5,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,tint:0xb17ad1}),
-  en5:Object.freeze({id:"en5",label:"EN Swordsman",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,tint:COLORS.amber})
+  ch1:Object.freeze({id:"ch1",label:"CH1",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
+  ch3:Object.freeze({id:"ch3",label:"CH Swordsman",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
+  en1:Object.freeze({id:"en1",label:"EN1",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:COLORS.amber}),
+  ch2:Object.freeze({id:"ch2",label:"CH2",faction:"player",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0x171a1d}),
+  en2:Object.freeze({id:"en2",label:"EN2",faction:"enemy",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xd84b55}),
+  en3:Object.freeze({id:"en3",label:"EN 3",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xbe63e6}),
+  en4:Object.freeze({id:"en4",label:"EN 4",faction:"enemy",maxHp:16,attack:5,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xb17ad1}),
+  en5:Object.freeze({id:"en5",label:"EN Swordsman",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:COLORS.amber})
 });
 function actorArchetype(archetypeId,faction="player"){
   const candidate=ACTOR_ARCHETYPES[archetypeId==="en-splitter"?"en3":archetypeId];
@@ -2525,6 +2527,8 @@ function actorBlueprintStats(archetypeId){return normalizeActorBlueprintStats(co
 function actorBlueprintProfile(archetypeId,faction){const archetype=actorArchetype(archetypeId,faction);return {...archetype,...actorBlueprintStats(archetype.id)}}
 function actorAcceleration(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.acceleration);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.acceleration,.5,ACTOR_ACCELERATION_INPUT_MAX)}
 function actorPatrolSpeed(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.patrolSpeed);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.patrolSpeed,.25,ACTOR_SPEED_INPUT_MAX)}
+function actorPatrolSpacing(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.patrolSpacing);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.patrolSpacing,.1,ACTOR_PATROL_SPACING_INPUT_MAX)}
+function actorPatrolPauseMax(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.patrolPauseMax);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.patrolPauseMax,0,ACTOR_PATROL_PAUSE_INPUT_MAX)}
 function actorSteerAcceleration(unit,baseAcceleration){return baseAcceleration*(actorAcceleration(unit)/ACTOR_DEFAULT_ACCELERATION)}
 function actorLegacyMoveSpeed(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction);return ACTOR_LEGACY_MOVE_SPEEDS[archetype.id]??actorDefaultMoveSpeed(unit?.userData?.faction)}
 function normalizeActorMoveSpeed(moveSpeed,archetypeId,faction){
@@ -2537,13 +2541,15 @@ function editorActorMoveScale(unit){
 }
 function applyEditorActorProfile(actor,profile){
   if(!actor?.userData||!profile)return;
-  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),healthBarOffset=Number(profile.healthBarOffset);
+  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),patrolSpacing=Number(profile.patrolSpacing),patrolPauseMax=Number(profile.patrolPauseMax),healthBarOffset=Number(profile.healthBarOffset);
   if(profile.archetypeId){actor.userData.actorArchetypeId=actorArchetype(profile.archetypeId,actor.userData.faction).id;if(actor.userData.faction==="player")actor.userData.companyId=deploymentGroupId(actor.userData.actorArchetypeId);}
   if(Number.isFinite(maxHp))actor.userData.maxHp=actor.userData.hp=THREE.MathUtils.clamp(maxHp,1,500);
   if(Number.isFinite(attack))actor.userData.attack=THREE.MathUtils.clamp(attack,.5,200);
   if(Number.isFinite(moveSpeed))actor.userData.moveSpeed=normalizeActorMoveSpeed(moveSpeed,actor.userData.actorArchetypeId,actor.userData.faction);
   if(Number.isFinite(acceleration))actor.userData.acceleration=THREE.MathUtils.clamp(acceleration,.5,ACTOR_ACCELERATION_INPUT_MAX);
   if(Number.isFinite(patrolSpeed))actor.userData.patrolSpeed=THREE.MathUtils.clamp(patrolSpeed,.25,ACTOR_SPEED_INPUT_MAX);
+  if(Number.isFinite(patrolSpacing))actor.userData.patrolSpacing=THREE.MathUtils.clamp(patrolSpacing,.1,ACTOR_PATROL_SPACING_INPUT_MAX);
+  if(Number.isFinite(patrolPauseMax))actor.userData.patrolPauseMax=THREE.MathUtils.clamp(patrolPauseMax,0,ACTOR_PATROL_PAUSE_INPUT_MAX);
   if(Number.isFinite(healthBarOffset))actor.userData.healthBarOffset=normalizeHealthBarOffset(healthBarOffset,ACTOR_HEALTH_BAR_OFFSET);
   if(isProgressBarBlueprint(profile.progressBarAssetId))actor.userData.progressBarAssetId=profile.progressBarAssetId;
   if(profile.modelAssetId)applyCharacterModel(actor,profile.modelAssetId);
@@ -2566,7 +2572,7 @@ function makeUnit(faction="player",archetypeId=null) {
   const g=new THREE.Group(),archetype=actorBlueprintProfile(archetypeId,faction),modelAssetId=actorModelAssetId(archetype.id);
   setCharacterVisual(g,modelAssetId,()=>{const body=roundedBox(.42,1.22,.38,mats.warrior,.1);body.position.y=.03;return body});
   const {maxHp,attack,moveSpeed}=archetype,materialColor=faction==="enemy"?actorMaterialColour(archetype.id):null;
-  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
+  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,patrolSpacing:archetype.patrolSpacing,patrolPauseMax:archetype.patrolPauseMax,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
   const tint=materialColor?new THREE.Color(materialColor).getHex():archetype.tint;if(Number.isInteger(tint))tintCharacter(g,tint);
   prepareDamageVisual(g);makeActorHealthWidget(g,false);addGroundContactOcclusion(g);makeEncounterRing(g);return g;
 }
@@ -2621,10 +2627,12 @@ function createPlacedHudWidgetElement(widget){
 function placedHudWidgetElement(widget){return hudWidgetElements.get(widget)??createPlacedHudWidgetElement(widget)}
 function spawnHudEnemies(widget){
   const archetype=hudWidgetArchetype(widget);if(archetype.faction!=="enemy"||!widget.userData.hudVisible)return false;
-  const count=normalizeHudWidgetSettings({spawnCount:widget.userData.hudSpawnCount},archetype.id).spawnCount,supportY=walkableSupportHeightAt(widget.position.x,widget.position.z)??GROUND_Y,seed=rand();
+  const count=normalizeHudWidgetSettings({spawnCount:widget.userData.hudSpawnCount},archetype.id).spawnCount,supportY=walkableSupportHeightAt(widget.position.x,widget.position.z)??GROUND_Y,seed=rand(),spawnedEnemies=[];
   for(let index=0;index<count;index++){
-    const offset=scatteredPackOffset(index,count,seed),enemy=makeUnit("enemy",archetype.id);enemy.position.set(widget.position.x+offset.lateral*.56,supportY+ACTOR_FOOT_CLEARANCE,widget.position.z+offset.forward*.56);battle.add(enemy);enemyUnits.push(enemy);
+    const offset=scatteredPackOffset(index,count,seed),enemy=makeUnit("enemy",archetype.id);enemy.position.set(widget.position.x+offset.lateral*.56,supportY+ACTOR_FOOT_CLEARANCE,widget.position.z+offset.forward*.56);battle.add(enemy);enemyUnits.push(enemy);spawnedEnemies.push(enemy);
   }
+  assignEnemyPatrolGroup(spawnedEnemies);
+  if(celebrationWinnerFaction==="player")clearFactionCelebration();
   activatePlacedCharacterEncounter({engageImmediately:true});updateStats();showToast(`${count} ${archetype.label.toUpperCase()} SPAWNED`,1100);return true;
 }
 function ensureDefaultHudWidgets(){
@@ -2657,6 +2665,8 @@ function spawnEnemySplitChildren(parent){
     child.userData.maxHp=stats.maxHp;child.userData.hp=stats.maxHp;child.userData.regenStartHealth=stats.maxHp;child.userData.attack=stats.attack;child.userData.moveSpeed=parent.userData.moveSpeed;child.userData.acceleration=actorAcceleration(parent);child.userData.patrolSpeed=actorPatrolSpeed(parent);child.userData.splitsOnDeath=false;child.userData.splitChild=true;const health=child.userData.healthWidget?.userData;if(health){health.current=stats.maxHp;health.lagHealth=stats.maxHp;}
     battle.add(child);enemyUnits.push(child);children.push(child);
   }
+  if(parent.userData.enemyPatrolPivot&&parent.userData.enemyPatrolGroupId!==undefined)for(const child of children){child.userData.enemyPatrolGroupId=parent.userData.enemyPatrolGroupId;child.userData.enemyPatrolPivot=parent.userData.enemyPatrolPivot.clone();}
+  else assignEnemyPatrolGroup(children);
   if(activeEncounter){activeEncounter.totalServants+=children.length;activeEncounter.threatBudget+=children.length;}
   return children;
 }
@@ -2747,7 +2757,7 @@ function updateBarracksDeparture(unit,dt){
   return true;
 }
 function spawnBarracksEnemy(barracks){
-  const enemy=makeUnit("enemy","en1");enemy.userData.barracksSpawned=true;beginBarracksDeparture(enemy,barracks,{hidden:true});battle.add(enemy);enemyUnits.push(enemy);
+  const enemy=makeUnit("enemy","en1");enemy.userData.barracksSpawned=true;beginBarracksDeparture(enemy,barracks,{hidden:true});battle.add(enemy);enemyUnits.push(enemy);assignEnemyPatrolGroup([enemy]);
   if(activeEncounter){activeEncounter.totalServants++;activeEncounter.threatBudget++;}
   return enemy;
 }
@@ -3162,7 +3172,7 @@ function spawnWave(){
   const approach=playerFocus().position.clone().sub(center).setY(0).normalize();
   enemyPackAnchor={position:center.clone(),forward:approach.clone(),velocity:new THREE.Vector3()};
   const healthMultiplier=practiceEnemyHealthMultiplier(waveNumber);
-  const placementSeed=rand();
+  const placementSeed=rand(),spawnedEnemies=[];
   for(let i=0;i<count;i++){
     const u=makeUnit(faction);
     u.userData.maxHp*=healthMultiplier;u.userData.hp=u.userData.maxHp;
@@ -3171,8 +3181,9 @@ function spawnWave(){
     const lateral=new THREE.Vector3(-localApproach.z,0,localApproach.x);
     const offset=circularArrival?{lateral:0,forward:0}:spawnPackOffset(i,count,placementSeed);
     u.position.copy(origin).addScaledVector(lateral,offset.lateral).addScaledVector(localApproach,offset.forward);
-    u.position.y=GROUND_Y;u.userData.leader=null;battle.add(u);enemyUnits.push(u);
+    u.position.y=GROUND_Y;u.userData.leader=null;battle.add(u);enemyUnits.push(u);spawnedEnemies.push(u);
   }
+  assignEnemyPatrolGroup(spawnedEnemies);
   activeEncounter={regionId:selectedRegion,faction,totalServants:count,aggro:false,done:false,victoryResolved:false,wave:waveNumber,swarmCount:1,threatBudget:count,formationSpread:1};
   return true;
 }
@@ -3457,7 +3468,9 @@ function steerStraightTowards(unit,desired,maxSpeed,acceleration,dt){
     const turnSpeed=Math.max(0,(alignment-.5)*2);
     desiredVelocity=forward.multiplyScalar(speed*turnSpeed);
   }else if(speed>0)desiredVelocity=delta.multiplyScalar(speed/distance);
-  const velocity=unit.userData.velocity??=new THREE.Vector3(), change=desiredVelocity.sub(velocity), maxChange=acceleration*(frontConstrained&&alignment<.8?3:1)*dt;
+  const velocity=unit.userData.velocity??=new THREE.Vector3();
+  if(frontConstrained&&alignment<.8){const turnDamping=THREE.MathUtils.clamp((.8-alignment)/.8,0,1),pathDirection=delta.multiplyScalar(1/distance),sidewaysVelocity=velocity.clone().sub(pathDirection.multiplyScalar(velocity.dot(pathDirection)));velocity.addScaledVector(sidewaysVelocity,-Math.min(1,40*turnDamping*dt));}
+  const change=desiredVelocity.sub(velocity), maxChange=acceleration*(frontConstrained&&alignment<.8?3:1)*dt;
   if(change.length()>maxChange)change.setLength(maxChange);
   velocity.add(change);unit.position.addScaledVector(velocity,dt);
   if(!frontConstrained&&velocity.lengthSq()>.03)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(velocity.x,velocity.z),10,dt);
@@ -3838,38 +3851,51 @@ function independentGroupPatrolRadii(grid=ensureNavigationGrid()){
   const patrol=Math.max(INDEPENDENT_GROUP_PATROL_RADIUS,Math.hypot(grid.cellSize.x,grid.cellSize.z)+.1);
   return {patrol,cohesion:Math.max(CH_PATROL_COHESION_RADIUS,patrol+.4)};
 }
+function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty){
+  const grid=ensureNavigationGrid(),{patrol:patrolRadius,cohesion:cohesionRadius}=independentGroupPatrolRadii(grid);
+  if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>cohesionRadius){unit.userData[goalProperty]=null;unit.userData[pauseProperty]=0;return pivot.setY(unit.position.y);}
+  if(unit.userData[goalProperty]&&Math.hypot(unit.userData[goalProperty].x-pivot.x,unit.userData[goalProperty].z-pivot.z)>patrolRadius)unit.userData[goalProperty]=null;
+  const previousGoal=unit.userData[goalProperty],arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
+  const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
+  if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
+  if(arrivedAtGoal&&!unit.userData[pauseProperty]){unit.userData[pauseProperty]=totalTime+rand()*actorPatrolPauseMax(unit);return unit.position.clone();}
+  if((unit.userData[pauseProperty]??0)>totalTime)return unit.position.clone();
+  unit.userData[pauseProperty]=0;
+  const occupied=[];
+  for(const member of members){if(member===unit)continue;occupied.push(member.position);const memberGoal=member.userData[goalProperty];if(memberGoal?.revision===grid.revision)occupied.push(memberGoal);}
+  const minimumStep=Math.min(grid.cellSize.x,grid.cellSize.z)*.4,candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=patrolRadius&&Math.hypot(cell.x-unit.position.x,cell.z-unit.position.z)>minimumStep).map(([,cell])=>cell);
+  const patrolGoal=choosePatrolGoal({origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:actorPatrolSpacing(unit)});
+  if(!patrolGoal)return pivot.setY(unit.position.y);
+  const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
+  unit.userData[goalProperty]={x:patrolGoal.x,y:goalY,z:patrolGoal.z,revision:grid.revision,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
+  return new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
+}
 function independentGroupPatrolTarget(unit,allies){
   const company=ensureCompanyLayout().find(item=>item.groupIndex===unit.userData.companyId),members=company?.soldiers.filter(member=>member.userData.alive)??[];
   if(!company||!members.length)return unit.position.clone();
-  const grid=ensureNavigationGrid(),{patrol:patrolRadius,cohesion:cohesionRadius}=independentGroupPatrolRadii(grid),anchor=ensureCompanyAnchor(company.groupIndex),pivot=(anchor.patrolHome??anchor.orderTarget??anchor.position).clone().setY(GROUND_Y);
+  const anchor=ensureCompanyAnchor(company.groupIndex),pivot=(anchor.patrolHome??anchor.orderTarget??anchor.position).clone().setY(GROUND_Y);
   anchor.patrolHome??=pivot.clone();
-  if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>cohesionRadius){unit.userData.groupPatrolGoal=null;unit.userData.groupPatrolPauseUntil=0;return pivot.setY(unit.position.y);}
-  if(unit.userData.groupPatrolGoal&&Math.hypot(unit.userData.groupPatrolGoal.x-pivot.x,unit.userData.groupPatrolGoal.z-pivot.z)>patrolRadius)unit.userData.groupPatrolGoal=null;
-  const previousGoal=unit.userData.groupPatrolGoal;
-  const arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
-  const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
-  if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
-  if(arrivedAtGoal&&!unit.userData.groupPatrolPauseUntil){unit.userData.groupPatrolPauseUntil=totalTime+rand()*INDEPENDENT_GROUP_PATROL_PAUSE_MAX;return unit.position.clone();}
-  if((unit.userData.groupPatrolPauseUntil??0)>totalTime)return unit.position.clone();
-  unit.userData.groupPatrolPauseUntil=0;
-  const occupied=[];
-  for(const member of members){
-    if(member===unit)continue;
-    occupied.push(member.position);
-    const memberGoal=member.userData.groupPatrolGoal;
-    if(memberGoal?.revision===grid.revision)occupied.push(memberGoal);
-  }
-  const minimumStep=Math.min(grid.cellSize.x,grid.cellSize.z)*.4;
-  const candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=patrolRadius&&Math.hypot(cell.x-unit.position.x,cell.z-unit.position.z)>minimumStep).map(([,cell])=>cell);
-  const patrolGoal=choosePatrolGoal({origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:INDEPENDENT_GROUP_PATROL_SEPARATION});
-  if(!patrolGoal)return pivot.setY(unit.position.y);
-  const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
-  unit.userData.groupPatrolGoal={x:patrolGoal.x,y:goalY,z:patrolGoal.z,revision:grid.revision,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
-  return new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
+  return compactGroupPatrolTarget(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil");
 }
 function updateIndependentGroupPatrol(unit,allies,dt){
   const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:independentGroupPatrolRadii().cohesion}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
   steerTowards(unit,desired,speed,actorSteerAcceleration(unit,5.4),dt,{goalKey:`group-patrol:${unit.userData.companyId}`});
+}
+function assignEnemyPatrolGroup(units){
+  const members=units.filter(unit=>unit?.userData?.alive);if(!members.length)return null;
+  const grid=ensureNavigationGrid(),candidates=[...grid.cells].filter(([cellKey])=>!grid.blocked.has(cellKey)).map(([,cell])=>cell),cell=candidates[Math.min(candidates.length-1,Math.floor(rand()*candidates.length))],point=cell??members[0].position;
+  const pivot=new THREE.Vector3(point.x,cell?(walkableSupportHeightAt(point.x,point.z)??GROUND_Y):point.y,point.z),groupId=`enemy-patrol-${members[0].id}`;
+  for(const member of members){member.userData.enemyPatrolGroupId=groupId;member.userData.enemyPatrolPivot=pivot.clone();member.userData.enemyPatrolGoal=null;member.userData.enemyPatrolPauseUntil=0;member.userData.navigationPath=null;member.userData.navigationYield=null;}
+  return pivot;
+}
+function enemyGroupPatrolTarget(unit,allies){
+  if(!unit.userData.enemyPatrolPivot){const unassigned=allies.filter(member=>member?.userData?.alive&&!member.userData.enemyPatrolPivot);assignEnemyPatrolGroup(unassigned.length?unassigned:[unit]);}
+  const groupId=unit.userData.enemyPatrolGroupId,members=allies.filter(member=>member?.userData?.alive&&member.userData.enemyPatrolGroupId===groupId),pivot=unit.userData.enemyPatrolPivot?.clone().setY(GROUND_Y)??unit.position.clone();
+  return compactGroupPatrolTarget(unit,members,pivot,"enemyPatrolGoal","enemyPatrolPauseUntil");
+}
+function updateEnemyGroupPatrol(unit,allies,dt){
+  const patrolTarget=enemyGroupPatrolTarget(unit,allies),pivot=unit.userData.enemyPatrolPivot??unit.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:independentGroupPatrolRadii().cohesion}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
+  steerTowards(unit,desired,speed,actorSteerAcceleration(unit,5.4),dt,{goalKey:`enemy-group-patrol:${unit.userData.enemyPatrolGroupId}`});
 }
 function manualOrderTravelGuidance(unit,destination,allies,travelSpeed){
   const forward=destination.clone().sub(unit.position).setY(0),distance=forward.length();
@@ -4178,7 +4204,7 @@ function updateBattle(dt){
     const committed=!!u.userData.lockedTarget?.userData.alive;
     let foe=enemyAssignments.get(u)??(committed?u.userData.lockedTarget:null);
     const waitingDuel=enemyWaitingAssignments.get(u);
-    if(peacefulPatrol&&!foe?.userData?.alive&&!waitingDuel){updatePeacefulPatrol(u,livingEnemies,dt);return;}
+    if(peacefulPatrol&&!foe?.userData?.alive&&!waitingDuel){updateEnemyGroupPatrol(u,livingEnemies,dt);return;}
     const packIndex=Math.max(0,livingEnemySoldiers.indexOf(u));
     const distanceToPack=enemyPackAnchor?u.position.distanceTo(enemyPackAnchor.position):0;
     const combatState=soldierCombatState({combat,formingBattleLine:false,targetAlive:!!foe?.userData.alive,waitingSlot:!!waitingDuel});
@@ -4836,7 +4862,7 @@ function applyEditorActorInput(input){
   const profile=selectedEditorActorProfile(),actor=profile?.actor??null;
   if(!profile)return;
   const property=input.dataset.actorProperty,value=Number(input.value),minimum=Number(input.min),maximum=Number(input.max);
-  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
+  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed","patrolSpacing","patrolPauseMax"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
   recordEditorUndo();const next=THREE.MathUtils.clamp(value,minimum,maximum);
   if(actor){
     actor.userData[property]=next;
@@ -6040,8 +6066,12 @@ function installRingVisibilityButtons(){
   }
   syncRingVisibilityButtons();
 }
+const UNIT_RING_ATTACK_COLOR_INPUTS=Object.freeze([["playerOuterAttackColor","ch-outer-attack-color"],["enemyOuterAttackColor","en-outer-attack-color"],["playerInnerAttackColor","ch-inner-attack-color"],["enemyInnerAttackColor","en-inner-attack-color"],["playerRadarAttackColor","ch-radar-attack-color"],["enemyRadarAttackColor","en-radar-attack-color"]]);
+function renderRingAttackColors(prefix){for(const [setting,id] of UNIT_RING_ATTACK_COLOR_INPUTS)$(`${prefix}-${id}`).value=unitRingSettings[setting]}
+function readRingAttackColors(prefix){return Object.fromEntries(UNIT_RING_ATTACK_COLOR_INPUTS.map(([setting,id])=>[setting,$(`${prefix}-${id}`).value]))}
 function renderUnitRingSettings(){
   syncRingVisibilityButtons();
+  renderRingAttackColors("ring");
   $("ring-outer-color").value=unitRingSettings.outerColor;$("ring-outer-size").value=String(unitRingSettings.outerSize);$("ring-outer-thickness").value=String(unitRingSettings.outerThickness);$("ring-outer-height").value=String(unitRingSettings.outerHeight);
   $("ring-inner-color").value=unitRingSettings.innerColor;$("ring-inner-size").value=String(unitRingSettings.innerSize);$("ring-inner-thickness").value=String(unitRingSettings.innerThickness);$("ring-inner-height").value=String(unitRingSettings.innerHeight);
   $("ring-ch-radar-color").value=unitRingSettings.playerRadarColor;$("ring-en-radar-color").value=unitRingSettings.enemyRadarColor;$("ring-radar-height").value=String(unitRingSettings.radarHeight);$("ring-radar-thickness").value=String(unitRingSettings.radarThickness);$("ring-radar-radius").value=String(unitRingSettings.radarRadius);$("ring-radar-size").value=String(Math.round(unitRingSettings.radarSize*100));$("ring-radar-size-value").textContent=`${Math.round(unitRingSettings.radarSize*100)}%`;
@@ -6049,18 +6079,19 @@ function renderUnitRingSettings(){
 function renderEditorActorRingControls(enabled){
   syncRingVisibilityButtons();
   const controls=$("editor-actor-ring-controls");if(!controls)return;controls.disabled=!enabled;
+  renderRingAttackColors("editor-ring");
   $("editor-ring-outer-color").value=unitRingSettings.outerColor;$("editor-ring-outer-size").value=String(unitRingSettings.outerSize);$("editor-ring-outer-thickness").value=String(unitRingSettings.outerThickness);$("editor-ring-outer-height").value=String(unitRingSettings.outerHeight);
   $("editor-ring-inner-color").value=unitRingSettings.innerColor;$("editor-ring-inner-size").value=String(unitRingSettings.innerSize);$("editor-ring-inner-thickness").value=String(unitRingSettings.innerThickness);$("editor-ring-inner-height").value=String(unitRingSettings.innerHeight);
   $("editor-ring-ch-radar-color").value=unitRingSettings.playerRadarColor;$("editor-ring-en-radar-color").value=unitRingSettings.enemyRadarColor;$("editor-ring-radar-height").value=String(unitRingSettings.radarHeight);$("editor-ring-radar-thickness").value=String(unitRingSettings.radarThickness);$("editor-ring-radar-radius").value=String(unitRingSettings.radarRadius);$("editor-ring-radar-size").value=String(Math.round(unitRingSettings.radarSize*100));$("editor-ring-radar-size-value").textContent=`${Math.round(unitRingSettings.radarSize*100)}%`;
 }
 function applyUnitRingSettings(){for(const unit of [master,...followers,...enemyUnits])if(unit?.userData?.encounterRing)refreshEncounterRing(unit.userData.encounterRing);rebuildSelectionVisuals();updateEncounterRings()}
 function updateUnitRingSettings(){
-  unitRingSettings=normalizeUnitRingSettings({...unitRingSettings,outerColor:$("ring-outer-color").value,outerSize:$("ring-outer-size").value,outerThickness:$("ring-outer-thickness").value,outerHeight:$("ring-outer-height").value,innerColor:$("ring-inner-color").value,innerSize:$("ring-inner-size").value,innerThickness:$("ring-inner-thickness").value,innerHeight:$("ring-inner-height").value,playerRadarColor:$("ring-ch-radar-color").value,enemyRadarColor:$("ring-en-radar-color").value,radarHeight:$("ring-radar-height").value,radarThickness:$("ring-radar-thickness").value,radarRadius:$("ring-radar-radius").value,radarSize:Number($("ring-radar-size").value)/100});
+  unitRingSettings=normalizeUnitRingSettings({...unitRingSettings,...readRingAttackColors("ring"),outerColor:$("ring-outer-color").value,outerSize:$("ring-outer-size").value,outerThickness:$("ring-outer-thickness").value,outerHeight:$("ring-outer-height").value,innerColor:$("ring-inner-color").value,innerSize:$("ring-inner-size").value,innerThickness:$("ring-inner-thickness").value,innerHeight:$("ring-inner-height").value,playerRadarColor:$("ring-ch-radar-color").value,enemyRadarColor:$("ring-en-radar-color").value,radarHeight:$("ring-radar-height").value,radarThickness:$("ring-radar-thickness").value,radarRadius:$("ring-radar-radius").value,radarSize:Number($("ring-radar-size").value)/100});
   try{localStorage.setItem(UNIT_RING_SETTINGS_KEY,JSON.stringify(unitRingSettings))}catch{}
   renderUnitRingSettings();applyUnitRingSettings();
 }
 function updateEditorActorRingControls(){
-  unitRingSettings=normalizeUnitRingSettings({...unitRingSettings,outerColor:$("editor-ring-outer-color").value,outerSize:$("editor-ring-outer-size").value,outerThickness:$("editor-ring-outer-thickness").value,outerHeight:$("editor-ring-outer-height").value,innerColor:$("editor-ring-inner-color").value,innerSize:$("editor-ring-inner-size").value,innerThickness:$("editor-ring-inner-thickness").value,innerHeight:$("editor-ring-inner-height").value,playerRadarColor:$("editor-ring-ch-radar-color").value,enemyRadarColor:$("editor-ring-en-radar-color").value,radarHeight:$("editor-ring-radar-height").value,radarThickness:$("editor-ring-radar-thickness").value,radarRadius:$("editor-ring-radar-radius").value,radarSize:Number($("editor-ring-radar-size").value)/100});
+  unitRingSettings=normalizeUnitRingSettings({...unitRingSettings,...readRingAttackColors("editor-ring"),outerColor:$("editor-ring-outer-color").value,outerSize:$("editor-ring-outer-size").value,outerThickness:$("editor-ring-outer-thickness").value,outerHeight:$("editor-ring-outer-height").value,innerColor:$("editor-ring-inner-color").value,innerSize:$("editor-ring-inner-size").value,innerThickness:$("editor-ring-inner-thickness").value,innerHeight:$("editor-ring-inner-height").value,playerRadarColor:$("editor-ring-ch-radar-color").value,enemyRadarColor:$("editor-ring-en-radar-color").value,radarHeight:$("editor-ring-radar-height").value,radarThickness:$("editor-ring-radar-thickness").value,radarRadius:$("editor-ring-radar-radius").value,radarSize:Number($("editor-ring-radar-size").value)/100});
   try{localStorage.setItem(UNIT_RING_SETTINGS_KEY,JSON.stringify(unitRingSettings))}catch{}
   renderUnitRingSettings();renderEditorActorRingControls(true);applyUnitRingSettings();$("editor-status").textContent="CH and EN ring controls updated and saved.";
 }
@@ -6184,6 +6215,7 @@ $("speed").oninput=e=>{gameSpeed=GAME_SPEED_STEPS[Number(e.currentTarget.value)]
 for(const id of PLAYER_DEPLOYMENT_ARCHETYPES)$(`starting-${id}-count`).oninput=e=>previewStartingChCount(id,e.currentTarget.value);
 for(const id of ["ring-outer-color","ring-outer-size","ring-outer-thickness","ring-outer-height","ring-inner-color","ring-inner-size","ring-inner-thickness","ring-inner-height","ring-ch-radar-color","ring-en-radar-color","ring-radar-height","ring-radar-thickness","ring-radar-radius","ring-radar-size"])$(id).oninput=updateUnitRingSettings;
 for(const id of ["editor-ring-outer-color","editor-ring-outer-size","editor-ring-outer-thickness","editor-ring-outer-height","editor-ring-inner-color","editor-ring-inner-size","editor-ring-inner-thickness","editor-ring-inner-height","editor-ring-ch-radar-color","editor-ring-en-radar-color","editor-ring-radar-height","editor-ring-radar-thickness","editor-ring-radar-radius","editor-ring-radar-size"])$(id).oninput=updateEditorActorRingControls;
+for(const [,id] of UNIT_RING_ATTACK_COLOR_INPUTS){$(`ring-${id}`).oninput=updateUnitRingSettings;$(`editor-ring-${id}`).oninput=updateEditorActorRingControls;}
 installRingVisibilityButtons();
 $("settings-apply").onclick=setStartingChCounts;
 $("settings-cancel").onclick=closeSettings;$("settings-exit").onclick=exitToTitle;

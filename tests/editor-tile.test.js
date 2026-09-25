@@ -831,7 +831,7 @@ test("level actors patrol before CH deployment and Barracks still complete their
   assert.doesNotMatch(spawners, /deploymentStarted/);
   assert.match(source, /function peacefulPatrolActive\(\)\{return mode==="playing"&&!celebrationWinnerFaction/);
   assert.match(source, /function updatePeacefulPatrol\(unit,allies,dt\)/);
-  assert.match(enemyLoop, /const waitingDuel=enemyWaitingAssignments\.get\(u\);\n    if\(peacefulPatrol&&!foe\?\.userData\?\.alive&&!waitingDuel\)\{updatePeacefulPatrol\(u,livingEnemies,dt\);return;\}/);
+  assert.match(enemyLoop, /const waitingDuel=enemyWaitingAssignments\.get\(u\);\n    if\(peacefulPatrol&&!foe\?\.userData\?\.alive&&!waitingDuel\)\{updateEnemyGroupPatrol\(u,livingEnemies,dt\);return;\}/);
   assert.match(source, /updateIndependentSoldier\(u,\{combat,enemyInSight:threatDetected,raidTarget,foe,waitingDuel,peacefulPatrol,patrolAllies:livingPlayerSoldiers,dt\}\)/);
   assert.match(source, /if\(deploymentStarted&&activeEncounter&&!activeEncounter\.done&&!activeEncounter\.aggro/);
   assert.match(source, /if\(deploymentStarted\)reserveRaidBuildingAssignments\(livingPlayerSoldiers\);/);

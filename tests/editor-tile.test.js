@@ -240,10 +240,21 @@ test("Crownwake Base has a reusable grid blueprint with its baked model", () => 
   assert.match(source, /CROWNWAKE_BASE_MODEL_ASSET_ID="model:crownwake-base"/);
   assert.match(source, /BASE_BP_ASSET_ID="blueprint:base"/);
   assert.match(source, /crownwakeBase:\s*\["\.\/Models\/Crownwake_Base\.glb",\s*64\]/);
-  assert.match(source, /id:BASE_BP_ASSET_ID,name:"Base_bp",type:"Blueprint",folderId:"bp_gn\/base",tileBlueprint:true/);
+  assert.match(source, /id:BASE_BP_ASSET_ID,name:"Crownwake Base",type:"Blueprint",folderId:"bp_gn\/base",tileBlueprint:true/);
   assert.match(source, /tileBlueprintAssetId=BASE_BP_ASSET_ID/);
   assert.match(source, /tileModelAssetId=CROWNWAKE_BASE_MODEL_ASSET_ID/);
   assert.match(indexSource, /id="editor-tile-size"/);
+});
+
+test("Boolean Box subtracts persistent cells from placeable Base_bp tiles", () => {
+  assert.match(source, /BOOLEAN_BOX_BP_ASSET_ID="blueprint:boolean-box"/);
+  assert.match(source, /id:BOOLEAN_BOX_BP_ASSET_ID,name:"Boolean Box",type:"Blueprint",folderId:"bp_gn\/base"/);
+  assert.match(source, /function addBooleanBox\(/);
+  assert.match(source, /function applyBooleanBox\(/);
+  assert.match(source, /booleanCutCells/);
+  assert.match(source, /function baseGameplayGridSpecs\(/);
+  assert.match(indexSource, /id="inspector-boolean-section"/);
+  assert.match(indexSource, /id="editor-boolean-apply"/);
 });
 
 test("permanent tile-grid lines are hidden by default", () => {
@@ -393,7 +404,7 @@ test("Base_bp derives exact navigation cells from its local rows and columns", (
   assert.deepEqual(spans, [6, 8]);
   assert.match(source, /function synchronizeBaseGridTransform\(tile\)/);
   assert.match(source, /tile\.scale\.x=1;tile\.scale\.z=1;/);
-  assert.match(source, /if\(baseBlueprint\)synchronizeBaseGridTransform\(spawner\)/);
+  assert.match(source, /if\(baseBlueprint\)\{synchronizeBaseGridTransform\(spawner\);refreshBaseBooleanMask\(spawner\)\}/);
 });
 
 function baseGridTransformHarness() {
@@ -432,11 +443,12 @@ test("Base_bp scaling snaps the mesh footprint to whole square cells", () => {
   assert.equal(base.rotation.y, Math.PI * .5);
 });
 
-test("Base_bp uses one edge-fitted grid for navigation and CH deployment", () => {
+test("Base_bp uses its edge-fitted grids for navigation and CH deployment", () => {
   assert.match(source, /function activeGameplayGridSpec\(/);
+  assert.match(source, /function baseGameplayGridSpecs\(/);
   assert.match(source, /function baseGameplayGridSpec\(source\)/);
   assert.match(source, /navigationGrid\.cellSize=gridSpec\.cellSize/);
-  assert.match(source, /if\(gridSpec\.cells\?\.length\)/);
+  assert.match(source, /for\(const baseSpec of baseSpecs\)for\(const cell of baseSpec\.cells\)/);
   const previewStart=source.indexOf("function deploymentPreviewCells(){");
   const previewEnd=source.indexOf("function enemyOccupiesDeploymentCell",previewStart);
   const previewSource=source.slice(previewStart,previewEnd);

@@ -263,6 +263,15 @@
               <p id="editor-tile-help">Drag Tile_bp into the level. Rows and columns set the number of equal boxes; tile size sets every box edge.</p>
             </div>
           </details>
+          <details id="inspector-boolean-section" class="hidden" open>
+            <summary>BOOLEAN BOX</summary>
+            <div class="editor-boolean-panel">
+              <div class="editor-time-rd-identity"><span>CSG</span><div><small>LEVEL TOOL</small><strong>SUBTRACT FROM BASE</strong></div></div>
+              <p>Use Transform Scale to size this box. Move it through one or more Crownwake Base tiles, then apply to turn overlapped cells into permanent map voids.</p>
+              <button id="editor-boolean-apply" type="button">APPLY BOOLEAN</button>
+              <small id="editor-boolean-status">Select a Boolean Box to edit it.</small>
+            </div>
+          </details>
           <details id="inspector-camera-section" class="hidden" open><summary>CAMERA</summary><div class="camera-inspector-controls"><label><span>CAMERA ZOOM <output data-world-look-output="cameraZoom">1&times;</output></span><input data-world-look-setting="cameraZoom" type="range" min="0.6" max="1.8" step="0.05" value="1"></label></div></details>
           <details id="inspector-foliage-section" class="hidden"><summary>FOLIAGE</summary><div id="editor-foliage-slot"></div></details>
           <details id="inspector-environment-section" class="hidden" open><summary>ENVIRONMENT</summary><div id="editor-environment-slot"></div></details>

@@ -86,9 +86,9 @@ const hoverable = [];
 const flags = [];
 let rngState = 0xC0FFEE;
 function rand() { rngState = (Math.imul(rngState, 1664525) + 1013904223) >>> 0; return rngState / 4294967296; }
-const PRACTICE_CONFIG_KEY="crownwake-practice-config",TILE_BP_ASSET_ID="blueprint:tile",BASE_BP_ASSET_ID="blueprint:base",TOWN_HALL_BP_ASSET_ID="blueprint:town-hall",BARRACKS_BP_ASSET_ID="blueprint:barracks",ACTOR_PROGRESS_BAR_BP_ASSET_ID="blueprint:character-progress-bar",BUILDING_PROGRESS_BAR_BP_ASSET_ID="blueprint:building-progress-bar",CHARACTER_MODEL_ASSET_ID="model:ch",CROWNWAKE_BUILDING_MODEL_ASSET_ID="model:crownwake-building",CROWNWAKE_BASE_MODEL_ASSET_ID="model:crownwake-base";
+const PRACTICE_CONFIG_KEY="crownwake-practice-config",TILE_BP_ASSET_ID="blueprint:tile",BASE_BP_ASSET_ID="blueprint:base",BOOLEAN_BOX_BP_ASSET_ID="blueprint:boolean-box",TOWN_HALL_BP_ASSET_ID="blueprint:town-hall",BARRACKS_BP_ASSET_ID="blueprint:barracks",ACTOR_PROGRESS_BAR_BP_ASSET_ID="blueprint:character-progress-bar",BUILDING_PROGRESS_BAR_BP_ASSET_ID="blueprint:building-progress-bar",CHARACTER_MODEL_ASSET_ID="model:ch",CROWNWAKE_BUILDING_MODEL_ASSET_ID="model:crownwake-building",CROWNWAKE_BASE_MODEL_ASSET_ID="model:crownwake-base";
 const UNIT_RING_SETTINGS_KEY="crownwake-unit-ring-settings-v1";
-const LEVEL_LAYOUT_KEY="crownwake-level-layout-v1",LEGACY_LEVEL_LAYOUT_VERSION=1,LEVEL_LAYOUT_VERSION=4,LEGACY_EDITOR_ASSET_LIBRARY_KEY="crownwake-editor-asset-library-v1",EDITOR_ASSET_LIBRARY_KEY="crownwake-editor-asset-library-v2";
+const LEVEL_LAYOUT_KEY="crownwake-level-layout-v1",LEGACY_LEVEL_LAYOUT_VERSION=1,LEVEL_LAYOUT_VERSION=5,LEGACY_EDITOR_ASSET_LIBRARY_KEY="crownwake-editor-asset-library-v1",EDITOR_ASSET_LIBRARY_KEY="crownwake-editor-asset-library-v2";
 const RAID_BUILDING_MAX_HP=480,RAID_BUILDING_ATTACK_RANGE=.36,COLLISION_FOOTPRINT_CELL_SIZE=.1,RAID_BUILDING_ATTACK_SLOT_BUFFER=.025,ACTOR_HEALTH_BAR_OFFSET=.2,RAID_BUILDING_HEALTH_BAR_OFFSET=1.12,RAID_BUILDING_ATTACK_APPROACH_DISTANCE=.72;
 const RAID_BUILDING_WAIT_CLEARANCE=1.3,RAID_BUILDING_WAIT_RING_GAP=.8,RAID_BUILDING_WAIT_SLOTS_PER_RING=12;
 const PROGRESS_BAR_BLUEPRINTS=Object.freeze({
@@ -205,7 +205,7 @@ const CONTENT_BROWSER_SYSTEM_FOLDERS=Object.freeze([
   {id:"hud/ch",name:"CH",parentId:"hud"},
   {id:"hud/en",name:"EN",parentId:"hud"},
   {id:"bp_gn",name:"BP_GN",parentId:CONTENT_BROWSER_ROOT_ID},
-  {id:"bp_gn/base",name:"Base",parentId:"bp_gn"},
+  {id:"bp_gn/base",name:"Map Bases",parentId:"bp_gn"},
   {id:"bp_gn/town-hall",name:"Town Hall",parentId:"bp_gn"},
   {id:"bp_gn/barracks",name:"Barracks",parentId:"bp_gn"},
   {id:"bp_gn/progress-bars",name:"Progress Bars",parentId:"bp_gn"},
@@ -1749,11 +1749,12 @@ function migratedCrownwakeBaseRecord(record){
 }
 function levelAssetRecord(object){
   const type=object?.userData?.editorAssetType;
-  if(!["world-floor","tile-spawner","town-hall","barracks","primitive-cube","tree-cluster","tree-billboard","grass-cluster","rock-pillar","archer-tower","forest-fence","imported-model","ch-character","enemy-character","hud-widget","hud-text"].includes(type))return null;
+  if(!["world-floor","tile-spawner","boolean-box","town-hall","barracks","primitive-cube","tree-cluster","tree-billboard","grass-cluster","rock-pillar","archer-tower","forest-fence","imported-model","ch-character","enemy-character","hud-widget","hud-text"].includes(type))return null;
   const scale=type==="grass-cluster"?(object.userData.grassSizeBaseScale??object.scale):object.scale;
   const record={type,x:Number(object.position.x.toFixed(3)),y:Number(object.position.y.toFixed(3)),z:Number(object.position.z.toFixed(3)),turn:Number(object.rotation.y.toFixed(4)),rotation:[object.rotation.x,object.rotation.y,object.rotation.z].map(value=>Number(value.toFixed(4))),scale:scale.toArray().map(value=>Number(value.toFixed(4)))};
   if(type==="primitive-cube")record.navigationBlocks=object.userData.navigationBlocks===true;
-  if(type==="world-floor"||type==="tile-spawner"){const defaults=tileBlueprintDefaults(object);record.tileRows=normalizeTileDimension(object.userData.tileRows,defaults.rows);record.tileColumns=normalizeTileDimension(object.userData.tileColumns,defaults.columns);record.tileSize=normalizeTileSize(object.userData.tileSize,defaults.tileSize);if(type==="tile-spawner"){record.tileBlueprintAssetId=tileBlueprintAssetId(object);record.tileModelAssetId=object.userData.tileModelAssetId??null}if(/^#[0-9a-f]{6}$/i.test(object.userData.tileColour??""))record.tileColour=object.userData.tileColour;}
+  if(type==="world-floor"||type==="tile-spawner"){const defaults=tileBlueprintDefaults(object);record.tileRows=normalizeTileDimension(object.userData.tileRows,defaults.rows);record.tileColumns=normalizeTileDimension(object.userData.tileColumns,defaults.columns);record.tileSize=normalizeTileSize(object.userData.tileSize,defaults.tileSize);if(type==="tile-spawner"){record.tileBlueprintAssetId=tileBlueprintAssetId(object);record.tileModelAssetId=object.userData.tileModelAssetId??null;if(isBaseTileBlueprint(object))record.booleanCutCells=normalizeBaseBooleanCutCells(object.userData.booleanCutCells,record.tileRows,record.tileColumns);}if(/^#[0-9a-f]{6}$/i.test(object.userData.tileColour??""))record.tileColour=object.userData.tileColour;}
+  if(type==="boolean-box")record.booleanApplied=object.userData.booleanApplied===true;
   if(type==="town-hall"||type==="barracks"){record.blueprintAssetId=object.userData.blueprintAssetId;record.blueprintModel=object.userData.blueprintModel;record.maxHp=normalizeRaidBuildingHealth(object.userData.maxHp);record.progressBarAssetId=object.userData.progressBarAssetId;record.healthBarOffset=object.userData.healthBarOffset;if(type==="barracks")record.barracksSpawnInterval=object.userData.barracksSpawnInterval;}
   if(type==="imported-model"){record.importedModelAssetId=object.userData.importedModelAssetId;record.materialSlot=object.userData.importedMaterialSlot??"";}
   if(type==="tile-spawner"&&isBaseTileBlueprint(object))record.materialSlot=object.userData.importedMaterialSlot??"__embedded__";
@@ -1804,6 +1805,7 @@ function addLevelAsset(record){
   const y=Number.isFinite(record.y)?record.y:GROUND_Y,turn=Number.isFinite(record.turn)?record.turn:0,rotation=Array.isArray(record.rotation)&&record.rotation.length===3&&record.rotation.every(Number.isFinite)?record.rotation:null,scale=Array.isArray(record.scale)&&record.scale.length===3&&record.scale.every(value=>Number.isFinite(value)&&value>0)?record.scale:null;
   if(record.type==="world-floor")return applySavedEditorMaterial(addWorldFloor(record),record);
   if(record.type==="tile-spawner")return applySavedEditorMaterial(addTileSpawner(record),record);
+  if(record.type==="boolean-box")return addBooleanBox(record);
   if(record.type==="town-hall"||record.type==="barracks")return applySavedEditorMaterial(addRaidBuilding({kind:record.type,x:record.x,y,z:record.z,turn,rotation,scale,blueprintAssetId:record.blueprintAssetId,blueprintModel:record.blueprintModel,materialColor:record.materialColor,maxHp:record.maxHp,barracksSpawnInterval:record.barracksSpawnInterval,progressBarAssetId:record.progressBarAssetId,healthBarOffset:record.healthBarOffset}),record);
   if(record.type==="primitive-cube")return applySavedEditorMaterial(addPrimitiveCube({x:record.x,y,z:record.z,turn,rotation,scale}),record);
   if(record.type==="ch-character")return applySavedEditorMaterial(addEditorCharacter({faction:"player",x:record.x,y,z:record.z,turn,rotation,scale,actor:record.actor}),record);
@@ -1835,7 +1837,7 @@ function addLevelAsset(record){
 function rememberLevelState(layout){
   savedLevelState={
     version:LEVEL_LAYOUT_VERSION,
-    assets:(layout.assets??[]).map(record=>({...record,rotation:record.rotation?.slice(),scale:record.scale?.slice(),actor:record.actor?{...record.actor}:undefined})),
+    assets:(layout.assets??[]).map(record=>({...record,rotation:record.rotation?.slice(),scale:record.scale?.slice(),actor:record.actor?{...record.actor}:undefined,booleanCutCells:record.booleanCutCells?.slice()})),
     camera:layout.camera?{...layout.camera,...(layout.camera.rotation?{rotation:layout.camera.rotation.slice()}:{})}:null,
     hudLayoutSeeded:layout.hudLayoutSeeded===true,
     hudTextSeeded:layout.hudTextSeeded===true
@@ -1844,7 +1846,7 @@ function rememberLevelState(layout){
 function restoreLevelLayout(){
   try{
     const layout=JSON.parse(localStorage.getItem(LEVEL_LAYOUT_KEY)||"null");
-    if(!layout||![LEGACY_LEVEL_LAYOUT_VERSION,2,3,LEVEL_LAYOUT_VERSION].includes(layout.version)||!Array.isArray(layout.assets))return false;
+    if(!layout||![LEGACY_LEVEL_LAYOUT_VERSION,2,3,4,LEVEL_LAYOUT_VERSION].includes(layout.version)||!Array.isArray(layout.assets))return false;
     savedLevelCamera=levelCameraFrame(layout.camera,{minScale:EDITOR_ZOOM_MIN,maxScale:EDITOR_ZOOM_MAX});
     if(savedLevelCamera){
       gameplayCameraFocus.set(savedLevelCamera.x,0,savedLevelCamera.z);
@@ -1932,6 +1934,33 @@ function isBaseTileBlueprint(tile){return tileBlueprintAssetId(tile)===BASE_BP_A
 function tileBlueprintDefaults(tile){return isBaseTileBlueprint(tile)?{rows:BASE_BP_DEFAULT_ROWS,columns:BASE_BP_DEFAULT_COLUMNS,tileSize:BASE_BP_DEFAULT_SIZE}:{rows:TILE_BP_DEFAULT_ROWS,columns:TILE_BP_DEFAULT_COLUMNS,tileSize:TILE_BP_DEFAULT_SIZE}}
 function tileDimensions(tile){const defaults=tileBlueprintDefaults(tile),rows=normalizeTileDimension(tile?.userData?.tileRows,defaults.rows),columns=normalizeTileDimension(tile?.userData?.tileColumns,defaults.columns),tileSize=normalizeTileSize(tile?.userData?.tileSize,defaults.tileSize);return {rows,columns,tileSize,width:columns*tileSize,depth:rows*tileSize}}
 function baseGridCellIndex(row,column){return `${row}:${column}`}
+function normalizeBaseBooleanCutCells(value,rows,columns){
+  const source=Array.isArray(value)?value:[],cuts=new Set();
+  for(const candidate of source){
+    const match=/^(\d+):(\d+)$/.exec(String(candidate));if(!match)continue;
+    const row=Number(match[1]),column=Number(match[2]);if(row>=0&&row<rows&&column>=0&&column<columns)cuts.add(baseGridCellIndex(row,column));
+  }
+  return [...cuts].sort((left,right)=>left.localeCompare(right,undefined,{numeric:true}));
+}
+function baseGridCellFromWorldPoint(base,x,z){
+  if(!isBaseTileBlueprint(base))return null;
+  const dimensions=tileDimensions(base);navigationLocalPoint.set(x,0,z);base.updateWorldMatrix(true,false);base.worldToLocal(navigationLocalPoint);
+  const column=Math.floor((navigationLocalPoint.x+dimensions.width*.5)/dimensions.tileSize),row=Math.floor((navigationLocalPoint.z+dimensions.depth*.5)/dimensions.tileSize);
+  return row<0||row>=dimensions.rows||column<0||column>=dimensions.columns?null:{row,column,key:baseGridCellIndex(row,column)};
+}
+function baseCellIsBooleanCut(base,x,z){const cell=baseGridCellFromWorldPoint(base,x,z);return Boolean(cell&&base.userData.booleanCutCells?.includes(cell.key));}
+function clearBaseBooleanMask(base){
+  const existing=base?.getObjectByName("Base Boolean Void");if(!existing)return;
+  base.remove(existing);existing.userData.geometry?.dispose?.();existing.userData.material?.dispose?.();
+}
+function refreshBaseBooleanMask(base){
+  if(!isBaseTileBlueprint(base))return;
+  clearBaseBooleanMask(base);const dimensions=tileDimensions(base),cuts=normalizeBaseBooleanCutCells(base.userData.booleanCutCells,dimensions.rows,dimensions.columns);base.userData.booleanCutCells=cuts;if(!cuts.length)return;
+  const voids=new THREE.Group(),material=new THREE.MeshStandardMaterial({color:0x13201e,roughness:.95,metalness:0}),geometry=new THREE.BoxGeometry(dimensions.tileSize*.992,.72,dimensions.tileSize*.992);
+  voids.name="Base Boolean Void";voids.userData={editorBooleanMask:true,geometry,material};
+  for(const key of cuts){const [row,column]=key.split(":").map(Number),cell=new THREE.Mesh(geometry,material);cell.position.set(-dimensions.width*.5+(column+.5)*dimensions.tileSize,-.36,-dimensions.depth*.5+(row+.5)*dimensions.tileSize);cell.castShadow=true;cell.receiveShadow=true;voids.add(cell);}
+  base.add(voids);
+}
 function baseGameplayGridSpec(source){
   if(!source?.userData?.sharedGameplayGrid||!isBaseTileBlueprint(source))return null;
   const dimensions=tileDimensions(source),cells=[],local=new THREE.Vector3(),world=new THREE.Vector3(),columnWorld=new THREE.Vector3(),rowWorld=new THREE.Vector3();
@@ -1970,7 +1999,7 @@ function applyTileBlueprint({target=selectedTileSpawner(),rows,columns,tileSize,
     else applyEditorMaterialColour(colour,[floor],{recordUndo:false,refreshUi:false});
     floor.userData.tileColour=colour.toLowerCase();
   }
-  refreshTileGrid(floor);invalidateNavigation();if(refreshUi){updateEditorTileInspector();renderWorldOutliner();}return true;
+  refreshTileGrid(floor);if(isBaseTileBlueprint(floor))refreshBaseBooleanMask(floor);invalidateNavigation();if(refreshUi){updateEditorTileInspector();renderWorldOutliner();}return true;
 }
 function synchronizeBaseGridTransform(tile){
   if(!isBaseTileBlueprint(tile))return false;
@@ -2005,13 +2034,38 @@ function tileSpawnerBaseGeometry(width,depth){
 function addTileSpawner(record={}){
   const blueprintAssetId=record.tileBlueprintAssetId===BASE_BP_ASSET_ID?BASE_BP_ASSET_ID:TILE_BP_ASSET_ID,baseBlueprint=blueprintAssetId===BASE_BP_ASSET_ID,defaults=tileBlueprintDefaults({tileBlueprintAssetId:blueprintAssetId}),rows=normalizeTileDimension(record.tileRows,defaults.rows),columns=normalizeTileDimension(record.tileColumns,defaults.columns),tileSize=normalizeTileSize(record.tileSize,defaults.tileSize),spawner=new THREE.Group();
   spawner.name=baseBlueprint?"Crownwake Base":"Tile Spawner";spawner.receiveShadow=true;spawner.userData.editorSelectable=true;spawner.userData.editorAssetType="tile-spawner";spawner.userData.walkableSurface="tile-spawner";spawner.userData.tileRows=rows;spawner.userData.tileColumns=columns;spawner.userData.tileSize=tileSize;spawner.userData.tileColour=/^#[0-9a-f]{6}$/i.test(record.tileColour??"")?record.tileColour.toLowerCase():null;
-  if(baseBlueprint){spawner.userData.tileBlueprintAssetId=BASE_BP_ASSET_ID;spawner.userData.tileModelAssetId=CROWNWAKE_BASE_MODEL_ASSET_ID;spawner.userData.sharedGameplayGrid=true}else spawner.userData.tileBlueprintAssetId=TILE_BP_ASSET_ID;
+  if(baseBlueprint){spawner.userData.tileBlueprintAssetId=BASE_BP_ASSET_ID;spawner.userData.tileModelAssetId=CROWNWAKE_BASE_MODEL_ASSET_ID;spawner.userData.sharedGameplayGrid=true;spawner.userData.booleanCutCells=normalizeBaseBooleanCutCells(record.booleanCutCells,rows,columns)}else spawner.userData.tileBlueprintAssetId=TILE_BP_ASSET_ID;
   const dimensions=tileDimensions(spawner),surfaceMaterial=baseBlueprint?new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,colorWrite:false,side:THREE.DoubleSide}):meadowGroundMaterial,surface=new THREE.Mesh(tileFloorGeometry(rows,columns,tileSize),surfaceMaterial),grid=new THREE.LineSegments(tileGridGeometry(rows,columns,tileSize),new THREE.LineBasicMaterial({color:spawner.userData.tileColour??0xf7fff1,transparent:true,opacity:.72,depthWrite:false}));
   surface.name="Tile Surface";surface.receiveShadow=!baseBlueprint;grid.name="Tile Grid";grid.visible=false;grid.renderOrder=2;grid.userData.editorMaterialOutline=true;spawner.add(surface,grid);
   if(baseBlueprint){const visual=cloneContentBrowserModelVisual(CROWNWAKE_BASE_MODEL_ASSET_ID);if(visual){visual.name="Base Model";visual.userData.groundModelSize=WORLD_FLOOR_BASE_SIZE;spawner.add(visual);fitTileSpawnerModel(spawner)}}
   else{const base=new THREE.Mesh(tileSpawnerBaseGeometry(dimensions.width,dimensions.depth),islandSideMaterial);base.name="Tile Base";base.position.y=-.25;base.castShadow=true;base.receiveShadow=true;spawner.add(base)}
   const x=Number.isFinite(record.x)?record.x:0,y=Number.isFinite(record.y)?record.y:GROUND_Y,z=Number.isFinite(record.z)?record.z:0,turn=Number.isFinite(record.turn)?record.turn:0,rotation=Array.isArray(record.rotation)&&record.rotation.length===3&&record.rotation.every(Number.isFinite)?record.rotation:[0,turn,0],scale=Array.isArray(record.scale)&&record.scale.length===3&&record.scale.every(value=>Number.isFinite(value)&&value>0)?record.scale:[1,1,1];
-  spawner.position.set(x,y,z);spawner.rotation.set(...rotation);spawner.scale.fromArray(scale);if(baseBlueprint)synchronizeBaseGridTransform(spawner);if(spawner.userData.tileColour)applyTileBlueprint({target:spawner,colour:spawner.userData.tileColour,recordUndo:false,refreshUi:false});battle.add(spawner);editorObjects.push(spawner);invalidateNavigation();return spawner;
+  spawner.position.set(x,y,z);spawner.rotation.set(...rotation);spawner.scale.fromArray(scale);if(baseBlueprint){synchronizeBaseGridTransform(spawner);refreshBaseBooleanMask(spawner)}if(spawner.userData.tileColour)applyTileBlueprint({target:spawner,colour:spawner.userData.tileColour,recordUndo:false,refreshUi:false});battle.add(spawner);editorObjects.push(spawner);invalidateNavigation();return spawner;
+}
+function addBooleanBox({x=0,z=0,y=GROUND_Y,turn=0,rotation=null,scale=null,booleanApplied=false}={}){
+  const box=new THREE.Group(),volumeGeometry=new THREE.BoxGeometry(1,1,1),material=new THREE.MeshStandardMaterial({color:0x4fdbc3,transparent:true,opacity:.2,roughness:.45,metalness:.05}),volume=new THREE.Mesh(volumeGeometry,material),edges=new THREE.LineSegments(new THREE.EdgesGeometry(volumeGeometry),new THREE.LineBasicMaterial({color:0x89f4dc,transparent:true,opacity:.95}));
+  volume.name="Boolean Volume";volume.userData.editorBooleanVolume=true;edges.name="Boolean Bounds";box.add(volume,edges);box.position.set(x,y,z);box.rotation.set(...(rotation??[0,turn,0]));box.scale.fromArray(scale??[4,1,4]);box.userData={editorSelectable:true,editorAssetType:"boolean-box",booleanApplied:booleanApplied===true};box.name="Boolean Box";box.visible=mode==="editor";battle.add(box);editorObjects.push(box);return box;
+}
+function booleanBoxContainsWorldPoint(box,point){
+  box.updateWorldMatrix(true,false);navigationLocalPoint.copy(point);box.worldToLocal(navigationLocalPoint);
+  return Math.abs(navigationLocalPoint.x)<=.5&&Math.abs(navigationLocalPoint.y)<=.5&&Math.abs(navigationLocalPoint.z)<=.5;
+}
+function booleanBoxCutKeysForBase(box,base){
+  const dimensions=tileDimensions(base),cuts=[],local=new THREE.Vector3(),world=new THREE.Vector3();base.updateWorldMatrix(true,false);
+  for(let row=0;row<dimensions.rows;row++)for(let column=0;column<dimensions.columns;column++){
+    local.set(-dimensions.width*.5+(column+.5)*dimensions.tileSize,0,-dimensions.depth*.5+(row+.5)*dimensions.tileSize);world.copy(local);base.localToWorld(world);
+    if(booleanBoxContainsWorldPoint(box,world))cuts.push(baseGridCellIndex(row,column));
+  }
+  return cuts;
+}
+function applyBooleanBox(box=selectedBooleanBox()){
+  if(!box)return 0;let changedCells=0;
+  for(const base of editorObjects.filter(isBaseTileBlueprint)){
+    const dimensions=tileDimensions(base),current=normalizeBaseBooleanCutCells(base.userData.booleanCutCells,dimensions.rows,dimensions.columns),merged=normalizeBaseBooleanCutCells([...current,...booleanBoxCutKeysForBase(box,base)],dimensions.rows,dimensions.columns);
+    if(merged.length===current.length)continue;
+    changedCells+=merged.length-current.length;base.userData.booleanCutCells=merged;refreshBaseBooleanMask(base);
+  }
+  box.userData.booleanApplied=changedCells>0;invalidateNavigation();return changedCells;
 }
 function addPrimitiveCube({x,z,y=GROUND_Y,turn=0,rotation=null,scale=null}){
   const cube=new THREE.Mesh(primitiveCubeGeometry,mats.stone);
@@ -2027,6 +2081,7 @@ function walkableSurfaceHeightAt(surface,x,z){
   surface.updateWorldMatrix(true,false);supportProbeWorld.set(x,0,z);supportProbeLocal.copy(supportProbeWorld);surface.worldToLocal(supportProbeLocal);
   const dimensions=type==="island"||type==="tile-spawner"?tileDimensions(surface):null,halfWidth=dimensions?dimensions.width*.5:.5,halfDepth=dimensions?dimensions.depth*.5:.5;
   if(Math.abs(supportProbeLocal.x)>halfWidth||Math.abs(supportProbeLocal.z)>halfDepth)return null;
+  if(isBaseTileBlueprint(surface)&&baseCellIsBooleanCut(surface,x,z))return null;
   supportSurfacePoint.set(supportProbeLocal.x,dimensions?0:1,supportProbeLocal.z);surface.localToWorld(supportSurfacePoint);
   return supportSurfacePoint.y;
 }
@@ -2070,8 +2125,9 @@ function navigationObstacleContains(point,obstacle,clearance=0){
 function clearNavigationOverlay(){
   for(const child of [...navigationOverlay.children]){navigationOverlay.remove(child);child.geometry?.dispose?.();for(const material of Array.isArray(child.material)?child.material:[child.material])material?.dispose?.();}
 }
+function baseGameplayGridSpecs(){return walkableSurfaceCandidates(editorObjects).filter(surface=>surface.userData.sharedGameplayGrid===true).map(baseGameplayGridSpec).filter(Boolean)}
 function activeGameplayGridSpec(){
-  const source=walkableSurfaceCandidates(editorObjects).find(surface=>surface.userData.sharedGameplayGrid===true);
+  const source=baseGameplayGridSpecs()[0]?.source;
   if(!source)return {cellSize:{x:NAVIGATION_CELL_SIZE,z:NAVIGATION_CELL_SIZE},offset:{x:0,z:0},source:null};
   const baseGrid=baseGameplayGridSpec(source);if(baseGrid)return baseGrid;
   const surface=tileSurface(source);if(!surface)return {cellSize:{x:NAVIGATION_CELL_SIZE,z:NAVIGATION_CELL_SIZE},offset:{x:0,z:0},source:null};
@@ -2097,12 +2153,12 @@ function editorNavigationDragActive(){return mode==="editor"&&["transform","obje
 function invalidateNavigation(){navigationGrid.dirty=true;if(navigationDebugVisible&&mode==="editor"&&!editorNavigationDragActive())ensureNavigationGrid();}
 function rebuildNavigationGrid(){
   navigationGrid.cells.clear();navigationGrid.walkable.clear();navigationGrid.blocked.clear();navigationGrid.baseCellsByIndex.clear();navigationGrid.baseDimensions=null;
-  const gridSpec=activeGameplayGridSpec();navigationGrid.cellSize=gridSpec.cellSize;navigationGrid.offset=gridSpec.offset;navigationGrid.source=gridSpec.source;
-  if(gridSpec.cells?.length){
-    navigationGrid.baseDimensions=gridSpec.dimensions;
-    for(const cell of gridSpec.cells){
-      const height=walkableSurfaceHeightAt(gridSpec.source,cell.x,cell.z);if(height===null)continue;
-      const key=navigationCellKey(cell),worldCell={...cell,y:height};navigationGrid.cells.set(key,worldCell);navigationGrid.baseCellsByIndex.set(baseGridCellIndex(cell.gridRow,cell.gridColumn),worldCell);
+  const baseSpecs=baseGameplayGridSpecs(),gridSpec=activeGameplayGridSpec();navigationGrid.cellSize=gridSpec.cellSize;navigationGrid.offset=gridSpec.offset;navigationGrid.source=baseSpecs.length===1?baseSpecs[0].source:null;
+  if(baseSpecs.length){
+    if(baseSpecs.length===1)navigationGrid.baseDimensions=baseSpecs[0].dimensions;
+    for(const baseSpec of baseSpecs)for(const cell of baseSpec.cells){
+      const height=walkableSurfaceHeightAt(baseSpec.source,cell.x,cell.z);if(height===null)continue;
+      const key=navigationCellKey(cell),worldCell={...cell,y:height};navigationGrid.cells.set(key,worldCell);if(baseSpecs.length===1)navigationGrid.baseCellsByIndex.set(baseGridCellIndex(cell.gridRow,cell.gridColumn),worldCell);
     }
   }else for(const surface of walkableSurfaceCandidates(editorObjects)){
     navigationBounds.setFromObject(surface);
@@ -4834,6 +4890,7 @@ function applyProgressBarBlueprintSettings(){
   recordEditorUndo();contentBrowserState.blueprintSettings[profile.asset.id]=settings;persistContentBrowserState();refreshProgressBarWidgets(profile.asset.id);renderContentBrowser();updateEditorAssetSelection();updateProgressBarBlueprintInspector();$("editor-status").textContent=`${profile.asset.name} settings updated.`;
 }
 function selectedTileSpawner(){return ["world-floor","tile-spawner"].includes(editorSelection?.userData?.editorAssetType)?editorSelection:null}
+function selectedBooleanBox(){return editorSelection?.userData?.editorAssetType==="boolean-box"?editorSelection:null}
 function tileBlueprintSelected(){return Boolean(selectedTileSpawner())||(contentBrowserSelection.size===1&&[TILE_BP_ASSET_ID,BASE_BP_ASSET_ID].includes(editorLibrarySelection))}
 function selectedTileColour(){
   const tile=selectedTileSpawner(),colour=tile?.userData?.tileColour;if(/^#[0-9a-f]{6}$/i.test(colour??""))return colour;
@@ -4853,6 +4910,18 @@ function updateEditorTileInspector(){
   if(rows){rows.value=String(normalizeTileDimension(floor?.userData?.tileRows,defaults.rows));rows.disabled=!enabled;}
   if(columns){columns.value=String(normalizeTileDimension(floor?.userData?.tileColumns,defaults.columns));columns.disabled=!enabled;}
   if(tileSize){tileSize.value=String(normalizeTileSize(floor?.userData?.tileSize,defaults.tileSize));tileSize.disabled=!enabled;}
+}
+function updateEditorBooleanInspector(){
+  const box=selectedBooleanBox(),applyButton=$("editor-boolean-apply"),status=$("editor-boolean-status");
+  if(applyButton)applyButton.disabled=!box;
+  if(status)status.textContent=box?(box.userData.booleanApplied?"Applied cuts stay on the overlapping Base tiles. Resize or move this box, then apply again to add more cuts.":"Resize and move this box so it overlaps one or more Crownwake Base tiles, then apply."):"Select a Boolean Box to edit it.";
+}
+function applySelectedBooleanBox(){
+  const box=selectedBooleanBox();if(!box)return;
+  const affectedBases=editorObjects.filter(isBaseTileBlueprint).filter(base=>booleanBoxCutKeysForBase(box,base).some(key=>!base.userData.booleanCutCells?.includes(key)));
+  if(!affectedBases.length){$("editor-boolean-status").textContent="No uncut Crownwake Base cells overlap this box.";return;}
+  recordEditorUndo();const changedCells=applyBooleanBox(box);saveLevelLayout();renderWorldOutliner();updateEditorInspector();
+  $("editor-status").textContent=`Boolean Box cut ${changedCells} base cell${changedCells===1?"":"s"}. Press Done to playtest the updated map.`;
 }
 function applyEditorTileInput(){
   const floor=selectedTileSpawner();if(!floor)return;const rows=Number($("editor-tile-rows").value),columns=Number($("editor-tile-columns").value),tileSize=Number($("editor-tile-size").value),colour=$("editor-tile-colour").value;
@@ -4995,7 +5064,7 @@ function applyEditorMaterialSlot(event){
   if(applyImportedModelMaterialSlot(object,event.currentTarget.value))$("editor-status").textContent="Material slot updated. Choosing a colour replaces it.";
 }
 function updateEditorInspector(){
-  const count=editorSelectedObjects.size,hasSelection=Boolean(editorSelection),actorProfile=selectedEditorActorProfile(),actorSelected=Boolean(actorProfile),hudProfile=selectedHudWidgetProfile(),hudSelected=Boolean(hudProfile),modelAsset=selectedContentBrowserModelAsset(),modelSelected=Boolean(modelAsset),buildingProfile=selectedBuildingBlueprintProfile(),buildingSelected=Boolean(buildingProfile),progressBarProfile=selectedProgressBarBlueprint(),progressBarSelected=Boolean(progressBarProfile),tileSelected=tileBlueprintSelected(),materialSelected=editorMaterialMeshes(editorMaterialTargets()).length>0,foliageSelected=editorSelection&&["grass-cluster","tree-cluster","tree-billboard"].includes(editorSelection.userData.editorAssetType),cameraSelected=Boolean(editorSelection?.userData?.editorCamera),environmentActive=editorEnvironmentOpen;
+  const count=editorSelectedObjects.size,hasSelection=Boolean(editorSelection),actorProfile=selectedEditorActorProfile(),actorSelected=Boolean(actorProfile),hudProfile=selectedHudWidgetProfile(),hudSelected=Boolean(hudProfile),modelAsset=selectedContentBrowserModelAsset(),modelSelected=Boolean(modelAsset),buildingProfile=selectedBuildingBlueprintProfile(),buildingSelected=Boolean(buildingProfile),progressBarProfile=selectedProgressBarBlueprint(),progressBarSelected=Boolean(progressBarProfile),tileSelected=tileBlueprintSelected(),booleanSelected=Boolean(selectedBooleanBox()),materialSelected=editorMaterialMeshes(editorMaterialTargets()).length>0,foliageSelected=editorSelection&&["grass-cluster","tree-cluster","tree-billboard"].includes(editorSelection.userData.editorAssetType),cameraSelected=Boolean(editorSelection?.userData?.editorCamera),environmentActive=editorEnvironmentOpen;
   const selectionName=actorProfile?.name?.toUpperCase()||hudProfile?.widget.name?.toUpperCase()||modelAsset?.name?.toUpperCase()||buildingProfile?.asset.name?.toUpperCase()||progressBarProfile?.asset.name?.toUpperCase()||editorSelection?.name?.toUpperCase()||(tileSelected?"TILE_BP":"");
   $("editor-inspector-title").textContent=environmentActive?"ENVIRONMENT":count>1?`${count} OBJECTS`:selectionName||"NOTHING SELECTED";
   $("editor-status-selection").textContent=count>1?`${count} SELECTED`:selectionName||"NO SELECTION";
@@ -5009,6 +5078,7 @@ function updateEditorInspector(){
   $("inspector-building-section").classList.toggle("hidden",!buildingSelected||environmentActive);if(buildingSelected&&!environmentActive)$("inspector-building-section").open=true;updateBuildingBlueprintInspector();
   $("inspector-progress-bar-section").classList.toggle("hidden",!progressBarSelected||environmentActive);if(progressBarSelected&&!environmentActive)$("inspector-progress-bar-section").open=true;updateProgressBarBlueprintInspector();
   $("inspector-tile-section").classList.toggle("hidden",!tileSelected||environmentActive);if(tileSelected&&!environmentActive)$("inspector-tile-section").open=true;updateEditorTileInspector();
+  $("inspector-boolean-section").classList.toggle("hidden",!booleanSelected||environmentActive);if(booleanSelected&&!environmentActive)$("inspector-boolean-section").open=true;updateEditorBooleanInspector();
   $("inspector-camera-section").classList.toggle("hidden",!cameraSelected||environmentActive);if(cameraSelected&&!environmentActive)$("inspector-camera-section").open=true;
   $("inspector-foliage-section").classList.toggle("hidden",!foliageSelected||environmentActive);if(foliageSelected&&!environmentActive)$("inspector-foliage-section").open=true;
   $("inspector-environment-section").classList.toggle("hidden",!environmentActive);if(environmentActive)$("inspector-environment-section").open=true;
@@ -5053,6 +5123,7 @@ function editorAssetTypeLabel(object){
   if(type==="editor-camera")return "CAMERA";
   if(type==="world-floor")return "LEVEL PLANE";
   if(type==="tile-spawner")return "TILE SPAWNER";
+  if(type==="boolean-box")return "BOOLEAN BOX";
   if(type==="town-hall")return "TOWN HALL";
   if(type==="barracks")return "BARRACKS";
   if(type==="primitive-cube")return "CUBE";
@@ -5073,6 +5144,8 @@ function editorOutlinerPath(object){
   if(type==="world-floor")return [sceneBranch,{id:"scene/ground",label:"GROUND"}];
   if(type==="editor-camera")return [sceneBranch,{id:"scene/camera",label:"CAMERA"}];
   if(type==="primitive-cube")return [sceneBranch,{id:"scene/terrain",label:"TERRAIN"},{id:"scene/terrain/primitives",label:"PRIMITIVES"}];
+  if(type==="boolean-box")return [sceneBranch,{id:"scene/terrain",label:"TERRAIN"},{id:"scene/terrain/booleans",label:"BOOLEAN BOXES"}];
+  if(type==="tile-spawner"&&isBaseTileBlueprint(object))return [sceneBranch,{id:"scene/map-bases",label:"MAP BASES"}];
   if(type==="tree-billboard"){
     const variant=tallConiferVariant(object.userData.variantIndex);return [sceneBranch,environmentBranch,{id:"scene/environment/trees",label:"TREES"},{id:`scene/environment/trees/conifer-${variant.id}`,label:`Conifer ${variant.label}`}];
   }
@@ -5164,6 +5237,7 @@ function applyEditorTransformInput(input){
     syncGrassSizeBaseScale(editorSelection);
   }else editorSelection[property][axis]=property==="rotation"?THREE.MathUtils.degToRad(value):value;
   synchronizeBaseGridTransform(editorSelection);
+  if(isBaseTileBlueprint(editorSelection))refreshBaseBooleanMask(editorSelection);
   invalidateNavigation();
   syncEditorCameraFocusFromObject(editorSelection);
   editorSelectionHelper?.update();updateEditorTransformGizmo();updateEditorTransformInspector();updateEditorInspector();renderWorldOutliner();
@@ -5287,6 +5361,8 @@ function positionFoliagePresetsPanel(){
 }
 function contentBrowserAssetIdForLevelObject(object){
   const type=object?.userData?.editorAssetType;
+  if(type==="boolean-box")return BOOLEAN_BOX_BP_ASSET_ID;
+  if(type==="tile-spawner"&&isBaseTileBlueprint(object))return BASE_BP_ASSET_ID;
   if(type==="imported-model")return object.userData.importedModelAssetId??null;
   if(type==="town-hall"||type==="barracks")return object.userData.blueprintAssetId??null;
   if(type==="tile-spawner")return tileBlueprintAssetId(object)??TILE_BP_ASSET_ID;
@@ -5383,6 +5459,7 @@ function createEditorAsset(assetId,point,{recordUndo=true,select=true}={}){
   if(blueprint?.blueprintKind){const building=addRaidBuilding({kind:blueprint.blueprintKind,x:point.x,z:point.z,blueprintAssetId:assetId});if(select)selectEditorObject(building);return building}
   if(blueprint?.importedModel){const model=addImportedModel({assetId,x:point.x,z:point.z});if(!model){$("editor-status").textContent=`${blueprint.name} could not be loaded from this browser.`;return null;}if(select)selectEditorObject(model);return model;}
   if(assetId===BASE_BP_ASSET_ID){const spawner=addTileSpawner({x:point.x,y:GROUND_Y,z:point.z,tileBlueprintAssetId:BASE_BP_ASSET_ID});if(select)selectEditorObject(spawner);return spawner}
+  if(assetId===BOOLEAN_BOX_BP_ASSET_ID){const box=addBooleanBox({x:point.x,y:GROUND_Y,z:point.z});if(select)selectEditorObject(box);return box}
   if(assetId===TILE_BP_ASSET_ID){const spawner=addTileSpawner({x:point.x,y:GROUND_Y,z:point.z});if(select)selectEditorObject(spawner);return spawner}
   if(assetId==="primitive-cube"){const cube=addPrimitiveCube({x:point.x,z:point.z});if(select)selectEditorObject(cube);return cube}
   const characterVariant=/^character:(ch|en)([2-5])?$/.exec(assetId),archetypeId=characterVariant?`${characterVariant[1]}${characterVariant[2]??"1"}`:null;
@@ -5558,7 +5635,8 @@ function contentBrowserAssetSpecs(){
     {id:HUD_TEXT_ASSET_ID,name:"Objective Text HUD",type:"HUD",folderId:"hud",hudText:true,preview:()=>hudTextAssetPreview()},
     ...HUD_ARCHETYPE_IDS.map(archetypeId=>{const archetype=ACTOR_ARCHETYPES[archetypeId];return {id:hudAssetId(archetypeId),name:`${archetype.label} HUD`,type:"HUD",folderId:`hud/${archetype.faction==="player"?"ch":"en"}`,hudArchetypeId:archetypeId,preview:()=>hudAssetPreview(archetypeId)};}),
     {id:TILE_BP_ASSET_ID,name:"Tile_bp",type:"Blueprint",folderId:"bp_gn",preview:()=>{const preview=document.createElement("span");preview.className="folder-preview";preview.textContent="TILE";return preview;}},
-    {id:BASE_BP_ASSET_ID,name:"Base_bp",type:"Blueprint",folderId:"bp_gn/base",tileBlueprint:true,preview:()=>{const preview=document.createElement("span");preview.className="folder-preview";preview.textContent="BASE";return preview;}},
+    {id:BASE_BP_ASSET_ID,name:"Crownwake Base",type:"Blueprint",folderId:"bp_gn/base",tileBlueprint:true,preview:()=>{const preview=document.createElement("span");preview.className="folder-preview";preview.textContent="BASE";return preview;}},
+    {id:BOOLEAN_BOX_BP_ASSET_ID,name:"Boolean Box",type:"Blueprint",folderId:"bp_gn/base",booleanBox:true,preview:()=>{const preview=document.createElement("span");preview.className="folder-preview";preview.textContent="CUT";return preview;}},
     {id:TOWN_HALL_BP_ASSET_ID,name:"TownHall_bp",type:"Blueprint",folderId:"bp_gn/town-hall",blueprintKind:"town-hall",preview:()=>raidBuildingBlueprintPreview("town-hall")},
     {id:BARRACKS_BP_ASSET_ID,name:"Barracks_bp",type:"Blueprint",folderId:"bp_gn/barracks",blueprintKind:"barracks",preview:()=>raidBuildingBlueprintPreview("barracks")},
     {id:ACTOR_PROGRESS_BAR_BP_ASSET_ID,name:"CharacterProgressBar_bp",type:"Blueprint",folderId:"bp_gn/progress-bars",placeable:false,progressBarBlueprint:true,preview:()=>progressBarBlueprintPreview(ACTOR_PROGRESS_BAR_BP_ASSET_ID)},
@@ -5829,7 +5907,7 @@ initializeEditorShell();applyEditorLayout();
 function openLevelEditor(){
   if(mode!=="settings")return;
   editorReturnMode=settingsReturnMode;$("settings-panel").classList.add("hidden");$("pause-state").classList.add("hidden");
-  clearTacticalSelection();mode="editor";editorCameraFocus.copy(gameplayCameraFocus.lengthSq()>.001?gameplayCameraFocus:playerFocus().position);editorCameraFocus.y=0;
+  clearTacticalSelection();mode="editor";for(const object of editorObjects)if(object.userData?.editorAssetType==="boolean-box")object.visible=true;editorCameraFocus.copy(gameplayCameraFocus.lengthSq()>.001?gameplayCameraFocus:playerFocus().position);editorCameraFocus.y=0;
   if(savedLevelCamera)editorCameraFocus.set(savedLevelCamera.x,0,savedLevelCamera.z);
   editorCameraRotation.fromArray(savedLevelCamera?.rotation??[0,0,0]);
   editorCameraScale=THREE.MathUtils.clamp(savedLevelCamera?.scale??gameplayCameraScale,EDITOR_ZOOM_MIN,EDITOR_ZOOM_MAX);document.body.classList.add("editor-active");$("editor-shell").classList.remove("hidden");
@@ -5843,7 +5921,7 @@ function closeLevelEditor(){
   if(editorPointerState&&canvas.hasPointerCapture?.(editorPointerState.pointerId))canvas.releasePointerCapture(editorPointerState.pointerId);
   editorPointerState=null;editorCameraTravel=null;editorKeys.clear();editorPendingAsset=null;editorAssetFolder=null;commandHoverCell=null;clearCommandGrid();updateEditorAssetSelection();closeEditorDeleteConfirm();selectEditorObject(null);removeEditorCameraObject();setAssetPanel(false);
   $("editor-shell").classList.add("hidden");$("editor-toolbar").classList.add("hidden");toggleEditorEnvironmentPopover(false);$("editor-transform-panel").classList.add("hidden");$("foliage-panel").classList.add("hidden");$("foliage-paint-panel").classList.add("hidden");$("foliage-presets-panel").classList.add("hidden");$("world-outliner").classList.add("hidden");$("editor-status").classList.add("hidden");navigationOverlay.visible=false;document.body.classList.remove("editor-active","editor-dragging","foliage-paint-active");
-  mode=editorReturnMode;updateEditorTileInspector();
+  mode=editorReturnMode;for(const object of editorObjects)if(object.userData?.editorAssetType==="boolean-box")object.visible=false;updateEditorTileInspector();
   if(savedLevelCamera){
     gameplayCameraFocus.set(savedLevelCamera.x,0,savedLevelCamera.z);
     gameplayCameraScale=savedLevelCamera.scale;
@@ -6177,6 +6255,7 @@ $("editor-tile-colour").addEventListener("input",applyEditorTileInput);
 $("editor-tile-rows").addEventListener("change",applyEditorTileInput);
 $("editor-tile-columns").addEventListener("change",applyEditorTileInput);
 $("editor-tile-size").addEventListener("change",applyEditorTileInput);
+$("editor-boolean-apply").onclick=applySelectedBooleanBox;
 $("editor-material-slot").addEventListener("change",applyEditorMaterialSlot);
 $("editor-material-colour").addEventListener("input",event=>{if(applyEditorMaterialColour(event.currentTarget.value))$("editor-status").textContent="Material colour updated. Press Done to save the level.";});
 $("editor-material-save-swatch").onclick=saveEditorMaterialSwatch;

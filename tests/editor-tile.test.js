@@ -246,32 +246,22 @@ test("Crownwake Base has a reusable grid blueprint with its baked model", () => 
   assert.match(indexSource, /id="editor-tile-size"/);
 });
 
-test("Boolean Box subtracts persistent cells from placeable Base_bp tiles", () => {
-  assert.match(source, /BOOLEAN_BOX_BP_ASSET_ID="blueprint:boolean-box"/);
-  assert.match(source, /id:BOOLEAN_BOX_BP_ASSET_ID,name:"Boolean Box",type:"Blueprint",folderId:"bp_gn\/base"/);
-  assert.match(source, /function addBooleanBox\(/);
-  assert.match(source, /function applyBooleanBox\(/);
-  assert.match(source, /booleanCutCells/);
-  assert.match(source, /function baseGameplayGridSpecs\(/);
-  assert.match(indexSource, /id="inspector-boolean-section"/);
-  assert.match(indexSource, /id="editor-boolean-apply"/);
+test("Crownwake Base remains the only level-base Blueprint after Boolean Box retirement", () => {
+  assert.match(source, /\{id:"bp_gn\/base",name:"Level Bases",parentId:"bp_gn"\}/);
+  assert.match(source, /id:BASE_BP_ASSET_ID,name:"Crownwake Base",type:"Blueprint",folderId:"bp_gn\/base",tileBlueprint:true/);
+  assert.match(source, /if\(assetId===BASE_BP_ASSET_ID\)\{const spawner=addTileSpawner\(/);
+  assert.doesNotMatch(source, /BOOLEAN_BOX_BP_ASSET_ID/);
+  assert.doesNotMatch(source, /editorAssetType:"boolean-box"/);
+  assert.doesNotMatch(source, /function addBooleanBox\(/);
+  assert.doesNotMatch(indexSource, /inspector-boolean-section/);
+  assert.doesNotMatch(indexSource, /editor-boolean-apply/);
 });
 
-test("Boolean Box rebuilds the base top with real cell holes instead of a coplanar overlay", () => {
-  const start = source.indexOf("function baseBooleanTopGeometry(");
-  const end = source.indexOf("function baseGameplayGridSpec(", start);
-  assert.notEqual(start, -1, "Boolean cuts need a dedicated base-top geometry builder");
-  assert.notEqual(end, -1, "Boolean geometry must remain near the base grid helpers");
-  const context = vm.createContext({ THREE, baseGridCellIndex: (row, column) => `${row}:${column}` });
-  vm.runInContext(source.slice(start, end), context);
-
-  const sourceTop = new THREE.PlaneGeometry(4, 4);
-  sourceTop.rotateX(-Math.PI / 2);
-  const cutTop = context.baseBooleanTopGeometry(sourceTop, 2, 2, ["0:1"]);
-
-  assert.equal(cutTop.getAttribute("position").count, 18, "three uncut cells should produce six triangles");
-  assert.equal(cutTop.getAttribute("normal").count, 18);
-  assert.equal(cutTop.getAttribute("uv").count, 18);
+test("saved levels discard retired Boolean boxes and restore their base surfaces", () => {
+  assert.match(source, /function stripRetiredBaseCutData\(record\)/);
+  assert.match(source, /record\.type==="boolean-box"\)return null/);
+  assert.match(source, /if\(record\.type==="boolean-box"\)continue;/);
+  assert.doesNotMatch(source, /function applyBooleanBox\(/);
 });
 
 test("permanent tile-grid lines are hidden by default", () => {
@@ -314,7 +304,7 @@ test("legacy raw Crownwake Base imports restore as the reusable Base_bp", () => 
   assert.deepEqual([converted.tileRows, converted.tileColumns, converted.tileSize], [32, 32, 2]);
   assert.equal("importedModelAssetId" in converted, false);
   assert.match(source, /migratedBaseModel=true/);
-  assert.match(source, /if\(layout\.version===LEGACY_LEVEL_LAYOUT_VERSION\|\|migratedBaseModel\)saveLevelLayout\(\)/);
+  assert.match(source, /if\(layout\.version!==LEVEL_LAYOUT_VERSION\|\|migratedBaseModel\|\|retiredCutDataRemoved\)saveLevelLayout\(\)/);
 });
 
 test("Base_bp preserves its imported model fit while scaling the shared grid", () => {
@@ -421,7 +411,7 @@ test("Base_bp derives exact navigation cells from its local rows and columns", (
   assert.deepEqual(spans, [6, 8]);
   assert.match(source, /function synchronizeBaseGridTransform\(tile\)/);
   assert.match(source, /tile\.scale\.x=1;tile\.scale\.z=1;/);
-  assert.match(source, /if\(baseBlueprint\)\{synchronizeBaseGridTransform\(spawner\);refreshBaseBooleanMask\(spawner\)\}/);
+  assert.match(source, /if\(baseBlueprint\)synchronizeBaseGridTransform\(spawner\);/);
 });
 
 function baseGridTransformHarness() {

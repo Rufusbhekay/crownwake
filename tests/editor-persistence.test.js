@@ -164,6 +164,7 @@ test("restoring a saved level includes an EN placed after earlier scenery", () =
     EDITOR_ZOOM_MAX: 3,
     localStorage: { getItem: () => JSON.stringify({ version: 2, assets: records }) },
     levelCameraFrame: () => null,
+    stripRetiredBaseCutData: record => record?.type === "boolean-box" ? null : record,
     addLevelAsset: record => restored.push(record),
     rememberLevelState: () => {},
     console: { warn: () => {} }

@@ -456,6 +456,7 @@ test("Base_bp uses its edge-fitted grids for navigation and CH deployment", () =
   assert.match(source, /function baseGameplayGridSpec\(source\)/);
   assert.match(source, /navigationGrid\.cellSize=gridSpec\.cellSize/);
   assert.match(source, /for\(const baseSpec of baseSpecs\)for\(const cell of baseSpec\.cells\)/);
+  assert.match(source, /for\(const surface of walkableSurfaceCandidates\(editorObjects\)\.filter\(surface=>!baseSpecs\.some\(baseSpec=>baseSpec\.source===surface\)\)\)/);
   const previewStart=source.indexOf("function deploymentPreviewCells(){");
   const previewEnd=source.indexOf("function enemyOccupiesDeploymentCell",previewStart);
   const previewSource=source.slice(previewStart,previewEnd);

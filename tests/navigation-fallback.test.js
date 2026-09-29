@@ -14,12 +14,14 @@ function navigationPathHarness({ route = null, directClear = false } = {}) {
     NAVIGATION_WAYPOINT_REACHED: .22,
     ensureNavigationGrid: () => ({
       walkable: new Set(["0:0"]),
+      links: new Map(),
       revision: 1,
       cellSize: { x: 1, z: 1 },
       offset: { x: 0, z: 0 }
     }),
     navigationGoalKey: (_desired, goalKey) => goalKey ?? "goal",
     navigationPathBlockedCells: () => new Set(),
+    navigationGridCellFromPoint: point => point,
     navigationTrafficCosts: () => new Map(),
     findNavigationPath: () => route,
     navigationPhysicalPathClear: () => directClear,

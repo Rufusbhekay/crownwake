@@ -939,6 +939,20 @@ test("navigation paths persist around authored blockers without cutting blocked 
   assert.equal(findNavigationPath({start:{x:0,z:0},goal:{x:1,z:1},walkable:cornerWalkable,blocked:cornerBlocked,cellSize:1}),null);
 });
 
+test("navigation paths cross an explicit link between touching level pads", () => {
+  const start = { x: 0, z: 0 }, goal = { x: 3, z: 0 };
+  const walkable = new Set([start, goal].map(navigationCellKey));
+  const links = new Map([
+    [navigationCellKey(start), [goal]],
+    [navigationCellKey(goal), [start]]
+  ]);
+
+  assert.equal(findNavigationPath({ start, goal, walkable, cellSize: 1 }), null);
+  const route = findNavigationPath({ start, goal, walkable, links, cellSize: 1 });
+  assert.ok(route);
+  assert.deepEqual(route.cells, [goal]);
+});
+
 test("broad legacy floor cubes stay walkable while authored cubes block navigation", () => {
   assert.equal(isNavigationPlatformCube({walkableSurface:"cube",scale:{x:64,y:1,z:64}}),true);
   assert.equal(isNavigationPlatformCube({walkableSurface:"cube",navigationBlocks:true,scale:{x:64,y:1,z:64}}),false);

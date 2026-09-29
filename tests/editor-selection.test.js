@@ -39,6 +39,18 @@ function makeActor(battle, context, x = 0) {
   return actor;
 }
 
+function makeLevelBase(battle, context) {
+  const base = new THREE.Group();
+  const surface = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial());
+  surface.rotation.x = -Math.PI / 2;
+  base.userData = { editorSelectable: true, editorAssetType: "tile-spawner" };
+  base.add(surface);
+  battle.add(base);
+  context.editorObjects.push(base);
+  battle.updateMatrixWorld(true);
+  return base;
+}
+
 function clientPoint(worldPoint, camera) {
   const point = worldPoint.clone().project(camera);
   return { x: (point.x + 1) * 500, y: (1 - point.y) * 500 };
@@ -72,4 +84,13 @@ test("hidden HUD placeholders cannot steal editor clicks from the ground", () =>
   battle.updateMatrixWorld(true);
   const point = clientPoint(new THREE.Vector3(0, 0, 0), camera);
   assert.equal(vm.runInContext(`editorObjectAt(${point.x}, ${point.y})`, context), floor);
+});
+
+test("editor selects a level base even when the larger level plane is hit first", () => {
+  const { battle, camera, context, floor } = selectionHarness();
+  floor.position.y = .1;
+  const base = makeLevelBase(battle, context);
+  const point = clientPoint(new THREE.Vector3(0, 0, 0), camera);
+
+  assert.equal(vm.runInContext(`editorObjectAt(${point.x}, ${point.y})`, context), base);
 });

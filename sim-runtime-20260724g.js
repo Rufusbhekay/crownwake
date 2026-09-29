@@ -635,6 +635,9 @@ export function findNavigationPath({
   walkable,
   blocked = new Set(),
   dynamicCosts = new Map(),
+  links = new Map(),
+  startCell: preferredStartCell = null,
+  goalCell: preferredGoalCell = null,
   cellSize = 1,
   offset = 0,
   maxVisited = 8192,
@@ -642,15 +645,16 @@ export function findNavigationPath({
 } = {}) {
   const size = gridCellAxes(cellSize);
   if (!(walkable instanceof Set) || !(blocked instanceof Set) || !Number.isFinite(size.x) || !Number.isFinite(size.z) || size.x <= 0 || size.z <= 0) return null;
-  const startCell = nearestNavigableCell({ point: start, walkable, blocked, cellSize, offset, maxRadius: nearestCellRadius });
-  const goalCell = nearestNavigableCell({ point: goal, walkable, blocked, cellSize, offset, maxRadius: nearestCellRadius });
-  if (!startCell || !goalCell) return null;
-  const startKey = navigationCellKey(startCell), goalKey = navigationCellKey(goalCell);
-  if (startKey === goalKey) return { cells: [], start: startCell, goal: goalCell, visited: 1 };
   const isNavigable = cell => {
+    if (!cell) return false;
     const key = navigationCellKey(cell);
     return Boolean(key) && walkable.has(key) && !blocked.has(key);
   };
+  const startCell = isNavigable(preferredStartCell) ? preferredStartCell : nearestNavigableCell({ point: start, walkable, blocked, cellSize, offset, maxRadius: nearestCellRadius });
+  const goalCell = isNavigable(preferredGoalCell) ? preferredGoalCell : nearestNavigableCell({ point: goal, walkable, blocked, cellSize, offset, maxRadius: nearestCellRadius });
+  if (!startCell || !goalCell) return null;
+  const startKey = navigationCellKey(startCell), goalKey = navigationCellKey(goalCell);
+  if (startKey === goalKey) return { cells: [], start: startCell, goal: goalCell, visited: 1 };
   const distanceUnit = Math.min(size.x, size.z);
   const heuristic = cell => Math.hypot(cell.x - goalCell.x, cell.z - goalCell.z) / distanceUnit;
   const frontier = [];
@@ -718,6 +722,19 @@ export function findNavigationPath({
       }
       const neighbourKey = navigationCellKey(neighbour), trafficCost = Math.max(0, Number(dynamicCosts?.get?.(neighbourKey)) || 0);
       const nextCost = current.cost + Math.hypot(moveX, moveZ) / distanceUnit + trafficCost;
+      if (nextCost >= (costByKey.get(neighbourKey) ?? Infinity)) continue;
+      costByKey.set(neighbourKey, nextCost);
+      cameFrom.set(neighbourKey, current.key);
+      cellByKey.set(neighbourKey, neighbour);
+      pushFrontier({ key: neighbourKey, cell: neighbour, cost: nextCost, priority: nextCost + heuristic(neighbour) });
+    }
+    for (const neighbour of links instanceof Map ? links.get(current.key) ?? [] : []) {
+      if (!isNavigable(neighbour)) continue;
+      const neighbourKey = navigationCellKey(neighbour), moveX = neighbour.x - current.cell.x, moveZ = neighbour.z - current.cell.z;
+      const travelDistance = Math.hypot(moveX, moveZ);
+      if (travelDistance <= 1e-6) continue;
+      const trafficCost = Math.max(0, Number(dynamicCosts?.get?.(neighbourKey)) || 0);
+      const nextCost = current.cost + travelDistance / distanceUnit + trafficCost;
       if (nextCost >= (costByKey.get(neighbourKey) ?? Infinity)) continue;
       costByKey.set(neighbourKey, nextCost);
       cameFrom.set(neighbourKey, current.key);

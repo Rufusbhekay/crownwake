@@ -210,7 +210,7 @@ test("placed imported GLB models retain their asset and material selection", () 
   assert.match(source, /IMPORTED_MODEL_DATABASE_NAME/);
 });
 
-test("viewport duplicate copies selected actors and level meshes nearby", () => {
+test("viewport duplicate preserves selected actors and level meshes at their exact transform", () => {
   const start = source.indexOf("function canDuplicateEditorObject(");
   const end = source.indexOf("\nfunction setEditorSelection", start);
   assert.notEqual(start, -1, "viewport duplication must filter selectable level objects");
@@ -237,7 +237,7 @@ test("viewport duplicate copies selected actors and level meshes nearby", () => 
 
   assert.equal(records[0], "undo");
   assert.deepEqual(records.slice(1).map(record => record.type), ["enemy-character", "primitive-cube"]);
-  assert.deepEqual(records.slice(1).map(record => [record.x, record.z]), [[9.4, 13.4], [9.4, 13.4]]);
+  assert.deepEqual(records.slice(1).map(record => [record.x, record.z]), [[8, 12], [8, 12]]);
   assert.equal(selections.length, 1);
   assert.match(status.textContent, /2 selected assets duplicated together/);
 });

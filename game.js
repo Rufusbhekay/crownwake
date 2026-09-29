@@ -162,7 +162,7 @@ let pendingStartingChCounts=configuredDeploymentReserves(),settingsStartingChDir
 const companyAnchors=new Map(),selectionVisuals=[];
 const editorCameraFocus=new THREE.Vector3(),editorKeys=new Set(),editorObjects=[],editorSelectedObjects=new Set(),editorFoliageObjects=new Set(),editorFoliagePaintSelection=new Set(),hudWidgetElements=new Map();
 const NAVIGATION_CELL_SIZE=1,NAVIGATION_AGENT_CLEARANCE=.36,NAVIGATION_WAYPOINT_REACHED=.22,NAVIGATION_GOAL_REPATH_DISTANCE=.72,NAVIGATION_YIELD_DURATION=.72,BARRACKS_ENEMY_DUEL_RADIUS=8,BARRACKS_ENEMY_ANCHOR_DISTANCE=1.45,BARRACKS_ENEMY_ANCHOR_SLOT_COUNT=8,BARRACKS_ENEMY_PATROL_MIN_DISTANCE=3.2,BARRACKS_ENEMY_PATROL_SEPARATION=2.1,EN_PATROL_ANCHOR_RADIUS=2.6,PEACEFUL_PATROL_MIN_DISTANCE=3.2,PEACEFUL_PATROL_SEPARATION=2.1,PEACEFUL_PATROL_SPEED=1.35,PEACEFUL_PATROL_DURATION=4.5,INDEPENDENT_GROUP_COLUMN_GAP=.68,INDEPENDENT_GROUP_PATROL_SEPARATION=.72,INDEPENDENT_GROUP_PATROL_RADIUS=3.2,INDEPENDENT_GROUP_PATROL_MIN_DISTANCE=.65,INDEPENDENT_GROUP_PATROL_DURATION=4,INDEPENDENT_GROUP_PATROL_PAUSE_MAX=.65,CH_PATROL_COHESION_RADIUS=2.4,INDEPENDENT_GROUP_ARRIVAL_DISTANCE=.16,BARRACKS_ENEMY_EXIT_DURATION=1.15,BARRACKS_ENEMY_DOORWAY_PROGRESS=.68,BARRACKS_ENEMY_SPAWN_INSIDE_MARKER="CROWNWAKE_EN_SPAWN_INSIDE",BARRACKS_ENEMY_SPAWN_EXIT_MARKER="CROWNWAKE_EN_SPAWN_EXIT",NAVIGATION_BLOCKING_TYPES=new Set(["primitive-cube","town-hall","barracks","archer-tower","forest-fence","imported-model"]),NAVIGATION_EDITOR_STATE_KEY="crownwake-navigation-overlay-v1";
-const navigationGrid={dirty:true,revision:0,cells:new Map(),walkable:new Set(),blocked:new Set(),obstacles:[],cellSize:{x:NAVIGATION_CELL_SIZE,z:NAVIGATION_CELL_SIZE},offset:{x:0,z:0},source:null,baseCellsByIndex:new Map(),baseDimensions:null};
+const navigationGrid={dirty:true,revision:0,cells:new Map(),walkable:new Set(),blocked:new Set(),links:new Map(),obstacles:[],cellSize:{x:NAVIGATION_CELL_SIZE,z:NAVIGATION_CELL_SIZE},offset:{x:0,z:0},source:null,baseCellsByIndex:new Map(),baseDimensions:null};
 const deploymentPreviewCache={revision:-1,cells:[]},deploymentPreviewRenderer={revision:-1,entries:[],entryByKey:new Map(),outline:null,enemyFill:null,hoverFill:null,hoverOutline:null,occupiedKeys:new Set(),fillGeometry:null};
 const navigationOverlay=new THREE.Group(),navigationBounds=new THREE.Box3(),navigationWorldScale=new THREE.Vector3(),navigationWorldPosition=new THREE.Vector3(),navigationLocalPoint=new THREE.Vector3(),navigationOverlayMatrix=new THREE.Object3D();
 navigationOverlay.name="Navigation Overlay";navigationOverlay.renderOrder=84;battle.add(navigationOverlay);
@@ -2185,20 +2185,47 @@ function renderNavigationOverlay(){
 }
 function editorNavigationDragActive(){return mode==="editor"&&["transform","object"].includes(editorPointerState?.type)}
 function invalidateNavigation(){navigationGrid.dirty=true;if(navigationDebugVisible&&mode==="editor"&&!editorNavigationDragActive())ensureNavigationGrid();}
+function navigationCellSize(cell){return cell?.cellSize??navigationGrid.cellSize}
+function navigationCellsShareGround(first,second){
+  if(!first||!second||first.navigationSource===second.navigationSource||Math.abs(first.y-second.y)>.18)return false;
+  const firstSize=navigationCellSize(first),secondSize=navigationCellSize(second),halfWidth=(firstSize.x+secondSize.x)*.5+.04,halfDepth=(firstSize.z+secondSize.z)*.5+.04;
+  const deltaX=second.x-first.x,deltaZ=second.z-first.z;
+  if(Math.abs(deltaX)>halfWidth||Math.abs(deltaZ)>halfDepth)return false;
+  const distance=Math.hypot(deltaX,deltaZ),steps=Math.max(1,Math.ceil(distance/.1));
+  for(let step=0;step<=steps;step++){
+    const amount=step/steps,x=first.x+deltaX*amount,z=first.z+deltaZ*amount;
+    if(!navigationFootprintSupported({x,z,halfX:NAVIGATION_AGENT_CLEARANCE,halfZ:NAVIGATION_AGENT_CLEARANCE},point=>walkableSupportHeightAt(point.x,point.z)))return false;
+  }
+  return true;
+}
+function rebuildNavigationLinks(){
+  navigationGrid.links.clear();const cells=[...navigationGrid.cells.entries()].filter(([key])=>navigationGrid.walkable.has(key)&&!navigationGrid.blocked.has(key));if(cells.length<2)return;
+  const bucketSize=Math.max(.001,...cells.map(([,cell])=>Math.max(navigationCellSize(cell).x,navigationCellSize(cell).z))),buckets=new Map();
+  cells.forEach(([key,cell],index)=>{const bucketKey=`${Math.floor(cell.x/bucketSize)}:${Math.floor(cell.z/bucketSize)}`,bucket=buckets.get(bucketKey)??[];bucket.push({key,cell,index});buckets.set(bucketKey,bucket);});
+  for(const [key,cell] of cells){
+    const bucketX=Math.floor(cell.x/bucketSize),bucketZ=Math.floor(cell.z/bucketSize);
+    for(let x=bucketX-1;x<=bucketX+1;x++)for(let z=bucketZ-1;z<=bucketZ+1;z++)for(const candidate of buckets.get(`${x}:${z}`)??[]){
+      if(candidate.key<=key||!navigationCellsShareGround(cell,candidate.cell))continue;
+      const firstLinks=navigationGrid.links.get(key)??[],secondLinks=navigationGrid.links.get(candidate.key)??[];
+      firstLinks.push(candidate.cell);secondLinks.push(cell);navigationGrid.links.set(key,firstLinks);navigationGrid.links.set(candidate.key,secondLinks);
+    }
+  }
+}
 function rebuildNavigationGrid(){
-  navigationGrid.cells.clear();navigationGrid.walkable.clear();navigationGrid.blocked.clear();navigationGrid.baseCellsByIndex.clear();navigationGrid.baseDimensions=null;
+  navigationGrid.cells.clear();navigationGrid.walkable.clear();navigationGrid.blocked.clear();navigationGrid.links.clear();navigationGrid.baseCellsByIndex.clear();navigationGrid.baseDimensions=null;
   const baseSpecs=baseGameplayGridSpecs(),gridSpec=activeGameplayGridSpec();navigationGrid.cellSize=gridSpec.cellSize;navigationGrid.offset=gridSpec.offset;navigationGrid.source=baseSpecs.length===1?baseSpecs[0].source:null;
   if(baseSpecs.length){
     if(baseSpecs.length===1)navigationGrid.baseDimensions=baseSpecs[0].dimensions;
     for(const baseSpec of baseSpecs)for(const cell of baseSpec.cells){
       const height=walkableSurfaceHeightAt(baseSpec.source,cell.x,cell.z);if(height===null)continue;
-      const key=navigationCellKey(cell),worldCell={...cell,y:height};navigationGrid.cells.set(key,worldCell);if(baseSpecs.length===1)navigationGrid.baseCellsByIndex.set(baseGridCellIndex(cell.gridRow,cell.gridColumn),worldCell);
+      const key=navigationCellKey(cell),worldCell={...cell,y:height,navigationSource:baseSpec.source,cellSize:baseSpec.cellSize};navigationGrid.cells.set(key,worldCell);if(baseSpecs.length===1)navigationGrid.baseCellsByIndex.set(baseGridCellIndex(cell.gridRow,cell.gridColumn),worldCell);
     }
-  }else for(const surface of walkableSurfaceCandidates(editorObjects)){
+  }
+  for(const surface of walkableSurfaceCandidates(editorObjects).filter(surface=>!baseSpecs.some(baseSpec=>baseSpec.source===surface))){
     navigationBounds.setFromObject(surface);
     for(const cell of gridCellsWithinBounds({minX:navigationBounds.min.x,maxX:navigationBounds.max.x,minZ:navigationBounds.min.z,maxZ:navigationBounds.max.z,cellSize:navigationGrid.cellSize,offset:navigationGrid.offset})){
       const height=walkableSurfaceHeightAt(surface,cell.x,cell.z);if(height===null)continue;
-      const key=navigationCellKey(cell),existing=navigationGrid.cells.get(key);if(!existing||height>existing.y)navigationGrid.cells.set(key,{...cell,y:height});
+      const key=navigationCellKey(cell),existing=navigationGrid.cells.get(key);if(!existing||height>existing.y)navigationGrid.cells.set(key,{...cell,y:height,navigationSource:surface,cellSize:navigationGrid.cellSize});
     }
   }
   navigationGrid.obstacles=editorObjects.flatMap(navigationObstacleFootprints);
@@ -2207,6 +2234,7 @@ function rebuildNavigationGrid(){
     navigationGrid.walkable.add(key);
     if(navigationGrid.obstacles.some(obstacle=>navigationObstacleContains(cell,obstacle,NAVIGATION_AGENT_CLEARANCE)))navigationGrid.blocked.add(key);
   }
+  rebuildNavigationLinks();
   navigationGrid.dirty=false;navigationGrid.revision++;renderNavigationOverlay();return navigationGrid;
 }
 function ensureNavigationGrid(){return navigationGrid.dirty?rebuildNavigationGrid():navigationGrid;}
@@ -2229,13 +2257,6 @@ function navigationGridCellFromPoint(point,grid=ensureNavigationGrid()){
     if(row<0||row>=rows||column<0||column>=columns)continue;
     const cell=baseSpec.cells[row*columns+column];
     if(cell)return grid.cells.get(navigationCellKey(cell))??null;
-  }
-  if(grid.source&&grid.baseDimensions&&grid.baseCellsByIndex.size){
-    const {width,depth,tileSize,rows,columns}=grid.baseDimensions;
-    navigationLocalPoint.copy(point);grid.source.updateWorldMatrix(true,false);grid.source.worldToLocal(navigationLocalPoint);
-    const column=Math.floor((navigationLocalPoint.x+width*.5)/tileSize),row=Math.floor((navigationLocalPoint.z+depth*.5)/tileSize);
-    if(row<0||row>=rows||column<0||column>=columns)return null;
-    return grid.baseCellsByIndex.get(baseGridCellIndex(row,column))??null;
   }
   return snapNavigationCell(point,grid.cellSize,grid.offset);
 }
@@ -2957,7 +2978,7 @@ function navigationPathDesired(unit,desired,{goalKey=null,targetActor=null,allow
   const identity=navigationGoalKey(desired,goalKey),existing=unit.userData.navigationPath,goalMoved=!existing?.goal||Math.hypot(existing.goal.x-desired.x,existing.goal.z-desired.z)>NAVIGATION_GOAL_REPATH_DISTANCE;
   const shouldRepath=!existing||existing.revision!==grid.revision||existing.identity!==identity||existing.targetActor!==targetActor||goalMoved||existing.failed&&totalTime>=existing.retryAt;
   if(shouldRepath){
-    const blocked=navigationPathBlockedCells(unit,targetActor),route=findNavigationPath({start:unit.position,goal:desired,walkable:grid.walkable,blocked,dynamicCosts:navigationTrafficCosts(unit,targetActor),cellSize:grid.cellSize,offset:grid.offset,maxVisited:Math.max(8192,grid.walkable.size*2),nearestCellRadius:6});
+    const blocked=navigationPathBlockedCells(unit,targetActor),route=findNavigationPath({start:unit.position,goal:desired,startCell:navigationGridCellFromPoint(unit.position,grid),goalCell:navigationGridCellFromPoint(desired,grid),walkable:grid.walkable,blocked,links:grid.links,dynamicCosts:navigationTrafficCosts(unit,targetActor),cellSize:grid.cellSize,offset:grid.offset,maxVisited:Math.max(8192,grid.walkable.size*2),nearestCellRadius:6});
     const directFallback=!route&&navigationPhysicalPathClear(unit.position,desired,unit);
     const directGoal=allowPhysicalGoal&&route?.goal&&navigationPointFullySupported(desired,unit)&&!navigationPointPhysicallyBlocked(desired,unit)&&navigationPhysicalPathClear(route.goal,desired,unit);
     unit.userData.navigationPath={revision:grid.revision,identity,targetActor,blocked,goal:{x:desired.x,z:desired.z},cells:route?.cells??[],index:0,arrival:route?.goal??null,directGoal:Boolean(directGoal),directFallback,failed:!route&&!directFallback,retryAt:totalTime+.42};
@@ -4613,14 +4634,15 @@ function editorNearbyObjectAt(clientX,clientY){
 }
 function editorObjectAt(clientX,clientY){
   setPointerFromClient(clientX,clientY);
-  let surface=null;
+  let floorSurface=null,tileSpawner=null;
   for(const hit of raycaster.intersectObjects(editorObjects,true)){
     const object=editorObjectFromHit(hit.object);
     if(!object||!object.visible||["hud-widget","hud-text"].includes(object.userData.editorAssetType))continue;
-    if(["world-floor","tile-spawner"].includes(object.userData.editorAssetType)){surface=object;break;}
+    if(object.userData.editorAssetType==="world-floor"){floorSurface??=object;continue;}
+    if(object.userData.editorAssetType==="tile-spawner"){tileSpawner??=object;continue;}
     return object;
   }
-  return editorNearbyObjectAt(clientX,clientY)??surface;
+  return editorNearbyObjectAt(clientX,clientY)??tileSpawner??floorSurface;
 }
 function disposeEditorSelectionHelper(){
   for(const helper of editorSelectionHelpers){scene.remove(helper);helper.traverse?.(part=>{part.geometry?.dispose?.();for(const material of Array.isArray(part.material)?part.material:[part.material])material?.dispose?.();});}
@@ -5284,7 +5306,7 @@ function duplicateEditorSelection(){
   const duplicates=[];
   for(const source of sources){
     const record=levelAssetRecord(source);if(!record)continue;
-    const duplicate=addLevelAsset({...record,x:record.x+1.4,z:record.z+1.4});if(!duplicate)continue;
+    const duplicate=addLevelAsset({...record});if(!duplicate)continue;
     duplicate.name=`${source.name||duplicate.name} copy`;duplicates.push(duplicate);
   }
   if(!duplicates.length)return;

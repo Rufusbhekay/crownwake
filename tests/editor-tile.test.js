@@ -257,6 +257,23 @@ test("Boolean Box subtracts persistent cells from placeable Base_bp tiles", () =
   assert.match(indexSource, /id="editor-boolean-apply"/);
 });
 
+test("Boolean Box rebuilds the base top with real cell holes instead of a coplanar overlay", () => {
+  const start = source.indexOf("function baseBooleanTopGeometry(");
+  const end = source.indexOf("function baseGameplayGridSpec(", start);
+  assert.notEqual(start, -1, "Boolean cuts need a dedicated base-top geometry builder");
+  assert.notEqual(end, -1, "Boolean geometry must remain near the base grid helpers");
+  const context = vm.createContext({ THREE, baseGridCellIndex: (row, column) => `${row}:${column}` });
+  vm.runInContext(source.slice(start, end), context);
+
+  const sourceTop = new THREE.PlaneGeometry(4, 4);
+  sourceTop.rotateX(-Math.PI / 2);
+  const cutTop = context.baseBooleanTopGeometry(sourceTop, 2, 2, ["0:1"]);
+
+  assert.equal(cutTop.getAttribute("position").count, 18, "three uncut cells should produce six triangles");
+  assert.equal(cutTop.getAttribute("normal").count, 18);
+  assert.equal(cutTop.getAttribute("uv").count, 18);
+});
+
 test("permanent tile-grid lines are hidden by default", () => {
   assert.match(source, /islandGrid\.name="Island Tile Grid";islandGrid\.visible=false;/);
   assert.match(source, /grid\.name="Tile Grid";grid\.visible=false;/);

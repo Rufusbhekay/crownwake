@@ -1949,17 +1949,45 @@ function baseGridCellFromWorldPoint(base,x,z){
   return row<0||row>=dimensions.rows||column<0||column>=dimensions.columns?null:{row,column,key:baseGridCellIndex(row,column)};
 }
 function baseCellIsBooleanCut(base,x,z){const cell=baseGridCellFromWorldPoint(base,x,z);return Boolean(cell&&base.userData.booleanCutCells?.includes(cell.key));}
+function baseBooleanTopGeometry(sourceGeometry,rows,columns,cuts=[]){
+  sourceGeometry.computeBoundingBox();const bounds=sourceGeometry.boundingBox,cutSet=new Set(cuts),positions=[],normals=[],uvs=[],width=Math.max(.0001,bounds.max.x-bounds.min.x),depth=Math.max(.0001,bounds.max.z-bounds.min.z),y=bounds.max.y;
+  for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){
+    if(cutSet.has(baseGridCellIndex(row,column)))continue;
+    const left=bounds.min.x+column/columns*width,right=bounds.min.x+(column+1)/columns*width,top=bounds.min.z+row/rows*depth,bottom=bounds.min.z+(row+1)/rows*depth;
+    const corners=[[left,top],[right,top],[right,bottom],[left,bottom]],order=[0,2,1,0,3,2];
+    for(const index of order){const [x,z]=corners[index];positions.push(x,y,z);normals.push(0,1,0);uvs.push((x-bounds.min.x)/width,(z-bounds.min.z)/depth);}
+  }
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));return geometry;
+}
+function baseBooleanTopMesh(base){
+  const visual=base?.getObjectByName("Base Model");let top=null;
+  visual?.traverse(part=>{
+    if(top||!part.isMesh||!part.geometry?.getAttribute("position"))return;
+    const normal=part.geometry.getAttribute("normal");if(!normal?.count)return;
+    let upward=true;for(let index=0;index<normal.count;index++)if(normal.getY(index)<.99){upward=false;break}
+    if(upward)top=part;
+  });
+  return top;
+}
+function restoreBaseBooleanTop(base){
+  const top=baseBooleanTopMesh(base),original=top?.userData?.booleanOriginalGeometry;if(!top||!original||top.geometry===original)return;
+  top.geometry.dispose();top.geometry=original;
+}
+function applyBaseBooleanTopCut(base,dimensions,cuts){
+  const top=baseBooleanTopMesh(base);if(!top)return false;
+  const original=top.userData.booleanOriginalGeometry??top.geometry;top.userData.booleanOriginalGeometry=original;
+  if(top.geometry!==original)top.geometry.dispose();top.geometry=baseBooleanTopGeometry(original,dimensions.rows,dimensions.columns,cuts);return true;
+}
 function clearBaseBooleanMask(base){
-  const existing=base?.getObjectByName("Base Boolean Void");if(!existing)return;
+  restoreBaseBooleanTop(base);const existing=base?.getObjectByName("Base Boolean Recess");if(!existing)return;
   base.remove(existing);existing.userData.geometry?.dispose?.();existing.userData.material?.dispose?.();
 }
 function refreshBaseBooleanMask(base){
   if(!isBaseTileBlueprint(base))return;
   clearBaseBooleanMask(base);const dimensions=tileDimensions(base),cuts=normalizeBaseBooleanCutCells(base.userData.booleanCutCells,dimensions.rows,dimensions.columns);base.userData.booleanCutCells=cuts;if(!cuts.length)return;
-  const voids=new THREE.Group(),material=new THREE.MeshStandardMaterial({color:0x13201e,roughness:.95,metalness:0}),geometry=new THREE.BoxGeometry(dimensions.tileSize*.992,.72,dimensions.tileSize*.992);
-  voids.name="Base Boolean Void";voids.userData={editorBooleanMask:true,geometry,material};
-  for(const key of cuts){const [row,column]=key.split(":").map(Number),cell=new THREE.Mesh(geometry,material);cell.position.set(-dimensions.width*.5+(column+.5)*dimensions.tileSize,-.36,-dimensions.depth*.5+(row+.5)*dimensions.tileSize);cell.castShadow=true;cell.receiveShadow=true;voids.add(cell);}
-  base.add(voids);
+  applyBaseBooleanTopCut(base,dimensions,cuts);
+  const source=new THREE.PlaneGeometry(dimensions.width,dimensions.depth);source.rotateX(-Math.PI*.5);const geometry=baseBooleanTopGeometry(source,dimensions.rows,dimensions.columns,cuts),material=new THREE.MeshStandardMaterial({color:0x13201e,roughness:.95,metalness:0}),recess=new THREE.Mesh(geometry,material);
+  source.dispose();recess.name="Base Boolean Recess";recess.position.y=-.12;recess.castShadow=true;recess.receiveShadow=true;recess.userData={editorBooleanMask:true,geometry,material};base.add(recess);
 }
 function baseGameplayGridSpec(source){
   if(!source?.userData?.sharedGameplayGrid||!isBaseTileBlueprint(source))return null;

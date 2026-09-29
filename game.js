@@ -2222,6 +2222,14 @@ function commandCellSupported(cell,cellSize=ensureNavigationGrid().cellSize){
 }
 function navigationGridCellFromPoint(point,grid=ensureNavigationGrid()){
   if(!point)return null;
+  for(const baseSpec of baseGameplayGridSpecs()){
+    const {source,dimensions}=baseSpec,{width,depth,tileSize,rows,columns}=dimensions;
+    navigationLocalPoint.copy(point);source.updateWorldMatrix(true,false);source.worldToLocal(navigationLocalPoint);
+    const column=Math.floor((navigationLocalPoint.x+width*.5)/tileSize),row=Math.floor((navigationLocalPoint.z+depth*.5)/tileSize);
+    if(row<0||row>=rows||column<0||column>=columns)continue;
+    const cell=baseSpec.cells[row*columns+column];
+    if(cell)return grid.cells.get(navigationCellKey(cell))??null;
+  }
   if(grid.source&&grid.baseDimensions&&grid.baseCellsByIndex.size){
     const {width,depth,tileSize,rows,columns}=grid.baseDimensions;
     navigationLocalPoint.copy(point);grid.source.updateWorldMatrix(true,false);grid.source.worldToLocal(navigationLocalPoint);

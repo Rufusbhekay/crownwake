@@ -464,6 +464,35 @@ test("Base_bp uses its edge-fitted grids for navigation and CH deployment", () =
   assert.doesNotMatch(previewSource,/DEPLOYMENT_PREVIEW_CELL/);
 });
 
+test("CH commands resolve the clicked cell on every placed Crownwake Base", () => {
+  const start = source.indexOf("function navigationGridCellFromPoint(");
+  const end = source.indexOf("function deploymentPreviewCells", start);
+  const firstBaseCell = { x: -.5, z: -.5, gridRow: 0, gridColumn: 0 };
+  const secondBaseCell = { x: 9.5, z: -.5, gridRow: 0, gridColumn: 0 };
+  const firstBase = { offsetX: 0, updateWorldMatrix() {}, worldToLocal(point) { point.x -= this.offsetX; } };
+  const secondBase = { offsetX: 10, updateWorldMatrix() {}, worldToLocal(point) { point.x -= this.offsetX; } };
+  const grid = {
+    source: null,
+    baseDimensions: null,
+    baseCellsByIndex: new Map(),
+    cells: new Map([["-0.5:-0.5", firstBaseCell], ["9.5:-0.5", secondBaseCell]])
+  };
+  const context = vm.createContext({
+    navigationLocalPoint: { copy(point) { this.x = point.x; this.y = point.y; this.z = point.z; return this; } },
+    baseGameplayGridSpecs: () => [
+      { source: firstBase, dimensions: { width: 2, depth: 2, tileSize: 1, rows: 2, columns: 2 }, cells: [firstBaseCell] },
+      { source: secondBase, dimensions: { width: 2, depth: 2, tileSize: 1, rows: 2, columns: 2 }, cells: [secondBaseCell] }
+    ],
+    ensureNavigationGrid: () => grid,
+    navigationCellKey: cell => `${cell.x}:${cell.z}`,
+    baseGridCellIndex: (row, column) => `${row}:${column}`,
+    snapNavigationCell: () => ({ x: .5, z: .5 })
+  });
+  vm.runInContext(source.slice(start, end), context);
+
+  assert.equal(context.navigationGridCellFromPoint({ x: 9.5, y: 0, z: -.5 }, grid), secondBaseCell);
+});
+
 test("Base_bp batches its scalable deployment grid instead of rebuilding one mesh per tile", () => {
   assert.match(source, /function addDeploymentPreviewGrid\(/);
   assert.match(source, /function addCommandGridInstances\(/);

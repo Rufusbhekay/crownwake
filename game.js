@@ -3970,19 +3970,37 @@ function compactGroupColumnOffset(index){const rank=Math.max(0,Math.floor(index)
 function chPatrolCollisionSpacing(memberCount){
   const count=Math.max(1,Math.floor(Number(memberCount)||1));
   if(count<=3)return .74;
-  if(count<=6)return .80;
-  if(count<=9)return .86;
-  return count<=12?.92:.94;
+  if(count<=6)return .84;
+  if(count<=9)return .94;
+  return count<=12?1.04:1.14;
 }
 function chGroupPatrolSpacing(unit,members){return Math.max(actorPatrolSpacing(unit),chPatrolCollisionSpacing(members.length));}
+function chPatrolReturnAllowance(memberCount){
+  const count=Math.max(1,Math.floor(Number(memberCount)||1));
+  if(count<=3)return .10;
+  if(count<=6)return .16;
+  if(count<=9)return .23;
+  return .30;
+}
+function chGroupPatrolOptions(unit,members){return {spacing:chGroupPatrolSpacing(unit,members),returnAllowance:chPatrolReturnAllowance(members.length),outerPatrolChance:.5};}
 function independentGroupPatrolRadii(grid=ensureNavigationGrid()){
   const patrol=Math.max(INDEPENDENT_GROUP_PATROL_RADIUS,Math.hypot(grid.cellSize.x,grid.cellSize.z)+.1);
   return {patrol,cohesion:Math.max(CH_PATROL_COHESION_RADIUS,patrol+.4)};
 }
-function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,spacing=actorPatrolSpacing(unit)){
+function compactGroupPatrolReturnTarget(unit,pivot,grid,patrolRadius){
+  const outward=unit.position.clone().sub(pivot).setY(0);
+  if(outward.lengthSq()<.001)return pivot.clone().setY(unit.position.y);
+  const desired=pivot.clone().addScaledVector(outward.normalize(),patrolRadius*.78),candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=patrolRadius&&!navigationPointPhysicallyBlocked(cell,unit));
+  let nearest=null,nearestDistance=Infinity;
+  for(const [,cell] of candidates){const distance=desired.distanceToSquared(new THREE.Vector3(cell.x,desired.y,cell.z));if(distance<nearestDistance){nearest=cell;nearestDistance=distance;}}
+  const target=nearest??desired,goalY=walkableSupportHeightAt(target.x,target.z)??unit.position.y;
+  return new THREE.Vector3(target.x,goalY,target.z);
+}
+function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,{spacing=actorPatrolSpacing(unit),returnAllowance=0,outerPatrolChance=0}={}){
   const grid=ensureNavigationGrid(),{patrol:patrolRadius,cohesion:cohesionRadius}=independentGroupPatrolRadii(grid);
-  if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>cohesionRadius){unit.userData[goalProperty]=null;unit.userData[pauseProperty]=0;return pivot.setY(unit.position.y);}
-  if(unit.userData[goalProperty]&&Math.hypot(unit.userData[goalProperty].x-pivot.x,unit.userData[goalProperty].z-pivot.z)>patrolRadius)unit.userData[goalProperty]=null;
+  const returnRadius=patrolRadius*(1+returnAllowance);
+  if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>returnRadius){unit.userData[goalProperty]=null;unit.userData[pauseProperty]=0;unit.userData.navigationPath=null;unit.userData.navigationYield=null;return compactGroupPatrolReturnTarget(unit,pivot,grid,patrolRadius);}
+  if(unit.userData[goalProperty]&&Math.hypot(unit.userData[goalProperty].x-pivot.x,unit.userData[goalProperty].z-pivot.z)>(unit.userData[goalProperty].outerPatrol?returnRadius:patrolRadius))unit.userData[goalProperty]=null;
   const previousGoal=unit.userData[goalProperty],arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
   const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
   if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
@@ -3991,11 +4009,12 @@ function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,
   unit.userData[pauseProperty]=0;
   const occupied=[];
   for(const member of members){if(member===unit)continue;occupied.push(member.position);const memberGoal=member.userData[goalProperty];if(memberGoal?.revision===grid.revision)occupied.push(memberGoal);}
-  const minimumStep=Math.min(grid.cellSize.x,grid.cellSize.z)*.4,candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=patrolRadius&&Math.hypot(cell.x-unit.position.x,cell.z-unit.position.z)>minimumStep).map(([,cell])=>cell);
-  const patrolGoal=choosePatrolGoal({origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:spacing});
+  const outerPatrol=returnAllowance>0&&rand()<outerPatrolChance;
+  const destinationRadius=outerPatrol?returnRadius:patrolRadius,minimumStep=Math.min(grid.cellSize.x,grid.cellSize.z)*.4,candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=destinationRadius&&Math.hypot(cell.x-unit.position.x,cell.z-unit.position.z)>minimumStep).map(([,cell])=>cell),outerCandidates=outerPatrol?candidates.filter(cell=>Math.hypot(cell.x-pivot.x,cell.z-pivot.z)>patrolRadius):[],patrolCandidates=outerCandidates.length?outerCandidates:candidates;
+  const patrolGoal=choosePatrolGoal({origin:unit.position,candidates:patrolCandidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:spacing});
   if(!patrolGoal)return pivot.setY(unit.position.y);
   const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
-  unit.userData[goalProperty]={x:patrolGoal.x,y:goalY,z:patrolGoal.z,revision:grid.revision,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
+  unit.userData[goalProperty]={x:patrolGoal.x,y:goalY,z:patrolGoal.z,revision:grid.revision,outerPatrol:outerCandidates.length>0,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
   return new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
 }
 function independentGroupPatrolTarget(unit,allies){
@@ -4003,7 +4022,7 @@ function independentGroupPatrolTarget(unit,allies){
   if(!company||!members.length)return unit.position.clone();
   const anchor=ensureCompanyAnchor(company.groupIndex),pivot=(anchor.patrolHome??anchor.orderTarget??anchor.position).clone().setY(GROUND_Y);
   anchor.patrolHome??=pivot.clone();
-  return compactGroupPatrolTarget(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil",chGroupPatrolSpacing(unit,members));
+  return compactGroupPatrolTarget(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil",chGroupPatrolOptions(unit,members));
 }
 function updateIndependentGroupPatrol(unit,allies,dt){
   const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:independentGroupPatrolRadii().cohesion}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;

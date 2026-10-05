@@ -229,22 +229,22 @@ test("CH patrol spacing and return allowance scale by deployed company size", ()
   assert.equal(context.chPatrolCollisionSpacing(10), 1.04);
   assert.equal(context.chPatrolCollisionSpacing(12), 1.04);
   assert.equal(context.chPatrolCollisionSpacing(13), 1.14);
-  assert.equal(context.chPatrolReturnAllowance(1), .10);
-  assert.equal(context.chPatrolReturnAllowance(4), .16);
-  assert.equal(context.chPatrolReturnAllowance(7), .23);
-  assert.equal(context.chPatrolReturnAllowance(10), .30);
-  assert.equal(context.chPatrolReturnAllowance(13), .30);
+  assert.equal(context.chPatrolReturnAllowance(1), .45);
+  assert.equal(context.chPatrolReturnAllowance(4), .50);
+  assert.equal(context.chPatrolReturnAllowance(7), .55);
+  assert.equal(context.chPatrolReturnAllowance(10), .60);
+  assert.equal(context.chPatrolReturnAllowance(13), .60);
   assert.equal(context.chGroupPatrolSpacing({ patrolSpacing: .72 }, Array(7)), .94);
   assert.equal(context.chGroupPatrolSpacing({ patrolSpacing: 1.1 }, Array(7)), 1.1);
   const options=context.chGroupPatrolOptions({ patrolSpacing: .72 }, Array(10));
   assert.equal(options.spacing,1.04);
-  assert.equal(options.returnAllowance,.30);
+  assert.equal(options.returnAllowance,.60);
   assert.equal(options.outerPatrolChance,.5);
 });
 
 test("a straying CH returns through a safe interior patrol tile", () => {
   const unit = new THREE.Group();
-  unit.position.set(3.7, 0, 0);
+  unit.position.set(5, 0, 0);
   unit.userData = { alive: true, companyId: 1, groupPatrolGoal: { x: 4, y: 0, z: 0, revision: 1, expiresAt: 10 } };
   const anchor = { position: new THREE.Vector3(), patrolHome: new THREE.Vector3() };
   const candidates = new Map([["outer", { x: 4, z: 0 }], ["inner", { x: 1.5, z: 0 }]]);

@@ -3977,10 +3977,10 @@ function chPatrolCollisionSpacing(memberCount){
 function chGroupPatrolSpacing(unit,members){return Math.max(actorPatrolSpacing(unit),chPatrolCollisionSpacing(members.length));}
 function chPatrolReturnAllowance(memberCount){
   const count=Math.max(1,Math.floor(Number(memberCount)||1));
-  if(count<=3)return .10;
-  if(count<=6)return .16;
-  if(count<=9)return .23;
-  return .30;
+  if(count<=3)return .45;
+  if(count<=6)return .50;
+  if(count<=9)return .55;
+  return .60;
 }
 function chGroupPatrolOptions(unit,members){return {spacing:chGroupPatrolSpacing(unit,members),returnAllowance:chPatrolReturnAllowance(members.length),outerPatrolChance:.5};}
 function independentGroupPatrolRadii(grid=ensureNavigationGrid()){

@@ -48,6 +48,8 @@ test("CH and EN Actor Details expose native patrol movement controls", () => {
   assert.match(index, /data-actor-property="acceleration"[^>]*type="number"/);
   assert.match(index, /data-actor-property="patrolSpeed"[^>]*type="number"/);
   assert.match(index, /data-actor-property="patrolSpacing"[^>]*type="number"/);
+  assert.match(index, /data-actor-property="patrolRadiusMin"[^>]*type="number"/);
+  assert.match(index, /data-actor-property="patrolRadiusMax"[^>]*type="number"/);
   assert.match(index, /data-actor-property="patrolPauseMax"[^>]*type="number"/);
   assert.doesNotMatch(index, /data-actor-property="patrolSpeed"[^>]*type="range"/);
 });
@@ -63,6 +65,8 @@ test("Content Browser CH and EN Blueprints save movement defaults for new placem
   assert.match(game, /function actorBlueprintProfile\(archetypeId,faction\)/);
   assert.match(game, /input\.disabled=!libraryProfile/);
   assert.match(game, /New placements will use this value/);
+  assert.match(game, /patrolRadiusMin/);
+  assert.match(game, /patrolRadiusMax/);
 });
 
 test("CH and EN rotate into their front-radar direction before moving", () => {
@@ -194,10 +198,12 @@ test("CH group members keep independently patrolling around their pivot", () => 
   assert.match(compactSource, /actorPatrolPauseMax\(unit\)/);
   assert.match(compactSource, /separation:spacing/);
   assert.match(compactSource, /const outerPatrol=returnAllowance>0&&rand\(\)<outerPatrolChance/);
+  assert.match(compactSource, /patrolRadiusRange=null/);
   assert.match(compactSource, /const destinationRadius=outerPatrol\?returnRadius:patrolRadius/);
+  assert.match(compactSource, /patrolRadius,/);
   assert.match(compactSource, /outerPatrol:outerCandidates\.length>0/);
   assert.match(compactSource, /expiresAt:totalTime\+INDEPENDENT_GROUP_PATROL_DURATION\+rand\(\)/);
-  assert.match(compactSource, /independentGroupPatrolRadii\(grid\)/);
+  assert.match(compactSource, /groupPatrolRadiusRange\(patrolRadiusRange,grid\)/);
   assert.match(compactSource, /occupied\.push\(member\.position\)/);
   assert.doesNotMatch(patrolSource, /anchor\.patrolGoal=/);
   const patrolUpdateStart = game.indexOf("function updateIndependentGroupPatrol(");
@@ -216,7 +222,7 @@ test("CH group members keep independently patrolling around their pivot", () => 
 });
 
 test("CH patrol spacing and return allowance scale by deployed company size", () => {
-  const context = vm.createContext({ actorPatrolSpacing: unit => unit.patrolSpacing });
+  const context = vm.createContext({ actorPatrolSpacing: unit => unit.patrolSpacing, actorPatrolRadiusRange: () => ({ minimum: 2.5, maximum: 4.5 }) });
   const start = game.indexOf("function chPatrolCollisionSpacing(");
   const end = game.indexOf("function independentGroupPatrolRadii(", start);
   vm.runInContext(game.slice(start, end), context);
@@ -240,6 +246,8 @@ test("CH patrol spacing and return allowance scale by deployed company size", ()
   assert.equal(options.spacing,1.04);
   assert.equal(options.returnAllowance,.60);
   assert.equal(options.outerPatrolChance,.5);
+  assert.equal(options.patrolRadiusRange.minimum,2.5);
+  assert.equal(options.patrolRadiusRange.maximum,4.5);
 });
 
 test("a straying CH returns through a safe interior patrol tile", () => {
@@ -253,7 +261,7 @@ test("a straying CH returns through a safe interior patrol tile", () => {
     INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65, INDEPENDENT_GROUP_PATROL_SEPARATION: .72,
     INDEPENDENT_GROUP_PATROL_DURATION: 4, INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65,
     INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16, totalTime: 0, rand: () => .5,
-    actorPatrolSpacing: () => .72, actorPatrolPauseMax: () => .65,
+    actorPatrolSpacing: () => .72, actorPatrolRadiusRange: () => ({ minimum: 3.2, maximum: 3.2 }), actorPatrolPauseMax: () => .65,
     ensureCompanyLayout: () => [{ groupIndex: 1, soldiers: [unit] }], ensureCompanyAnchor: () => anchor,
     ensureNavigationGrid: () => ({ revision: 1, cells: candidates, blocked: new Set(), cellSize: { x: 1, z: 1 } }),
     navigationPointPhysicallyBlocked: () => false, walkableSupportHeightAt: () => 0,
@@ -290,7 +298,7 @@ test("seven CH have enough nearby tiles to keep patrolling after an order", () =
       INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65, INDEPENDENT_GROUP_PATROL_SEPARATION: .72,
       INDEPENDENT_GROUP_PATROL_DURATION: 4, INDEPENDENT_GROUP_PATROL_PAUSE_MAX: .65,
       INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16, totalTime: 0, rand: () => 0,
-      actorPatrolSpacing: () => .72, actorPatrolPauseMax: () => .65,
+      actorPatrolSpacing: () => .72, actorPatrolRadiusRange: () => ({ minimum: 3.2, maximum: 3.2 }), actorPatrolPauseMax: () => .65,
       ensureCompanyLayout: () => [{ groupIndex: 1, soldiers: members }],
       ensureCompanyAnchor: () => ({ position: new THREE.Vector3(), patrolHome: new THREE.Vector3() }),
       ensureNavigationGrid: () => ({ revision: 1, cells, blocked: new Set(), cellSize: { x: tileSize, z: tileSize } }),

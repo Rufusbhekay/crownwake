@@ -228,9 +228,10 @@ function normalizeImportedModelRecord(record){
 function normalizeActorBlueprintStats(settings){
   if(!settings||typeof settings!=="object")return {};
   const normalized={};
-  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15],["patrolSpacing",.1,5],["patrolPauseMax",0,2]]){
+  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15],["patrolSpacing",.1,5],["patrolRadiusMin",.5,30],["patrolRadiusMax",.5,30],["patrolPauseMax",0,2]]){
     const value=Number(settings[property]);if(Number.isFinite(value))normalized[property]=Math.min(maximum,Math.max(minimum,value));
   }
+  if("patrolRadiusMin" in normalized||"patrolRadiusMax" in normalized){const minimum=normalized.patrolRadiusMin??3.2,maximum=normalized.patrolRadiusMax??3.2;normalized.patrolRadiusMin=Math.min(minimum,maximum);normalized.patrolRadiusMax=Math.max(minimum,maximum);}
   return normalized;
 }
 function loadContentBrowserState(){
@@ -1774,6 +1775,8 @@ function levelAssetRecord(object){
     acceleration:Number(actorAcceleration(object).toFixed(2)),
     patrolSpeed:Number(actorPatrolSpeed(object).toFixed(2)),
     patrolSpacing:Number(actorPatrolSpacing(object).toFixed(2)),
+    patrolRadiusMin:Number(actorPatrolRadiusRange(object).minimum.toFixed(2)),
+    patrolRadiusMax:Number(actorPatrolRadiusRange(object).maximum.toFixed(2)),
     patrolPauseMax:Number(actorPatrolPauseMax(object).toFixed(2)),
     modelAssetId:object.userData.modelAssetId,
     progressBarAssetId:object.userData.progressBarAssetId,
@@ -2622,12 +2625,12 @@ function makeMaster(faction="player") {
 }
 const ACTOR_SPEED_BOOST=1.5;
 const ACTOR_LEGACY_MOVE_SPEEDS=Object.freeze({ch1:2.65,ch2:3.18,ch3:2.65,en1:2.65,en2:3.18,en3:2.65,en4:2.65,en5:2.65});
-const ACTOR_DEFAULT_ACCELERATION=5.4,ACTOR_SPEED_INPUT_MAX=15,ACTOR_ACCELERATION_INPUT_MAX=30,ACTOR_PATROL_SPACING_INPUT_MAX=5,ACTOR_PATROL_PAUSE_INPUT_MAX=2;
+const ACTOR_DEFAULT_ACCELERATION=5.4,ACTOR_SPEED_INPUT_MAX=15,ACTOR_ACCELERATION_INPUT_MAX=30,ACTOR_PATROL_SPACING_INPUT_MAX=5,ACTOR_PATROL_RADIUS_INPUT_MIN=.5,ACTOR_PATROL_RADIUS_INPUT_MAX=30,ACTOR_PATROL_RADIUS_DEFAULT=3.2,ACTOR_PATROL_PAUSE_INPUT_MAX=2;
 const ACTOR_ARCHETYPES=Object.freeze({
-  ch1:Object.freeze({id:"ch1",label:"CH1",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
-  ch3:Object.freeze({id:"ch3",label:"CH Swordsman",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
+  ch1:Object.freeze({id:"ch1",label:"CH1",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
+  ch3:Object.freeze({id:"ch3",label:"CH Swordsman",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
   en1:Object.freeze({id:"en1",label:"EN1",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:COLORS.amber}),
-  ch2:Object.freeze({id:"ch2",label:"CH2",faction:"player",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0x171a1d}),
+  ch2:Object.freeze({id:"ch2",label:"CH2",faction:"player",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0x171a1d}),
   en2:Object.freeze({id:"en2",label:"EN2",faction:"enemy",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xd84b55}),
   en3:Object.freeze({id:"en3",label:"EN 3",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xbe63e6}),
   en4:Object.freeze({id:"en4",label:"EN 4",faction:"enemy",maxHp:16,attack:5,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xb17ad1}),
@@ -2648,6 +2651,10 @@ function actorBlueprintProfile(archetypeId,faction){const archetype=actorArchety
 function actorAcceleration(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.acceleration);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.acceleration,.5,ACTOR_ACCELERATION_INPUT_MAX)}
 function actorPatrolSpeed(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.patrolSpeed);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.patrolSpeed,.25,ACTOR_SPEED_INPUT_MAX)}
 function actorPatrolSpacing(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.patrolSpacing);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.patrolSpacing,.1,ACTOR_PATROL_SPACING_INPUT_MAX)}
+function actorPatrolRadiusRange(unit){
+  const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configuredMin=Number(unit?.userData?.patrolRadiusMin),configuredMax=Number(unit?.userData?.patrolRadiusMax),minimum=THREE.MathUtils.clamp(Number.isFinite(configuredMin)?configuredMin:archetype.patrolRadiusMin??ACTOR_PATROL_RADIUS_DEFAULT,ACTOR_PATROL_RADIUS_INPUT_MIN,ACTOR_PATROL_RADIUS_INPUT_MAX),maximum=THREE.MathUtils.clamp(Number.isFinite(configuredMax)?configuredMax:archetype.patrolRadiusMax??ACTOR_PATROL_RADIUS_DEFAULT,ACTOR_PATROL_RADIUS_INPUT_MIN,ACTOR_PATROL_RADIUS_INPUT_MAX);
+  return {minimum:Math.min(minimum,maximum),maximum:Math.max(minimum,maximum)};
+}
 function actorPatrolPauseMax(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction),configured=Number(unit?.userData?.patrolPauseMax);return THREE.MathUtils.clamp(Number.isFinite(configured)?configured:archetype.patrolPauseMax,0,ACTOR_PATROL_PAUSE_INPUT_MAX)}
 function actorSteerAcceleration(unit,baseAcceleration){return baseAcceleration*(actorAcceleration(unit)/ACTOR_DEFAULT_ACCELERATION)}
 function actorLegacyMoveSpeed(unit){const archetype=actorArchetype(unit?.userData?.actorArchetypeId,unit?.userData?.faction);return ACTOR_LEGACY_MOVE_SPEEDS[archetype.id]??actorDefaultMoveSpeed(unit?.userData?.faction)}
@@ -2661,7 +2668,7 @@ function editorActorMoveScale(unit){
 }
 function applyEditorActorProfile(actor,profile){
   if(!actor?.userData||!profile)return;
-  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),patrolSpacing=Number(profile.patrolSpacing),patrolPauseMax=Number(profile.patrolPauseMax),healthBarOffset=Number(profile.healthBarOffset);
+  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),patrolSpacing=Number(profile.patrolSpacing),patrolRadiusMin=Number(profile.patrolRadiusMin),patrolRadiusMax=Number(profile.patrolRadiusMax),patrolPauseMax=Number(profile.patrolPauseMax),healthBarOffset=Number(profile.healthBarOffset);
   if(profile.archetypeId){actor.userData.actorArchetypeId=actorArchetype(profile.archetypeId,actor.userData.faction).id;if(actor.userData.faction==="player")actor.userData.companyId=deploymentGroupId(actor.userData.actorArchetypeId);}
   if(Number.isFinite(maxHp))actor.userData.maxHp=actor.userData.hp=THREE.MathUtils.clamp(maxHp,1,500);
   if(Number.isFinite(attack))actor.userData.attack=THREE.MathUtils.clamp(attack,.5,200);
@@ -2669,6 +2676,8 @@ function applyEditorActorProfile(actor,profile){
   if(Number.isFinite(acceleration))actor.userData.acceleration=THREE.MathUtils.clamp(acceleration,.5,ACTOR_ACCELERATION_INPUT_MAX);
   if(Number.isFinite(patrolSpeed))actor.userData.patrolSpeed=THREE.MathUtils.clamp(patrolSpeed,.25,ACTOR_SPEED_INPUT_MAX);
   if(Number.isFinite(patrolSpacing))actor.userData.patrolSpacing=THREE.MathUtils.clamp(patrolSpacing,.1,ACTOR_PATROL_SPACING_INPUT_MAX);
+  if(Number.isFinite(patrolRadiusMin))actor.userData.patrolRadiusMin=THREE.MathUtils.clamp(patrolRadiusMin,ACTOR_PATROL_RADIUS_INPUT_MIN,ACTOR_PATROL_RADIUS_INPUT_MAX);
+  if(Number.isFinite(patrolRadiusMax))actor.userData.patrolRadiusMax=THREE.MathUtils.clamp(patrolRadiusMax,ACTOR_PATROL_RADIUS_INPUT_MIN,ACTOR_PATROL_RADIUS_INPUT_MAX);
   if(Number.isFinite(patrolPauseMax))actor.userData.patrolPauseMax=THREE.MathUtils.clamp(patrolPauseMax,0,ACTOR_PATROL_PAUSE_INPUT_MAX);
   if(Number.isFinite(healthBarOffset))actor.userData.healthBarOffset=normalizeHealthBarOffset(healthBarOffset,ACTOR_HEALTH_BAR_OFFSET);
   if(isProgressBarBlueprint(profile.progressBarAssetId))actor.userData.progressBarAssetId=profile.progressBarAssetId;
@@ -2692,7 +2701,7 @@ function makeUnit(faction="player",archetypeId=null) {
   const g=new THREE.Group(),archetype=actorBlueprintProfile(archetypeId,faction),modelAssetId=actorModelAssetId(archetype.id);
   setCharacterVisual(g,modelAssetId,()=>{const body=roundedBox(.42,1.22,.38,mats.warrior,.1);body.position.y=.03;return body});
   const {maxHp,attack,moveSpeed}=archetype,materialColor=faction==="enemy"?actorMaterialColour(archetype.id):null;
-  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,patrolSpacing:archetype.patrolSpacing,patrolPauseMax:archetype.patrolPauseMax,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
+  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,patrolSpacing:archetype.patrolSpacing,patrolRadiusMin:archetype.patrolRadiusMin,patrolRadiusMax:archetype.patrolRadiusMax,patrolPauseMax:archetype.patrolPauseMax,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
   const tint=materialColor?new THREE.Color(materialColor).getHex():archetype.tint;if(Number.isInteger(tint))tintCharacter(g,tint);
   prepareDamageVisual(g);makeActorHealthWidget(g,false);addGroundContactOcclusion(g);makeEncounterRing(g);return g;
 }
@@ -3982,10 +3991,14 @@ function chPatrolReturnAllowance(memberCount){
   if(count<=9)return .55;
   return .60;
 }
-function chGroupPatrolOptions(unit,members){return {spacing:chGroupPatrolSpacing(unit,members),returnAllowance:chPatrolReturnAllowance(members.length),outerPatrolChance:.5};}
+function chGroupPatrolOptions(unit,members){return {spacing:chGroupPatrolSpacing(unit,members),returnAllowance:chPatrolReturnAllowance(members.length),outerPatrolChance:.5,patrolRadiusRange:actorPatrolRadiusRange(unit)};}
 function independentGroupPatrolRadii(grid=ensureNavigationGrid()){
   const patrol=Math.max(INDEPENDENT_GROUP_PATROL_RADIUS,Math.hypot(grid.cellSize.x,grid.cellSize.z)+.1);
   return {patrol,cohesion:Math.max(CH_PATROL_COHESION_RADIUS,patrol+.4)};
+}
+function groupPatrolRadiusRange(patrolRadiusRange,grid=ensureNavigationGrid()){
+  const floor=independentGroupPatrolRadii(grid).patrol,minimum=Math.max(floor,Number(patrolRadiusRange?.minimum)||floor),maximum=Math.max(minimum,Number(patrolRadiusRange?.maximum)||floor);
+  return {minimum,maximum};
 }
 function compactGroupPatrolReturnTarget(unit,pivot,grid,patrolRadius){
   const outward=unit.position.clone().sub(pivot).setY(0);
@@ -3996,12 +4009,12 @@ function compactGroupPatrolReturnTarget(unit,pivot,grid,patrolRadius){
   const target=nearest??desired,goalY=walkableSupportHeightAt(target.x,target.z)??unit.position.y;
   return new THREE.Vector3(target.x,goalY,target.z);
 }
-function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,{spacing=actorPatrolSpacing(unit),returnAllowance=0,outerPatrolChance=0}={}){
-  const grid=ensureNavigationGrid(),{patrol:patrolRadius,cohesion:cohesionRadius}=independentGroupPatrolRadii(grid);
-  const returnRadius=patrolRadius*(1+returnAllowance);
+function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,{spacing=actorPatrolSpacing(unit),returnAllowance=0,outerPatrolChance=0,patrolRadiusRange=null}={}){
+  const grid=ensureNavigationGrid(),range=groupPatrolRadiusRange(patrolRadiusRange,grid);let previousGoal=unit.userData[goalProperty],patrolRadius=THREE.MathUtils.clamp(Number(previousGoal?.patrolRadius)||range.maximum,range.minimum,range.maximum),returnRadius=patrolRadius*(1+returnAllowance);
   if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>returnRadius){unit.userData[goalProperty]=null;unit.userData[pauseProperty]=0;unit.userData.navigationPath=null;unit.userData.navigationYield=null;return compactGroupPatrolReturnTarget(unit,pivot,grid,patrolRadius);}
-  if(unit.userData[goalProperty]&&Math.hypot(unit.userData[goalProperty].x-pivot.x,unit.userData[goalProperty].z-pivot.z)>(unit.userData[goalProperty].outerPatrol?returnRadius:patrolRadius))unit.userData[goalProperty]=null;
-  const previousGoal=unit.userData[goalProperty],arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
+  if(previousGoal&&Math.hypot(previousGoal.x-pivot.x,previousGoal.z-pivot.z)>(previousGoal.outerPatrol?returnRadius:patrolRadius))unit.userData[goalProperty]=null;
+  previousGoal=unit.userData[goalProperty];patrolRadius=THREE.MathUtils.clamp(Number(previousGoal?.patrolRadius)||range.minimum+rand()*(range.maximum-range.minimum),range.minimum,range.maximum);returnRadius=patrolRadius*(1+returnAllowance);
+  const arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
   const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
   if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
   if(arrivedAtGoal&&!unit.userData[pauseProperty]){unit.userData[pauseProperty]=totalTime+rand()*actorPatrolPauseMax(unit);return unit.position.clone();}
@@ -4014,7 +4027,7 @@ function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,
   const patrolGoal=choosePatrolGoal({origin:unit.position,candidates:patrolCandidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:spacing});
   if(!patrolGoal)return pivot.setY(unit.position.y);
   const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
-  unit.userData[goalProperty]={x:patrolGoal.x,y:goalY,z:patrolGoal.z,revision:grid.revision,outerPatrol:outerCandidates.length>0,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
+  unit.userData[goalProperty]={x:patrolGoal.x,y:goalY,z:patrolGoal.z,patrolRadius,revision:grid.revision,outerPatrol:outerCandidates.length>0,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
   return new THREE.Vector3(patrolGoal.x,goalY,patrolGoal.z);
 }
 function independentGroupPatrolTarget(unit,allies){
@@ -4024,8 +4037,12 @@ function independentGroupPatrolTarget(unit,allies){
   anchor.patrolHome??=pivot.clone();
   return compactGroupPatrolTarget(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil",chGroupPatrolOptions(unit,members));
 }
+function chGroupMaximumPatrolRadius(unit){
+  const company=ensureCompanyLayout().find(item=>item.groupIndex===unit.userData.companyId),members=company?.soldiers.filter(member=>member.userData.alive)??[unit],range=groupPatrolRadiusRange(actorPatrolRadiusRange(unit));
+  return range.maximum*(1+chPatrolReturnAllowance(members.length));
+}
 function updateIndependentGroupPatrol(unit,allies,dt){
-  const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:independentGroupPatrolRadii().cohesion}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
+  const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:chGroupMaximumPatrolRadius(unit)}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
   steerTowards(unit,desired,speed,actorSteerAcceleration(unit,5.4),dt,{goalKey:`group-patrol:${unit.userData.companyId}`});
 }
 function assignEnemyPatrolGroup(units){
@@ -4842,8 +4859,10 @@ function updateEditorActorInspector(){
     const property=input.dataset.actorProperty,value=libraryProfile?.values?.[property],configuredMasterSpeed=Number(libraryProfile?.values?.moveSpeed),masterSpeed=Number.isFinite(configuredMasterSpeed)?configuredMasterSpeed:archetype.moveSpeed;
     if(property==="moveSpeed")input.max=String(Number((archetype.moveSpeed*3).toFixed(3)));
     if(property==="patrolSpeed")input.max=String(Number((masterSpeed*3).toFixed(3)));
-    input.value=Number.isFinite(value)?String(Math.round(value*100)/100):"0";input.disabled=!libraryProfile;
+    const chRangeProperty=property==="patrolRadiusMin"||property==="patrolRadiusMax";
+    input.value=Number.isFinite(value)?String(Math.round(value*100)/100):"0";input.disabled=!libraryProfile||(chRangeProperty&&archetype.faction!=="player");
   });
+  $("editor-ch-patrol-range-settings")?.classList.toggle("hidden",!libraryProfile||archetype.faction!=="player");
   const materialInput=$("editor-actor-material"),enemyEditable=Boolean(libraryProfile&&archetype.faction==="enemy"),colour=actor?.userData.editorMaterialColor??actorMaterialColour(archetype.id)??`#${new THREE.Color(archetype.tint??COLORS.amber).getHexString()}`;
   if(materialInput){materialInput.value=colour;materialInput.disabled=!enemyEditable;}
   populateContentBrowserModelSelect($("editor-actor-model"),actor?.userData.modelAssetId??actorModelAssetId(archetype.id),CHARACTER_MODEL_ASSET_ID,Boolean(libraryProfile));
@@ -5010,10 +5029,11 @@ function applyEditorActorInput(input){
   const profile=selectedEditorActorProfile(),actor=profile?.actor??null;
   if(!profile)return;
   const property=input.dataset.actorProperty,value=Number(input.value),minimum=Number(input.min),maximum=Number(input.max);
-  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed","patrolSpacing","patrolPauseMax"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
+  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed","patrolSpacing","patrolRadiusMin","patrolRadiusMax","patrolPauseMax"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
   recordEditorUndo();const next=THREE.MathUtils.clamp(value,minimum,maximum);
   if(actor){
     actor.userData[property]=next;
+    if(property==="patrolRadiusMin"||property==="patrolRadiusMax"){const range=actorPatrolRadiusRange(actor);actor.userData.patrolRadiusMin=range.minimum;actor.userData.patrolRadiusMax=range.maximum;}
     if(property==="maxHp"){actor.userData.hp=next;actor.userData.regenStartHealth=next;actor.userData.regenActive=false;}
   }else{
     const archetypeId=profile.archetype.id,existing=actorBlueprintStats(archetypeId);contentBrowserState.actorStats[archetypeId]=normalizeActorBlueprintStats({...existing,[property]:next});persistContentBrowserState();

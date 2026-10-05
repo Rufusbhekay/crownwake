@@ -188,11 +188,11 @@ test("CH group members keep independently patrolling around their pivot", () => 
   const patrolStart = game.indexOf("function independentGroupPatrolTarget(");
   const patrolEnd = game.indexOf("function updateIndependentGroupPatrol(", patrolStart);
   const patrolSource = game.slice(patrolStart, patrolEnd);
-  assert.match(patrolSource, /compactGroupPatrolTarget\(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil"\)/);
+  assert.match(patrolSource, /compactGroupPatrolTarget\(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil",chGroupPatrolSpacing\(unit,members\)\)/);
   const compactStart=game.indexOf("function compactGroupPatrolTarget("),compactEnd=game.indexOf("function independentGroupPatrolTarget(",compactStart),compactSource=game.slice(compactStart,compactEnd);
   assert.match(compactSource, /unit\.userData\[goalProperty\]=/);
   assert.match(compactSource, /actorPatrolPauseMax\(unit\)/);
-  assert.match(compactSource, /separation:actorPatrolSpacing\(unit\)/);
+  assert.match(compactSource, /separation:spacing/);
   assert.match(compactSource, /expiresAt:totalTime\+INDEPENDENT_GROUP_PATROL_DURATION\+rand\(\)/);
   assert.match(compactSource, /independentGroupPatrolRadii\(grid\)/);
   assert.match(compactSource, /occupied\.push\(member\.position\)/);
@@ -212,6 +212,24 @@ test("CH group members keep independently patrolling around their pivot", () => 
   assert.doesNotMatch(soldierSource, /manualMoving=false;u\.userData\.manualTarget=null;u\.userData\.velocity\.set\(0,0,0\)/);
 });
 
+test("CH patrol spacing scales collision avoidance by deployed company size", () => {
+  const context = vm.createContext({ actorPatrolSpacing: unit => unit.patrolSpacing });
+  const start = game.indexOf("function chPatrolCollisionSpacing(");
+  const end = game.indexOf("function independentGroupPatrolRadii(", start);
+  vm.runInContext(game.slice(start, end), context);
+  assert.equal(context.chPatrolCollisionSpacing(1), .74);
+  assert.equal(context.chPatrolCollisionSpacing(3), .74);
+  assert.equal(context.chPatrolCollisionSpacing(4), .80);
+  assert.equal(context.chPatrolCollisionSpacing(6), .80);
+  assert.equal(context.chPatrolCollisionSpacing(7), .86);
+  assert.equal(context.chPatrolCollisionSpacing(9), .86);
+  assert.equal(context.chPatrolCollisionSpacing(10), .92);
+  assert.equal(context.chPatrolCollisionSpacing(12), .92);
+  assert.equal(context.chPatrolCollisionSpacing(13), .94);
+  assert.equal(context.chGroupPatrolSpacing({ patrolSpacing: .72 }, Array(7)), .86);
+  assert.equal(context.chGroupPatrolSpacing({ patrolSpacing: 1.1 }, Array(7)), 1.1);
+});
+
 test("a straying CH discards its outward patrol goal and chooses an interior tile", () => {
   const unit = new THREE.Group();
   unit.position.set(3.7, 0, 0);
@@ -229,7 +247,7 @@ test("a straying CH discards its outward patrol goal and chooses an interior til
     navigationPointPhysicallyBlocked: () => false, walkableSupportHeightAt: () => 0,
     choosePatrolGoal: ({ candidates: options }) => options[0] ?? null
   });
-  const start = game.indexOf("function independentGroupPatrolRadii(");
+  const start = game.indexOf("function chPatrolCollisionSpacing(");
   const end = game.indexOf("function updateIndependentGroupPatrol(", start);
   vm.runInContext(game.slice(start, end), context);
   assert.equal(context.independentGroupPatrolTarget(unit, []).x, 0);
@@ -267,7 +285,7 @@ test("seven CH have enough nearby tiles to keep patrolling after an order", () =
       navigationPointPhysicallyBlocked: () => false, walkableSupportHeightAt: () => 0,
       choosePatrolGoal: options => { candidateCount = options.candidates.length; return choosePatrolGoal(options); }
     });
-    const start = game.indexOf("function independentGroupPatrolRadii(");
+    const start = game.indexOf("function chPatrolCollisionSpacing(");
     const end = game.indexOf("function updateIndependentGroupPatrol(", start);
     vm.runInContext(game.slice(start, end), context);
     for(const member of members){

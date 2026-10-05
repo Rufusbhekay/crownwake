@@ -1252,7 +1252,7 @@ test("Barracks EN pair, take waiter slots, or anchor after leaving the Barracks"
   assert.match(source, /function enemyRoamDestination/);
 });
 
-test("CH deployment uses separate icons and deploys the selected reserve as one group", () => {
+test("CH deployment uses separate icons and deploys the selected HUD batch as one group", () => {
   const start = source.indexOf("function deploySoldier(point){");
   const end = source.indexOf("function issueCompanyOrder", start);
   const deployment = source.slice(start, end);
@@ -1260,7 +1260,7 @@ test("CH deployment uses separate icons and deploys the selected reserve as one 
   assert.match(indexSource, /id="companies-ch2"[^>]*data-deployment-archetype="ch2"/);
   assert.match(indexSource, /id="starting-ch1-count"/);
   assert.match(indexSource, /id="starting-ch2-count"/);
-  assert.match(deployment, /const count=deploymentReserves\[deploymentArchetypeId\]/);
+  assert.match(deployment, /count=Math\.min\(reserve,deploymentRequestedCount\|\|reserve\)/);
   assert.match(deployment, /makeUnit\("player",deploymentArchetypeId\)/);
   assert.match(deployment, /unit\.userData\.companyId=deploymentGroupId\(deploymentArchetypeId\)/);
   assert.match(deployment, /activatePlacedCharacterEncounter\(\{engageImmediately:true\}\)/);
@@ -1280,6 +1280,19 @@ test("CH and EN HUD Blueprints are placeable, persistent level controls", () => 
   assert.match(source, /record\.type==="hud-widget"/);
   assert.match(source, /inspector-hud-section/);
   assert.match(source, /function spawnHudEnemies\(/);
+});
+
+test("CH HUDs expose and use the same configurable spawn count as EN HUDs", () => {
+  const toggleStart = source.indexOf("function toggleDeploymentMode(");
+  const toggleEnd = source.indexOf("function updateDeploymentEnemyOccupancy(", toggleStart);
+  const toggle = source.slice(toggleStart, toggleEnd);
+  assert.match(indexSource, /<span>UNITS TO SPAWN<\/span>/);
+  assert.match(source, /spawnSetting\.classList\.toggle\("hidden",!enabled\|\|isText\)/);
+  assert.match(source, /spawnInput\.disabled=!enabled\|\|isText/);
+  assert.match(source, /toggleDeploymentMode\(archetype\.id,widget\.userData\.hudSpawnCount\)/);
+  assert.match(source, /amount=player\?Math\.min\(deploymentReserves\[archetype\.id\]\?\?0,widget\.userData\.hudSpawnCount\)/);
+  assert.match(toggle, /function toggleDeploymentMode\(archetypeId,requestedCount=null\)/);
+  assert.match(toggle, /deploymentRequestedCount=count/);
 });
 
 test("the default CH deploy row is an editable persisted HUD block layout", () => {

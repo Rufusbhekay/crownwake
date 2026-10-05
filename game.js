@@ -157,7 +157,7 @@ const PLAYER_DEPLOYMENT_ARCHETYPES=Object.freeze(["ch1","ch2","ch3"]);
 function deploymentGroupId(archetypeId){const index=PLAYER_DEPLOYMENT_ARCHETYPES.indexOf(archetypeId);return index<0?0:index}
 function deploymentReserveTotal(){return PLAYER_DEPLOYMENT_ARCHETYPES.reduce((total,archetypeId)=>total+(deploymentReserves[archetypeId]??0),0)}
 function configuredDeploymentReserves(config=PRACTICE_CONFIG){return Object.fromEntries(PLAYER_DEPLOYMENT_ARCHETYPES.map(id=>[id,config[`${id}Soldiers`]]))}
-let selectedCompanyId=null,selectedCommander=null,commandHoverCell=null,wasCombat=false,deploymentReserves=configuredDeploymentReserves(),deploymentArchetypeId=null,deploymentPlacementReady=false,deploymentStarted=false,deploymentPreviewOccupancySignature="";
+let selectedCompanyId=null,selectedCommander=null,commandHoverCell=null,wasCombat=false,deploymentReserves=configuredDeploymentReserves(),deploymentArchetypeId=null,deploymentRequestedCount=0,deploymentPlacementReady=false,deploymentStarted=false,deploymentPreviewOccupancySignature="";
 let pendingStartingChCounts=configuredDeploymentReserves(),settingsStartingChDirty=false;
 const companyAnchors=new Map(),selectionVisuals=[];
 const editorCameraFocus=new THREE.Vector3(),editorKeys=new Set(),editorObjects=[],editorSelectedObjects=new Set(),editorFoliageObjects=new Set(),editorFoliagePaintSelection=new Set(),hudWidgetElements=new Map();
@@ -2523,7 +2523,7 @@ function updateDeploymentControl(){
   }
 }
 function disarmDeployment(){
-  deploymentArchetypeId=null;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";commandHoverCell=null;
+  deploymentArchetypeId=null;deploymentRequestedCount=0;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";commandHoverCell=null;
   refreshCommandGrid();updateDeploymentControl();
 }
 function deploymentCellBlocked(cell){
@@ -2531,13 +2531,14 @@ function deploymentCellBlocked(cell){
   const preview=deploymentPreviewCells().find(candidate=>candidate.cell.x===cell.x&&candidate.cell.z===cell.z);
   return !preview||deploymentPreviewState(preview).blocked;
 }
-function toggleDeploymentMode(archetypeId){
+function toggleDeploymentMode(archetypeId,requestedCount=null){
   if(mode!=="playing")return;
   if(!PLAYER_DEPLOYMENT_ARCHETYPES.includes(archetypeId))return;
   const reserve=deploymentReserves[archetypeId]??0;
   if(!canDeploySoldier(reserve)){showToast(`NO ${archetypeId.toUpperCase()} SOLDIERS LEFT`,1100);return}
   if(deploymentPlacementReady&&deploymentArchetypeId===archetypeId){disarmDeployment();showToast("DEPLOYMENT CANCELLED",900);return}
-  deploymentArchetypeId=archetypeId;deploymentPlacementReady=true;deploymentPreviewOccupancySignature="";commandHoverCell=null;clearTacticalSelection();refreshCommandGrid();updateDeploymentControl();showToast(`CHOOSE A POINT FOR ${archetypeId.toUpperCase()}`,1300);synthTone(430,.12,"sine",.018);
+  const requested=Math.floor(Number(requestedCount)),count=Math.min(reserve,Number.isFinite(requested)&&requested>0?requested:reserve);
+  deploymentArchetypeId=archetypeId;deploymentRequestedCount=count;deploymentPlacementReady=true;deploymentPreviewOccupancySignature="";commandHoverCell=null;clearTacticalSelection();refreshCommandGrid();updateDeploymentControl();showToast(`CHOOSE A POINT FOR ${count} ${archetypeId.toUpperCase()}`,1300);synthTone(430,.12,"sine",.018);
 }
 function updateDeploymentEnemyOccupancy(){
   if(!deploymentPlacementReady)return;
@@ -2550,7 +2551,7 @@ function updateDeploymentEnemyOccupancy(){
 }
 function deploySoldier(point){
   if(!deploymentPlacementReady||!PLAYER_DEPLOYMENT_ARCHETYPES.includes(deploymentArchetypeId)||!canDeploySoldier(deploymentReserves[deploymentArchetypeId]))return false;
-  const count=deploymentReserves[deploymentArchetypeId],grid=ensureNavigationGrid(),cell=deploymentCellFromPoint(point),seed=rand();
+  const reserve=deploymentReserves[deploymentArchetypeId],count=Math.min(reserve,deploymentRequestedCount||reserve),grid=ensureNavigationGrid(),cell=deploymentCellFromPoint(point),seed=rand();
   if(!cell){commandHoverCell=null;refreshCommandGrid();showToast("CHOOSE THE ISLAND",1000);return false;}
   if(deploymentCellBlocked(cell)){commandHoverCell=commandCellSupported(cell,grid.cellSize)?cell:null;refreshCommandGrid();showToast(commandHoverCell?"ENEMY GROUND":"CHOOSE THE ISLAND",1000);return false}
   const surfaceY=walkableSupportHeightAt(cell.x,cell.z),deployed=[];
@@ -2560,7 +2561,7 @@ function deploySoldier(point){
   }
   const deployedArchetypeId=deploymentArchetypeId,groupId=deploymentGroupId(deployedArchetypeId),anchor=ensureCompanyAnchor(groupId);anchor.position.set(cell.x,GROUND_Y,cell.z);anchor.patrolHome=anchor.position.clone();anchor.patrolGoal=null;anchor.forward.set(0,0,-1);anchor.moving=false;
   deploymentReserves[deploymentArchetypeId]=deploymentReserveAfterDeploy(deploymentReserves[deploymentArchetypeId],count);deploymentStarted=true;clearPeacefulPatrols();companyLayoutDirty=true;activatePlacedCharacterEncounter({engageImmediately:true});
-  deploymentArchetypeId=null;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";commandHoverCell=null;refreshCommandGrid();updateDeploymentControl();
+  deploymentArchetypeId=null;deploymentRequestedCount=0;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";commandHoverCell=null;refreshCommandGrid();updateDeploymentControl();
   updateStats();playSound("move");synthTone(520,.12,"sine",.022);showToast(`${deployedArchetypeId.toUpperCase()} GROUP DEPLOYED`,950);
   return true;
 }
@@ -2739,7 +2740,7 @@ function createPlacedHudWidgetElement(widget){
   const button=document.createElement("button"),icon=document.createElement("i"),label=document.createElement("small"),count=document.createElement("strong");
   button.type="button";button.className="placed-hud-widget";button.append(icon,label,count);button.addEventListener("pointerdown",event=>{if(mode==="editor")beginHudLayoutDrag(widget,event);else event.stopPropagation();});button.addEventListener("pointermove",updateHudLayoutDrag);button.addEventListener("pointerup",endHudLayoutDrag);button.addEventListener("pointercancel",endHudLayoutDrag);button.addEventListener("click",event=>{
     event.preventDefault();event.stopPropagation();if(mode!=="playing"||widget.userData.hudVisible===false)return;
-    const archetype=hudWidgetArchetype(widget);if(archetype.faction==="player")toggleDeploymentMode(archetype.id);else spawnHudEnemies(widget);
+    const archetype=hudWidgetArchetype(widget);if(archetype.faction==="player")toggleDeploymentMode(archetype.id,widget.userData.hudSpawnCount);else spawnHudEnemies(widget);
   });
   $("placed-hud-layer")?.append(button);hudWidgetElements.set(widget,button);return button;
 }
@@ -2771,7 +2772,7 @@ function renderPlacedHudWidgets(){
     widget.visible=false;const element=placedHudWidgetElement(widget),archetype=hudWidgetArchetype(widget),layout=hudWidgetLayout(widget),visible=widget.userData.hudVisible!==false&&["playing","paused","editor"].includes(mode);
     element.classList.toggle("hidden",!visible);if(!visible)continue;
     element.classList.toggle("editor-selected",editorSelection===widget);element.style.left=`${rect.left+layout.x*rect.width}px`;element.style.top=`${rect.top+layout.y*rect.height}px`;element.style.setProperty("--placed-hud-scale",String(hudWidgetScale(widget)));if(widget.userData.editorAssetType==="hud-text"){element.textContent=widget.userData.hudText;continue;}
-    const icon=element.querySelector("i"),label=element.querySelector("small"),count=element.querySelector("strong"),player=archetype.faction==="player",amount=player?(deploymentReserves[archetype.id]??0):widget.userData.hudSpawnCount;
+    const icon=element.querySelector("i"),label=element.querySelector("small"),count=element.querySelector("strong"),player=archetype.faction==="player",amount=player?Math.min(deploymentReserves[archetype.id]??0,widget.userData.hudSpawnCount):widget.userData.hudSpawnCount;
     icon.className=`placed-hud-icon ${player?"ch":"en"} ${archetype.id}`;label.textContent=archetype.label.toUpperCase();count.textContent=String(amount);element.disabled=mode==="playing"&&player&&amount<=0;element.setAttribute("aria-label",player?`Deploy ${amount} ${archetype.label} soldiers`:`Spawn ${amount} ${archetype.label} enemies`);
   }
 }
@@ -3334,7 +3335,7 @@ function resetPlaytestToSavedLevel(){
   particles=[];tombstones=[];followers=[];enemyUnits=[];editorObjects.length=0;editorFoliageObjects.clear();worldFloor=null;invalidateNavigation();
   activeEncounter=null;enemyPackAnchor=null;enemyRetreat=null;defeatCinematic=null;celebrationWinnerFaction=null;nextWaveTimer=0;waveNumber=0;wasCombat=false;
   companyAnchors.clear();playerCompanies=[];companyLayoutDirty=true;selectedCompanyId=null;selectedCommander=null;commandHoverCell=null;
-  campaign=makeCampaign();selectedRegion=2;deploymentReserves=configuredDeploymentReserves();deploymentArchetypeId=null;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";deploymentStarted=false;
+  campaign=makeCampaign();selectedRegion=2;deploymentReserves=configuredDeploymentReserves();deploymentArchetypeId=null;deploymentRequestedCount=0;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";deploymentStarted=false;
   commanderHearts=3;masterHealth=INDEPENDENT_SOLDIERS?32:PLAYER_COMMANDER.maxHealth;sinceDamage=99;damagePulse=0;damageStacks=0;shake=0;totalTime=0;interfaceTime=0;rngState=0xC0FFEE;
   master.visible=false;master.userData.alive=false;master.userData.falling=false;master.userData.verticalVelocity=0;master.userData.velocity.set(0,0,0);master.position.set(0,GROUND_Y,0);resetDuel(master);target.copy(master.position);
   savedLevelCamera=levelCameraFrame(savedLevelState.camera,{minScale:EDITOR_ZOOM_MIN,maxScale:EDITOR_ZOOM_MAX});
@@ -3966,11 +3967,19 @@ function independentGroupRegroupTarget(unit){
   return anchor.position.clone().addScaledVector(lateral,offset.lateral).addScaledVector(forward,offset.forward).setY(unit.position.y);
 }
 function compactGroupColumnOffset(index){const rank=Math.max(0,Math.floor(index));return {lateral:0,forward:rank===0?0:-rank*INDEPENDENT_GROUP_COLUMN_GAP}}
+function chPatrolCollisionSpacing(memberCount){
+  const count=Math.max(1,Math.floor(Number(memberCount)||1));
+  if(count<=3)return .74;
+  if(count<=6)return .80;
+  if(count<=9)return .86;
+  return count<=12?.92:.94;
+}
+function chGroupPatrolSpacing(unit,members){return Math.max(actorPatrolSpacing(unit),chPatrolCollisionSpacing(members.length));}
 function independentGroupPatrolRadii(grid=ensureNavigationGrid()){
   const patrol=Math.max(INDEPENDENT_GROUP_PATROL_RADIUS,Math.hypot(grid.cellSize.x,grid.cellSize.z)+.1);
   return {patrol,cohesion:Math.max(CH_PATROL_COHESION_RADIUS,patrol+.4)};
 }
-function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty){
+function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,spacing=actorPatrolSpacing(unit)){
   const grid=ensureNavigationGrid(),{patrol:patrolRadius,cohesion:cohesionRadius}=independentGroupPatrolRadii(grid);
   if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>cohesionRadius){unit.userData[goalProperty]=null;unit.userData[pauseProperty]=0;return pivot.setY(unit.position.y);}
   if(unit.userData[goalProperty]&&Math.hypot(unit.userData[goalProperty].x-pivot.x,unit.userData[goalProperty].z-pivot.z)>patrolRadius)unit.userData[goalProperty]=null;
@@ -3983,7 +3992,7 @@ function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty)
   const occupied=[];
   for(const member of members){if(member===unit)continue;occupied.push(member.position);const memberGoal=member.userData[goalProperty];if(memberGoal?.revision===grid.revision)occupied.push(memberGoal);}
   const minimumStep=Math.min(grid.cellSize.x,grid.cellSize.z)*.4,candidates=[...grid.cells].filter(([cellKey,cell])=>!grid.blocked.has(cellKey)&&Math.hypot(cell.x-pivot.x,cell.z-pivot.z)<=patrolRadius&&Math.hypot(cell.x-unit.position.x,cell.z-unit.position.z)>minimumStep).map(([,cell])=>cell);
-  const patrolGoal=choosePatrolGoal({origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:actorPatrolSpacing(unit)});
+  const patrolGoal=choosePatrolGoal({origin:unit.position,candidates,recentGoal:previousGoal,occupied,roll:rand(),minimumTravelDistance:INDEPENDENT_GROUP_PATROL_MIN_DISTANCE,separation:spacing});
   if(!patrolGoal)return pivot.setY(unit.position.y);
   const goalY=walkableSupportHeightAt(patrolGoal.x,patrolGoal.z)??unit.position.y;
   unit.userData[goalProperty]={x:patrolGoal.x,y:goalY,z:patrolGoal.z,revision:grid.revision,expiresAt:totalTime+INDEPENDENT_GROUP_PATROL_DURATION+rand()};unit.userData.navigationPath=null;unit.userData.navigationYield=null;
@@ -3994,7 +4003,7 @@ function independentGroupPatrolTarget(unit,allies){
   if(!company||!members.length)return unit.position.clone();
   const anchor=ensureCompanyAnchor(company.groupIndex),pivot=(anchor.patrolHome??anchor.orderTarget??anchor.position).clone().setY(GROUND_Y);
   anchor.patrolHome??=pivot.clone();
-  return compactGroupPatrolTarget(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil");
+  return compactGroupPatrolTarget(unit,members,pivot,"groupPatrolGoal","groupPatrolPauseUntil",chGroupPatrolSpacing(unit,members));
 }
 function updateIndependentGroupPatrol(unit,allies,dt){
   const patrolTarget=independentGroupPatrolTarget(unit,allies),anchor=ensureCompanyAnchor(unit.userData.companyId),pivot=anchor.patrolHome??anchor.position,cohesionTarget=patrolCohesionTarget({unit:unit.position,center:pivot,desired:patrolTarget,radius:independentGroupPatrolRadii().cohesion}),desired=new THREE.Vector3(cohesionTarget.x,unit.position.y,cohesionTarget.z),distance=unit.position.distanceTo(desired),arrivalSpeed=Math.min(1,Math.max(.24,distance/.58)),speed=distance>.08?actorPatrolSpeed(unit)*arrivalSpeed:0;
@@ -4841,7 +4850,7 @@ function updateEditorHudWidgetInspector(){
   $("editor-hud-layout-x").value=String(Math.round((profile?.settings.layoutX??.5)*100));$("editor-hud-layout-x").disabled=!enabled;
   $("editor-hud-layout-y").value=String(Math.round((profile?.settings.layoutY??.1)*100));$("editor-hud-layout-y").disabled=!enabled;
   const textSetting=$("editor-hud-text-setting"),textInput=$("editor-hud-text");textSetting.classList.toggle("hidden",!isText);textInput.value=profile?.settings.text??HUD_TEXT_DEFAULTS.text;textInput.disabled=!isText;
-  const spawnSetting=$("editor-hud-spawn-count-setting"),spawnInput=$("editor-hud-spawn-count");spawnSetting.classList.toggle("hidden",!enabled||isText||archetype.faction!=="enemy");spawnInput.value=String(profile?.settings.spawnCount??HUD_WIDGET_DEFAULTS.spawnCount);spawnInput.disabled=!enabled||isText||archetype.faction!=="enemy";
+  const spawnSetting=$("editor-hud-spawn-count-setting"),spawnInput=$("editor-hud-spawn-count");spawnSetting.classList.toggle("hidden",!enabled||isText);spawnInput.value=String(profile?.settings.spawnCount??HUD_WIDGET_DEFAULTS.spawnCount);spawnInput.disabled=!enabled||isText;
 }
 function applyEditorHudWidgetSettings(){
   const profile=selectedHudWidgetProfile();if(!profile)return;
@@ -6162,7 +6171,7 @@ function setStartingChCounts(){
   const next=normalizePracticeConfig({...PRACTICE_CONFIG,...Object.fromEntries(PLAYER_DEPLOYMENT_ARCHETYPES.map(id=>[`${id}Soldiers`,pendingStartingChCounts[id]]))});
   Object.assign(PRACTICE_CONFIG,next);pendingStartingChCounts=configuredDeploymentReserves(next);settingsStartingChDirty=false;
   try{localStorage.setItem(PRACTICE_CONFIG_KEY,JSON.stringify({...PRACTICE_CONFIG,deploymentRosterVersion:2}))}catch{}
-  deploymentReserves=configuredDeploymentReserves(next);deploymentArchetypeId=null;deploymentPlacementReady=false;deploymentStarted=false;commandHoverCell=null;clearTacticalSelection();refreshCommandGrid();
+  deploymentReserves=configuredDeploymentReserves(next);deploymentArchetypeId=null;deploymentRequestedCount=0;deploymentPlacementReady=false;deploymentStarted=false;commandHoverCell=null;clearTacticalSelection();refreshCommandGrid();
   for(const id of PLAYER_DEPLOYMENT_ARCHETYPES)$(`starting-${id}-count`).value=String(next[`${id}Soldiers`]);$("settings-apply").classList.add("hidden");updateStats();
 }
 function syncRingVisibilityButtons(){

@@ -3593,14 +3593,16 @@ function navigationTargetActor(unit){return unit.userData.lockedTarget??unit.use
 function steerStraightTowards(unit,desired,maxSpeed,acceleration,dt){
   const delta=desired.clone().sub(unit.position);delta.y=0;
   const distance=delta.length(), speed=arrivalSpeed(distance,maxSpeed),frontConstrained=Boolean(unit.userData?.actorArchetypeId&&!unit.userData?.isMaster);
-  let desiredVelocity=new THREE.Vector3(),alignment=1;
+  let desiredVelocity=new THREE.Vector3(),alignment=1,turningInPlace=false;
   if(speed>0&&frontConstrained){
     const heading=Math.atan2(delta.x,delta.z);unit.rotation.y=smoothAngle(unit.rotation.y,heading,6,dt);
     const forward=new THREE.Vector3(Math.sin(unit.rotation.y),0,Math.cos(unit.rotation.y));alignment=Math.max(0,forward.dot(delta)/distance);
-    const turnSpeed=Math.max(0,(alignment-.5)*2);
+    turningInPlace=unit.userData?.faction==="player"&&alignment<.94;
+    const turnSpeed=turningInPlace?0:Math.max(0,(alignment-.5)*2);
     desiredVelocity=forward.multiplyScalar(speed*turnSpeed);
   }else if(speed>0)desiredVelocity=delta.multiplyScalar(speed/distance);
   const velocity=unit.userData.velocity??=new THREE.Vector3();
+  if(turningInPlace)velocity.multiplyScalar(Math.max(0,1-22*dt));
   if(frontConstrained&&alignment<.8){const turnDamping=THREE.MathUtils.clamp((.8-alignment)/.8,0,1),pathDirection=delta.multiplyScalar(1/distance),sidewaysVelocity=velocity.clone().sub(pathDirection.multiplyScalar(velocity.dot(pathDirection)));velocity.addScaledVector(sidewaysVelocity,-Math.min(1,40*turnDamping*dt));}
   const change=desiredVelocity.sub(velocity), maxChange=acceleration*(frontConstrained&&alignment<.8?3:1)*dt;
   if(change.length()>maxChange)change.setLength(maxChange);

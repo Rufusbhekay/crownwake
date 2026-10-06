@@ -91,6 +91,18 @@ test("CH and EN brake and turn gradually rather than slide through a reversal", 
   }
 });
 
+test("CH brake to turn in place before following a new heading", () => {
+  const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle });
+  const start = game.indexOf("function steerStraightTowards("), end = game.indexOf("function steerTowards(", start);
+  vm.runInContext(game.slice(start, end), context);
+  const unit = new THREE.Group(), destination = new THREE.Vector3(10, 0, 0);
+  unit.userData = { actorArchetypeId: "ch2", faction: "player", velocity: new THREE.Vector3(0, 0, 2.65) };
+
+  for(let frame = 0; frame < 6; frame++)context.steerStraightTowards(unit, destination, 2.65, 5.4, 1 / 60);
+  assert.ok(unit.rotation.y > .4, "CH should visibly rotate toward the new heading");
+  assert.ok(unit.userData.velocity.length() < .25, `CH should brake before moving, not keep sliding at ${unit.userData.velocity.length().toFixed(2)}`);
+});
+
 test("CH and EN shed sideways momentum when a waypoint changes direction", () => {
   const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle });
   const start = game.indexOf("function steerStraightTowards("), end = game.indexOf("function steerTowards(", start);

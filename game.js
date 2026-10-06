@@ -3994,7 +3994,7 @@ function chPatrolReturnAllowance(memberCount){
   if(count<=9)return .55;
   return .60;
 }
-function chGroupPatrolOptions(unit,members){return {spacing:chGroupPatrolSpacing(unit,members),returnAllowance:chPatrolReturnAllowance(members.length),outerPatrolChance:.5,patrolRadiusRange:actorPatrolRadiusRange(unit)};}
+function chGroupPatrolOptions(unit,members){return {spacing:chGroupPatrolSpacing(unit,members),returnAllowance:chPatrolReturnAllowance(members.length),outerPatrolChance:.5,patrolRadiusRange:actorPatrolRadiusRange(unit),holdGoalUntilArrival:true};}
 function independentGroupPatrolRadii(grid=ensureNavigationGrid()){
   const patrol=Math.max(INDEPENDENT_GROUP_PATROL_RADIUS,Math.hypot(grid.cellSize.x,grid.cellSize.z)+.1);
   return {patrol,cohesion:Math.max(CH_PATROL_COHESION_RADIUS,patrol+.4)};
@@ -4012,13 +4012,13 @@ function compactGroupPatrolReturnTarget(unit,pivot,grid,patrolRadius){
   const target=nearest??desired,goalY=walkableSupportHeightAt(target.x,target.z)??unit.position.y;
   return new THREE.Vector3(target.x,goalY,target.z);
 }
-function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,{spacing=actorPatrolSpacing(unit),returnAllowance=0,outerPatrolChance=0,patrolRadiusRange=null}={}){
+function compactGroupPatrolTarget(unit,members,pivot,goalProperty,pauseProperty,{spacing=actorPatrolSpacing(unit),returnAllowance=0,outerPatrolChance=0,patrolRadiusRange=null,holdGoalUntilArrival=false}={}){
   const grid=ensureNavigationGrid(),range=groupPatrolRadiusRange(patrolRadiusRange,grid);let previousGoal=unit.userData[goalProperty],patrolRadius=THREE.MathUtils.clamp(Number(previousGoal?.patrolRadius)||range.maximum,range.minimum,range.maximum),returnRadius=patrolRadius*(1+returnAllowance);
   if(Math.hypot(unit.position.x-pivot.x,unit.position.z-pivot.z)>returnRadius){unit.userData[goalProperty]=null;unit.userData[pauseProperty]=0;unit.userData.navigationPath=null;unit.userData.navigationYield=null;return compactGroupPatrolReturnTarget(unit,pivot,grid,patrolRadius);}
   if(previousGoal&&Math.hypot(previousGoal.x-pivot.x,previousGoal.z-pivot.z)>(previousGoal.outerPatrol?returnRadius:patrolRadius))unit.userData[goalProperty]=null;
   previousGoal=unit.userData[goalProperty];patrolRadius=THREE.MathUtils.clamp(Number(previousGoal?.patrolRadius)||range.minimum+rand()*(range.maximum-range.minimum),range.minimum,range.maximum);returnRadius=patrolRadius*(1+returnAllowance);
   const arrivedAtGoal=previousGoal&&unit.position.distanceToSquared(previousGoal)<=INDEPENDENT_GROUP_ARRIVAL_DISTANCE**2;
-  const goalActive=previousGoal?.revision===grid.revision&&previousGoal.expiresAt>totalTime&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
+  const goalActive=previousGoal?.revision===grid.revision&&(holdGoalUntilArrival||previousGoal.expiresAt>totalTime)&&!arrivedAtGoal&&!navigationPointPhysicallyBlocked(previousGoal,unit);
   if(goalActive)return new THREE.Vector3(previousGoal.x,previousGoal.y,previousGoal.z);
   if(arrivedAtGoal&&!unit.userData[pauseProperty]){unit.userData[pauseProperty]=totalTime+rand()*actorPatrolPauseMax(unit);return unit.position.clone();}
   if((unit.userData[pauseProperty]??0)>totalTime)return unit.position.clone();

@@ -277,6 +277,26 @@ test("a straying CH returns through a safe interior patrol tile", () => {
   assert.equal(unit.userData.groupPatrolGoal.x, 1.5);
 });
 
+test("CH patrols retain their selected course until arrival", () => {
+  const unit = new THREE.Group();
+  unit.position.set(0, 0, 0);
+  unit.userData = { alive: true, groupPatrolGoal: { x: 1.5, y: 0, z: 0, patrolRadius: 3.2, revision: 1, expiresAt: 1 } };
+  const cells = new Map([["other", { x: -2, z: 0 }], ["goal", { x: 1.5, z: 0 }]]);
+  const context = vm.createContext({
+    THREE, GROUND_Y: 0, CH_PATROL_COHESION_RADIUS: 2.4, INDEPENDENT_GROUP_PATROL_RADIUS: 3.2,
+    INDEPENDENT_GROUP_PATROL_MIN_DISTANCE: .65, INDEPENDENT_GROUP_PATROL_DURATION: 4, INDEPENDENT_GROUP_ARRIVAL_DISTANCE: .16,
+    totalTime: 2, rand: () => .5, actorPatrolSpacing: () => .72, actorPatrolPauseMax: () => .65,
+    ensureNavigationGrid: () => ({ revision: 1, cells, blocked: new Set(), cellSize: { x: 1, z: 1 } }),
+    navigationPointPhysicallyBlocked: () => false, walkableSupportHeightAt: () => 0, choosePatrolGoal: ({ candidates }) => candidates[0] ?? null
+  });
+  const start = game.indexOf("function independentGroupPatrolRadii(");
+  const end = game.indexOf("function independentGroupPatrolTarget(", start);
+  vm.runInContext(game.slice(start, end), context);
+
+  const goal = context.compactGroupPatrolTarget(unit, [unit], new THREE.Vector3(), "groupPatrolGoal", "groupPatrolPauseUntil", { patrolRadiusRange: { minimum: 3.2, maximum: 3.2 }, holdGoalUntilArrival: true });
+  assert.equal(goal.x, 1.5);
+});
+
 test("seven CH have enough nearby tiles to keep patrolling after an order", () => {
   for(const tileSize of [2, 8]){
     const unit = new THREE.Group();

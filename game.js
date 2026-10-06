@@ -180,8 +180,11 @@ const CONTENT_BROWSER_STORAGE_KEY="crownwake-content-browser-v1",CONTENT_BROWSER
 const EDITOR_CONTEXTS=Object.freeze({select:{title:"SELECT",kicker:"EDITOR MODE"},assets:{title:"ASSETS",kicker:"WORLD TOOL"},foliage:{title:"FOLIAGE",kicker:"WORLD TOOL"},environment:{title:"ENVIRONMENT",kicker:"WORLD LOOK"}});
 let editorContext="select",editorOutlinerQuery="",editorCameraObject=null;
 function readEditorLayout(){
-  try{return {...{leftWidth:280,rightWidth:320,contentDrawerHeight:340,leftCollapsed:false,rightCollapsed:false,maximized:false},...JSON.parse(localStorage.getItem(EDITOR_LAYOUT_STORAGE_KEY)||"{}")}}
-  catch{return {leftWidth:280,rightWidth:320,contentDrawerHeight:340,leftCollapsed:false,rightCollapsed:false,maximized:false}}
+  const defaults={leftWidth:280,rightWidth:320,contentDrawerHeight:340,leftCollapsed:false,rightCollapsed:false,maximized:false,lastContext:"select",assetFolder:CONTENT_BROWSER_ROOT_ID,assetQuery:"",environmentOpen:false};
+  try{
+    const layout={...defaults,...JSON.parse(localStorage.getItem(EDITOR_LAYOUT_STORAGE_KEY)||"{}")};
+    layout.lastContext=EDITOR_CONTEXTS[layout.lastContext]?layout.lastContext:"select";layout.assetFolder=typeof layout.assetFolder==="string"&&layout.assetFolder?layout.assetFolder:CONTENT_BROWSER_ROOT_ID;layout.assetQuery=typeof layout.assetQuery==="string"?layout.assetQuery:"";layout.environmentOpen=Boolean(layout.environmentOpen);return layout;
+  }catch{return defaults}
 }
 const editorLayout=readEditorLayout();
 function persistEditorLayout(){try{localStorage.setItem(EDITOR_LAYOUT_STORAGE_KEY,JSON.stringify(editorLayout))}catch{}}
@@ -1888,7 +1891,7 @@ function persistSavedLevelLayout(){
   try{localStorage.setItem(LEVEL_LAYOUT_KEY,JSON.stringify(savedLevelState));return true;}
   catch(error){console.warn("Saved level layout could not be persisted",error);return false;}
 }
-addEventListener("pagehide",()=>mode==="editor"?saveLevelLayout():persistSavedLevelLayout());
+addEventListener("pagehide",()=>{if(mode==="editor"){rememberEditorWorkspace();saveLevelLayout();}else persistSavedLevelLayout();});
 function currentEditorCameraFrame(){return levelCameraFrame({x:editorCameraFocus.x,z:editorCameraFocus.z,scale:editorCameraScale,rotation:[editorCameraRotation.x,editorCameraRotation.y,editorCameraRotation.z]},{minScale:EDITOR_ZOOM_MIN,maxScale:EDITOR_ZOOM_MAX});}
 function editorSnapshot(){return {assets:editorObjects.map(levelAssetRecord).filter(Boolean),hiddenAssets:[...hiddenEditorAssets],contentBrowser:copyContentBrowserState(),camera:currentEditorCameraFrame()};}
 function updateEditorUndoControl(){$("editor-undo").disabled=editorUndoHistory.length===0;}
@@ -4807,7 +4810,7 @@ function setEditorContext(context){
   updateEditorInspector();
 }
 function toggleEditorViewportMaximize(){editorLayout.maximized=!editorLayout.maximized;applyEditorLayout();$("editor-status").textContent=editorLayout.maximized?"Viewport maximized. Press Tab to restore the editor panels.":"Editor panels restored.";}
-function saveEditorSession(){saveLevelLayout();persistEditorLayout();$("editor-status").textContent="Level and editor layout saved locally.";}
+function saveEditorSession(){rememberEditorWorkspace();saveLevelLayout();persistEditorLayout();$("editor-status").textContent="Level and editor layout saved locally.";}
 function selectedEditorActorProfile(){
   const actor=editorSelectedObjects.size===1&&editorSelection?.userData?.editorActor?editorSelection:null;
   if(actor){
@@ -5978,6 +5981,14 @@ function setAssetPanel(open){
   if(open){if(editorAssetFolder===null)openEditorAssetFolder(null);panel.classList.remove("hidden");panel.classList.add("open");}
   else{panel.classList.remove("open");panel.classList.add("hidden");}
 }
+function rememberEditorWorkspace(){
+  editorLayout.lastContext=EDITOR_CONTEXTS[editorContext]?editorContext:"select";editorLayout.assetFolder=typeof editorAssetFolder==="string"&&editorAssetFolder?editorAssetFolder:contentBrowserFolderId||CONTENT_BROWSER_ROOT_ID;editorLayout.assetQuery=typeof contentBrowserQuery==="string"?contentBrowserQuery:"";editorLayout.environmentOpen=Boolean(editorEnvironmentOpen);persistEditorLayout();
+}
+function restoreEditorWorkspace(){
+  const context=EDITOR_CONTEXTS[editorLayout.lastContext]?editorLayout.lastContext:"select",folder=typeof editorLayout.assetFolder==="string"&&editorLayout.assetFolder?editorLayout.assetFolder:CONTENT_BROWSER_ROOT_ID;
+  editorAssetFolder=folder;contentBrowserFolderId=folder;ensureContentBrowserFolder();contentBrowserQuery=typeof editorLayout.assetQuery==="string"?editorLayout.assetQuery:"";const search=$("content-browser-search");if(search)search.value=contentBrowserQuery;
+  renderEditorAssets();setEditorContext(context);setAssetPanel(true);toggleEditorEnvironmentPopover(Boolean(editorLayout.environmentOpen),{remember:false});
+}
 function toggleEditorEnvironmentPopover(force){
   const panel=$("world-look-panel");if(!panel)return;
   const open=typeof force==="boolean"?force:!editorEnvironmentOpen;
@@ -6004,11 +6015,11 @@ function openLevelEditor(){
   editorCameraRotation.fromArray(savedLevelCamera?.rotation??[0,0,0]);
   editorCameraScale=THREE.MathUtils.clamp(savedLevelCamera?.scale??gameplayCameraScale,EDITOR_ZOOM_MIN,EDITOR_ZOOM_MAX);document.body.classList.add("editor-active");$("editor-shell").classList.remove("hidden");
   editorUndoHistory=[];commandHoverCell=null;updateEditorUndoControl();updateEditorZoomControls();updateEditorTransformControls();updateEditorScaleLock();syncFoliagePaintControls();buildEditorTransformGizmo();
-  $("editor-toolbar").classList.remove("hidden");toggleEditorEnvironmentPopover(false);$("editor-transform-panel").classList.add("hidden");$("world-outliner").classList.remove("hidden");$("editor-status").classList.remove("hidden");ensureEditorCameraObject();syncWorldLookControls();applyWorldLook();renderEditorAssets();renderWorldOutliner();updateEditorTransformInspector();setEditorContext("select");setAssetPanel(true);updateFoliagePanel();applyEditorLayout();refreshCommandGrid();setNavigationDebugVisible(navigationDebugVisible);sounds.music.pause();
+  $("editor-toolbar").classList.remove("hidden");$("editor-transform-panel").classList.add("hidden");$("world-outliner").classList.remove("hidden");$("editor-status").classList.remove("hidden");ensureEditorCameraObject();syncWorldLookControls();applyWorldLook();restoreEditorWorkspace();renderWorldOutliner();updateEditorTransformInspector();updateFoliagePanel();applyEditorLayout();refreshCommandGrid();setNavigationDebugVisible(navigationDebugVisible);sounds.music.pause();
 }
 function closeLevelEditor(){
   if(mode!=="editor")return;
-  saveLevelLayout();
+  saveLevelLayout();rememberEditorWorkspace();
   if(foliagePaintActive)setFoliagePaintActive(false);
   if(editorPointerState&&canvas.hasPointerCapture?.(editorPointerState.pointerId))canvas.releasePointerCapture(editorPointerState.pointerId);
   editorPointerState=null;editorCameraTravel=null;editorKeys.clear();editorPendingAsset=null;editorAssetFolder=null;commandHoverCell=null;clearCommandGrid();updateEditorAssetSelection();closeEditorDeleteConfirm();selectEditorObject(null);removeEditorCameraObject();setAssetPanel(false);

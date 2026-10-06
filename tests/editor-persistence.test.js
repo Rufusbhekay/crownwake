@@ -7,6 +7,40 @@ import { levelCameraFrame } from "../src/sim.js";
 
 const source = readFileSync(new URL("../game.js", import.meta.url), "utf8");
 
+test("World Tools restores its last workspace after returning from playtest", () => {
+  const calls = [];
+  const search = { value: "" };
+  const context = vm.createContext({
+    CONTENT_BROWSER_ROOT_ID: "content",
+    EDITOR_CONTEXTS: { select: {}, assets: {}, foliage: {}, environment: {} },
+    editorLayout: { lastContext: "foliage", assetFolder: "environment/trees", assetQuery: "oak", environmentOpen: true },
+    contentBrowserFolderId: "content", editorAssetFolder: null, contentBrowserQuery: "",
+    $: id => id === "content-browser-search" ? search : null,
+    ensureContentBrowserFolder: () => calls.push("folder"),
+    renderEditorAssets: () => calls.push("assets"),
+    setEditorContext: value => calls.push(`context:${value}`),
+    setAssetPanel: value => calls.push(`panel:${value}`),
+    toggleEditorEnvironmentPopover: (value, options) => calls.push(`environment:${value}:${options.remember}`)
+  });
+  const start = source.indexOf("function restoreEditorWorkspace()");
+  const end = source.indexOf("\nfunction ", start + 1);
+
+  assert.notEqual(start, -1, "World Tools must restore its prior workspace");
+  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext("restoreEditorWorkspace()", context);
+
+  assert.equal(context.editorAssetFolder, "environment/trees");
+  assert.equal(context.contentBrowserFolderId, "environment/trees");
+  assert.equal(context.contentBrowserQuery, "oak");
+  assert.equal(search.value, "oak");
+  assert.deepEqual(calls, ["folder", "assets", "context:foliage", "panel:true", "environment:true:false"]);
+  const openStart = source.indexOf("function openLevelEditor()");
+  const closeStart = source.indexOf("function closeLevelEditor()");
+  const closeEnd = source.indexOf("\nfunction ", closeStart + 1);
+  assert.match(source.slice(openStart, closeStart), /restoreEditorWorkspace\(\);[\s\S]*refreshCommandGrid\(\)/);
+  assert.match(source.slice(closeStart, closeEnd), /saveLevelLayout\(\);rememberEditorWorkspace\(\);/);
+});
+
 test("reopening the editor restores saved zoom and focus instead of the gameplay view", () => {
   const context = vm.createContext({
     THREE, mode: "settings", settingsReturnMode: "playing", editorReturnMode: "playing",
@@ -18,7 +52,7 @@ test("reopening the editor restores saved zoom and focus instead of the gameplay
     $: () => ({ classList: { add() {}, remove() {} } }),
     sounds: { music: { pause() {} } }, playerFocus: () => ({ position: new THREE.Vector3(10, 0, 20) })
   });
-  for (const name of ["clearTacticalSelection", "updateEditorUndoControl", "updateEditorZoomControls", "updateEditorTransformControls", "updateEditorScaleLock", "syncFoliagePaintControls", "buildEditorTransformGizmo", "toggleEditorEnvironmentPopover", "ensureEditorCameraObject", "syncWorldLookControls", "applyWorldLook", "renderEditorAssets", "renderWorldOutliner", "updateEditorTransformInspector", "setEditorContext", "setAssetPanel", "updateFoliagePanel", "applyEditorLayout", "refreshCommandGrid", "setNavigationDebugVisible"]) context[name] = () => {};
+  for (const name of ["clearTacticalSelection", "updateEditorUndoControl", "updateEditorZoomControls", "updateEditorTransformControls", "updateEditorScaleLock", "syncFoliagePaintControls", "buildEditorTransformGizmo", "restoreEditorWorkspace", "ensureEditorCameraObject", "syncWorldLookControls", "applyWorldLook", "renderWorldOutliner", "updateEditorTransformInspector", "updateFoliagePanel", "applyEditorLayout", "refreshCommandGrid", "setNavigationDebugVisible"]) context[name] = () => {};
   const start = source.indexOf("function openLevelEditor()");
   vm.runInContext(source.slice(start, source.indexOf("function closeLevelEditor()", start)), context);
   context.openLevelEditor();

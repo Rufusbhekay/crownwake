@@ -348,25 +348,28 @@ test("practice session runs ten waves across three size bands", () => {
   assert.deepEqual([0,.5,.999].map(practiceWaveInterval),[5,6,7]);
 });
 
-test("custom practice settings keep separate CH1, CH2 and swordsman reserves", () => {
+test("custom practice settings keep separate CH1, CH2, swordsman and ranged reserves", () => {
   assert.deepEqual(
-    (({ch1Soldiers,ch2Soldiers,playerSoldiers})=>({ch1Soldiers,ch2Soldiers,playerSoldiers}))(normalizePracticeConfig()),
-    {ch1Soldiers:7,ch2Soldiers:7,playerSoldiers:19}
+    (({ch1Soldiers,ch2Soldiers,ch3Soldiers,ch4Soldiers,playerSoldiers})=>({ch1Soldiers,ch2Soldiers,ch3Soldiers,ch4Soldiers,playerSoldiers}))(normalizePracticeConfig()),
+    {ch1Soldiers:7,ch2Soldiers:7,ch3Soldiers:5,ch4Soldiers:5,playerSoldiers:24}
   );
   const settings=normalizePracticeConfig({ch1Soldiers:0,ch2Soldiers:99,startingEnemies:99,waveCounts:[0,99,4],waveDelay:12.5});
   assert.equal(settings.ch1Soldiers,0);
   assert.equal(settings.ch2Soldiers,99);
   assert.equal(settings.ch3Soldiers,5);
-  assert.equal(settings.playerSoldiers,104);
+  assert.equal(settings.ch4Soldiers,5);
+  assert.equal(settings.playerSoldiers,109);
   assert.equal(normalizePracticeConfig({ch3Soldiers:0}).ch3Soldiers,0);
   assert.equal(normalizePracticeConfig({ch3Soldiers:8}).ch3Soldiers,8);
+  assert.equal(normalizePracticeConfig({ch4Soldiers:0}).ch4Soldiers,0);
+  assert.equal(normalizePracticeConfig({ch4Soldiers:8}).ch4Soldiers,8);
   assert.equal(settings.startingEnemies,24);
   assert.deepEqual(settings.waveCounts.slice(0,4),[0,24,4,5]);
   assert.equal(settings.waveCounts.length,10);
   assert.equal(settings.waveDelay,12.5);
   assert.deepEqual(
-    (({ch1Soldiers,ch2Soldiers,playerSoldiers})=>({ch1Soldiers,ch2Soldiers,playerSoldiers}))(normalizePracticeConfig({playerSoldiers:137})),
-    {ch1Soldiers:69,ch2Soldiers:68,playerSoldiers:142}
+    (({ch1Soldiers,ch2Soldiers,ch4Soldiers,playerSoldiers})=>({ch1Soldiers,ch2Soldiers,ch4Soldiers,playerSoldiers}))(normalizePracticeConfig({playerSoldiers:137})),
+    {ch1Soldiers:69,ch2Soldiers:68,ch4Soldiers:5,playerSoldiers:147}
   );
 });
 

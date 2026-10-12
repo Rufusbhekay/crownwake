@@ -3749,10 +3749,10 @@ function updateDuel(unit,foe,dt){
 function activeTransientParticleCount(){let count=0;for(const particle of particles)if(particle.visible&&particle.userData.kind!=="shatter")count++;return count}
 function persistentFragmentCount(){let count=0;for(const particle of particles)if(particle.visible&&particle.userData.kind==="shatter")count++;return count}
 function shatterCommander(commander){
-  const count=10+Math.floor(rand()*7),palette=commander.userData.faction==="player"?[0x247bff,0x103e9c,0x34383a]:[0xd92f43,0x8b1f2d,0x3b3437];
+  const count=20+Math.floor(rand()*9),palette=[0xd92f43,0x971d28,0xff5d62];
   for(let i=0;i<count;i++){
     if(!persistentFragmentBudgetAllows(persistentFragmentCount(),MAX_PERSISTENT_FRAGMENTS))break;
-    const size=.07+rand()*.11,p=new THREE.Mesh(new THREE.BoxGeometry(size,size,size),mat(palette[i%palette.length],.9));
+    const size=.035+rand()*.055,p=new THREE.Mesh(new THREE.BoxGeometry(size,size,size),mat(palette[i%palette.length],.9));
     p.position.copy(commander.position);p.position.y+=.78+rand()*.45;
     const angle=rand()*Math.PI*2,speed=.9+rand()*2.1;
     p.userData={kind:"shatter",persistent:true,life:Infinity,maxLife:Infinity,halfSize:size*.5,bounces:0,settled:false,vel:new THREE.Vector3(Math.cos(angle)*speed,2+rand()*2.8,Math.sin(angle)*speed),spin:new THREE.Vector3((rand()-.5)*9,(rand()-.5)*9,(rand()-.5)*9)};
@@ -3761,10 +3761,10 @@ function shatterCommander(commander){
   shake=reducedMotion?0:.16;synthTone(72,.38,"sawtooth",.04);
 }
 function shatterSoldier(soldier){
-  const count=soldierFragmentCount(rand()),palette=soldier.userData.faction==="player"?[0x35c9c2,0x4383bd,0xf7f2e4]:[COLORS.amber,0xb7650e,0xffd566];
+  const count=soldierFragmentCount(rand()),palette=[0xd92f43,0x971d28,0xff5d62];
   for(let i=0;i<count;i++){
     if(!persistentFragmentBudgetAllows(persistentFragmentCount(),MAX_PERSISTENT_FRAGMENTS))break;
-    const scale=soldier.userData.faction==="player"?1:1.5,size=(.045+rand()*.065)*scale,p=new THREE.Mesh(new THREE.BoxGeometry(size,size,size),mat(palette[i%palette.length],.9));
+    const size=.024+rand()*.032,p=new THREE.Mesh(new THREE.BoxGeometry(size,size,size),mat(palette[i%palette.length],.9));
     p.position.copy(soldier.position);p.position.y+=.45+rand()*.5;
     const angle=rand()*Math.PI*2,speed=.55+rand()*1.45;
     p.userData={kind:"shatter",persistent:true,life:Infinity,maxLife:Infinity,halfSize:size*.5,bounces:0,settled:false,vel:new THREE.Vector3(Math.cos(angle)*speed,1.35+rand()*1.85,Math.sin(angle)*speed),spin:new THREE.Vector3((rand()-.5)*10,(rand()-.5)*10,(rand()-.5)*10)};

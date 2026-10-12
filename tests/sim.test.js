@@ -841,10 +841,10 @@ test("enemy soldiers never evade, even when one remains", () => {
   assert.equal(shouldEnemyEvade(0), false);
 });
 
-test("player soldier deaths create a compact fragment burst", () => {
-  assert.equal(soldierFragmentCount(0),8);
-  assert.equal(soldierFragmentCount(.5),10);
-  assert.equal(soldierFragmentCount(.99),12);
+test("player soldier deaths create a dense fragment burst", () => {
+  assert.equal(soldierFragmentCount(0),16);
+  assert.equal(soldierFragmentCount(.5),20);
+  assert.equal(soldierFragmentCount(.99),24);
 });
 
 test("environment keeps the matte non-metallic terrain grade without tile overscan", () => {

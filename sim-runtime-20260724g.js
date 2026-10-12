@@ -979,7 +979,7 @@ export function recruitRevivalTiming(index) {
 }
 
 export function soldierFragmentCount(roll) {
-  return 8 + Math.min(4, Math.floor(Math.max(0, roll) * 5));
+  return 16 + Math.min(8, Math.floor(Math.max(0, roll) * 9));
 }
 
 export function revivalBlinkIntensity(progress) {

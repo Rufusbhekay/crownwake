@@ -3658,7 +3658,7 @@ function dealDamage(attacker,victim){
   showActorHealth(victim,previousHealth);
   const knockback=hitKnockback(attacker.position,victim.position,victim.userData.isMaster?1.35:2.25);
   victim.userData.velocity.add(new THREE.Vector3(knockback.x,0,knockback.z));
-  burst(victim.position,attacker.userData.faction); if(rand()<.22)synthTone(125+rand()*70,.08,"triangle",.018);
+  if(rand()<.22)synthTone(125+rand()*70,.08,"triangle",.018);
   attacker.userData.attackAnim=1;victim.userData.damageAnim=1;victim.userData.hitPulse=1;
   if(victim===master&&!INDEPENDENT_SOLDIERS){
     masterHealth=Math.max(0,victim.userData.hp);sinceDamage=0;damagePulse=Math.min(1.65,damagePulse+.62);damageStacks=Math.min(6,damageStacks+1);
@@ -3748,10 +3748,6 @@ function updateDuel(unit,foe,dt){
 }
 function activeTransientParticleCount(){let count=0;for(const particle of particles)if(particle.visible&&particle.userData.kind!=="shatter")count++;return count}
 function persistentFragmentCount(){let count=0;for(const particle of particles)if(particle.visible&&particle.userData.kind==="shatter")count++;return count}
-function burst(pos,faction){
-  const color=COLORS[faction]||COLORS.player;
-  for(let i=0;i<5;i++){if(!particleBudgetAllows(activeTransientParticleCount(),MAX_ACTIVE_PARTICLES))break;let p=particles.find(x=>!x.visible&&x.userData.kind==="hit");if(!p){p=new THREE.Mesh(new THREE.TetrahedronGeometry(.09),mat(color));p.userData.kind="hit";particles.push(p);battle.add(p)}p.material.color.setHex(color);p.position.copy(pos);p.position.y=.8;p.userData.life=.45;p.userData.maxLife=.45;p.userData.vel=new THREE.Vector3((rand()-.5)*2,1+rand()*1.8,(rand()-.5)*2);p.userData.spin=null;p.visible=true}shake=reducedMotion?0:.07;
-}
 function shatterCommander(commander){
   const count=10+Math.floor(rand()*7),palette=commander.userData.faction==="player"?[0x247bff,0x103e9c,0x34383a]:[0xd92f43,0x8b1f2d,0x3b3437];
   for(let i=0;i<count;i++){

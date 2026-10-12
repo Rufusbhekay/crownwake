@@ -3673,9 +3673,9 @@ function dealDamage(attacker,victim){
     if(victim.userData.isMaster&&!INDEPENDENT_SOLDIERS){
       playSound("death");
       if(victim===master){commanderHearts=Math.max(0,commanderHearts-1);updateHearts()}
-      shatterCommander(victim);victim.visible=false
+      victim.visible=false
     }
-    else if(victim.userData.faction==="player"||INDEPENDENT_SOLDIERS){playSound("death");shatterSoldier(victim);victim.visible=false}
+    else if(victim.userData.faction==="player"||INDEPENDENT_SOLDIERS){playSound("death");victim.visible=false}
     else setFallenAppearance(victim,true);
     if(victim.userData.faction==="player"){companyLayoutDirty=true;updateStats()}
   }

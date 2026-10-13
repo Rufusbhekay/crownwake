@@ -668,7 +668,7 @@ test("swordsman deployment owns a third group separate from CH1 and CH2", () => 
 
 test("legacy hidden swordsman count migrates to five and configured counts survive reload", () => {
   const start = game.indexOf("function loadPracticeConfig()"), end = game.indexOf("\n", start);
-  for (const [saved, expected] of [[{ ch1Soldiers: 5, ch2Soldiers: 0, ch3Soldiers: 2 }, 2], [{ deploymentRosterVersion: 2, ch3Soldiers: 2 }, 2], [{ deploymentRosterVersion: 2, ch3Soldiers: 0 }, 0]]) {
+  for (const [saved, expected] of [[{ ch1Soldiers: 5, ch2Soldiers: 0, ch3Soldiers: 2 }, 5], [{ deploymentRosterVersion: 2, ch3Soldiers: 2 }, 2], [{ deploymentRosterVersion: 2, ch3Soldiers: 0 }, 0]]) {
     const context = vm.createContext({ normalizePracticeConfig, PRACTICE_CONFIG_KEY: "test", localStorage: { getItem: () => JSON.stringify(saved) } });
     vm.runInContext(game.slice(start, end), context);
     assert.equal(context.loadPracticeConfig().ch3Soldiers, expected);

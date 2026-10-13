@@ -96,9 +96,9 @@ const PROGRESS_BAR_BLUEPRINTS=Object.freeze({
   [BUILDING_PROGRESS_BAR_BP_ASSET_ID]:Object.freeze({backgroundColor:"#000000",mainColor:"#ef6d78",width:4.625,height:.075})
 });
 const SWORDSMAN_MODEL_ASSET_ID="model:ch-swordsman";
-const ACTOR_PROGRESS_BAR_ARCHETYPE_IDS=Object.freeze(["ch1","ch2","ch3","ch4","en1","en2","en3","en4","en5"]);
+const ACTOR_PROGRESS_BAR_ARCHETYPE_IDS=Object.freeze(["ch1","ch2","ch3","en1","en2","en3","en4","en5"]);
 const HUD_ARCHETYPE_IDS=ACTOR_PROGRESS_BAR_ARCHETYPE_IDS,HUD_LAYOUT_GRID=Object.freeze({columns:24,rows:16}),HUD_WIDGET_DEFAULTS=Object.freeze({size:1,spawnCount:5,visible:true});
-const HUD_LAYOUT_DEFAULTS=Object.freeze({ch1:{x:.56,y:.09},ch2:{x:.67,y:.09},ch3:{x:.8,y:.09},ch4:{x:.91,y:.09},en1:{x:.56,y:.18},en2:{x:.67,y:.18},en3:{x:.8,y:.18},en4:{x:.56,y:.27},en5:{x:.67,y:.27}});
+const HUD_LAYOUT_DEFAULTS=Object.freeze({ch1:{x:.56,y:.09},ch2:{x:.67,y:.09},ch3:{x:.8,y:.09},en1:{x:.56,y:.18},en2:{x:.67,y:.18},en3:{x:.8,y:.18},en4:{x:.56,y:.27},en5:{x:.67,y:.27}});
 const HUD_TEXT_ASSET_ID="hud:text",HUD_TEXT_DEFAULTS=Object.freeze({text:"BREAK THE RIVAL CROWN",size:1,visible:true,layoutX:.39,layoutY:.09});
 function hudAssetId(archetypeId){return `hud:${archetypeId}`}
 function hudLayoutDefault(archetypeId){return HUD_LAYOUT_DEFAULTS[archetypeId]??{x:.5,y:.16}}
@@ -135,7 +135,7 @@ function normalizeBuildingBlueprintSettings(settings={},kind="barracks"){
   const model=isContentBrowserModelId(settings.model)?settings.model:BUILDING_BLUEPRINT_DEFAULTS.model,materialColor=normalizeHexColour(settings.materialColor,BUILDING_BLUEPRINT_DEFAULTS.materialColor),barracksSpawnInterval=THREE.MathUtils.clamp(Math.round(Number(settings.barracksSpawnInterval)||BUILDING_BLUEPRINT_DEFAULTS.barracksSpawnInterval),5,10),maxHp=normalizeRaidBuildingHealth(settings.maxHp,defaultRaidBuildingHealth()),progressBarAssetId=isProgressBarBlueprint(settings.progressBarAssetId)?settings.progressBarAssetId:BUILDING_BLUEPRINT_DEFAULTS.progressBarAssetId,healthBarOffset=normalizeHealthBarOffset(settings.healthBarOffset,BUILDING_BLUEPRINT_DEFAULTS.healthBarOffset);
   return {model,materialColor,barracksSpawnInterval,maxHp,progressBarAssetId,healthBarOffset};
 }
-function loadPracticeConfig(){try{const saved=JSON.parse(localStorage.getItem(PRACTICE_CONFIG_KEY)||"{}");if(saved.ch3Soldiers==null)saved.ch3Soldiers=5;if(saved.ch4Soldiers==null)saved.ch4Soldiers=5;return normalizePracticeConfig(saved)}catch{return normalizePracticeConfig()}}
+function loadPracticeConfig(){try{const saved=JSON.parse(localStorage.getItem(PRACTICE_CONFIG_KEY)||"{}");if(saved.deploymentRosterVersion!==2)saved.ch3Soldiers=5;return normalizePracticeConfig(saved)}catch{return normalizePracticeConfig()}}
 const AUDIO_PREFERENCE_KEY="crownwake-audio-enabled";
 function loadAudioPreference(){try{return localStorage.getItem(AUDIO_PREFERENCE_KEY)!=="false"}catch{return true}}
 const PRACTICE_CONFIG=loadPracticeConfig();
@@ -143,7 +143,7 @@ let unitRingSettings=loadUnitRingSettings();
 let campaign = makeCampaign(), mode = "title", target = new THREE.Vector3(), activeEncounter = null;
 const PLAYER_COMMANDER=commanderCombatProfile("player"),ENEMY_COMMANDER=commanderCombatProfile("enemy"),OPENING_ENEMY_RADIUS=8,WAVES_ENABLED=false;
 const INDEPENDENT_SOLDIERS=true;
-let master, masterHealth = INDEPENDENT_SOLDIERS?32:PLAYER_COMMANDER.maxHealth, sinceDamage = 99, followers = [], enemyUnits = [], particles = [], projectiles = [], tombstones = [];
+let master, masterHealth = INDEPENDENT_SOLDIERS?32:PLAYER_COMMANDER.maxHealth, sinceDamage = 99, followers = [], enemyUnits = [], particles = [], tombstones = [];
 const MAX_ACTIVE_PARTICLES=180,MAX_PERSISTENT_FRAGMENTS=800;
 let totalTime = 0, interfaceTime = 0, shake = 0, reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches, audioOn = loadAudioPreference(), gameSpeed = 1, hudCompact = false, settingsReturnMode = "playing";
 let selectedRegion = 2, toastTimer = 0, nextWaveTimer = 0, waveNumber = 0, enemyPackAnchor = null;
@@ -153,7 +153,7 @@ let celebrationWinnerFaction = null;
 let damagePulse = 0, damageStacks = 0;
 let commanderHearts = 3;
 let companyLayoutDirty=true,playerCompanies=[];
-const PLAYER_DEPLOYMENT_ARCHETYPES=Object.freeze(["ch1","ch2","ch3","ch4"]);
+const PLAYER_DEPLOYMENT_ARCHETYPES=Object.freeze(["ch1","ch2","ch3"]);
 function deploymentGroupId(archetypeId){const index=PLAYER_DEPLOYMENT_ARCHETYPES.indexOf(archetypeId);return index<0?0:index}
 function deploymentReserveTotal(){return PLAYER_DEPLOYMENT_ARCHETYPES.reduce((total,archetypeId)=>total+(deploymentReserves[archetypeId]??0),0)}
 function configuredDeploymentReserves(config=PRACTICE_CONFIG){return Object.fromEntries(PLAYER_DEPLOYMENT_ARCHETYPES.map(id=>[id,config[`${id}Soldiers`]]))}
@@ -231,7 +231,7 @@ function normalizeImportedModelRecord(record){
 function normalizeActorBlueprintStats(settings){
   if(!settings||typeof settings!=="object")return {};
   const normalized={};
-  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15],["patrolSpacing",.1,5],["patrolRadiusMin",.5,30],["patrolRadiusMax",.5,30],["patrolPauseMax",0,2],["projectileDamage",.5,200],["projectileSpeed",1,50],["projectileLength",.2,5],["projectileThickness",.02,.4]]){
+  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15],["patrolSpacing",.1,5],["patrolRadiusMin",.5,30],["patrolRadiusMax",.5,30],["patrolPauseMax",0,2]]){
     const value=Number(settings[property]);if(Number.isFinite(value))normalized[property]=Math.min(maximum,Math.max(minimum,value));
   }
   if("patrolRadiusMin" in normalized||"patrolRadiusMax" in normalized){const minimum=normalized.patrolRadiusMin??3.2,maximum=normalized.patrolRadiusMax??3.2;normalized.patrolRadiusMin=Math.min(minimum,maximum);normalized.patrolRadiusMax=Math.max(minimum,maximum);}
@@ -1774,10 +1774,6 @@ function levelAssetRecord(object){
     archetypeId:object.userData.actorArchetypeId,
     maxHp:Number(object.userData.maxHp.toFixed(2)),
     attack:Number(object.userData.attack.toFixed(2)),
-    projectileDamage:Number((object.userData.projectileDamage??0).toFixed(2)),
-    projectileSpeed:Number((object.userData.projectileSpeed??0).toFixed(2)),
-    projectileLength:Number((object.userData.projectileLength??0).toFixed(2)),
-    projectileThickness:Number((object.userData.projectileThickness??0).toFixed(3)),
     moveSpeed:Number(object.userData.moveSpeed.toFixed(2)),
     acceleration:Number(actorAcceleration(object).toFixed(2)),
     patrolSpeed:Number(actorPatrolSpeed(object).toFixed(2)),
@@ -2631,12 +2627,11 @@ function makeMaster(faction="player") {
   if(faction!=="player")tintCharacter(g,COLORS.coral);prepareDamageVisual(g);makeActorHealthWidget(g,false);addGroundContactOcclusion(g);makeEncounterRing(g);return g;
 }
 const ACTOR_SPEED_BOOST=1.5;
-const ACTOR_LEGACY_MOVE_SPEEDS=Object.freeze({ch1:2.65,ch2:3.18,ch3:2.65,ch4:2.65,en1:2.65,en2:3.18,en3:2.65,en4:2.65,en5:2.65});
+const ACTOR_LEGACY_MOVE_SPEEDS=Object.freeze({ch1:2.65,ch2:3.18,ch3:2.65,en1:2.65,en2:3.18,en3:2.65,en4:2.65,en5:2.65});
 const ACTOR_DEFAULT_ACCELERATION=5.4,ACTOR_SPEED_INPUT_MAX=15,ACTOR_ACCELERATION_INPUT_MAX=30,ACTOR_PATROL_SPACING_INPUT_MAX=5,ACTOR_PATROL_RADIUS_INPUT_MIN=.5,ACTOR_PATROL_RADIUS_INPUT_MAX=30,ACTOR_PATROL_RADIUS_DEFAULT=3.2,ACTOR_PATROL_PAUSE_INPUT_MAX=2;
 const ACTOR_ARCHETYPES=Object.freeze({
   ch1:Object.freeze({id:"ch1",label:"CH1",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
   ch3:Object.freeze({id:"ch3",label:"CH Swordsman",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
-  ch4:Object.freeze({id:"ch4",label:"CH3",faction:"player",maxHp:28,attack:9,projectile:true,projectileDamage:9,projectileSpeed:13,projectileLength:1.1,projectileThickness:.065,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
   en1:Object.freeze({id:"en1",label:"EN1",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:COLORS.amber}),
   ch2:Object.freeze({id:"ch2",label:"CH2",faction:"player",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0x171a1d}),
   en2:Object.freeze({id:"en2",label:"EN2",faction:"enemy",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xd84b55}),
@@ -2676,14 +2671,10 @@ function editorActorMoveScale(unit){
 }
 function applyEditorActorProfile(actor,profile){
   if(!actor?.userData||!profile)return;
-  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),projectileDamage=Number(profile.projectileDamage),projectileSpeed=Number(profile.projectileSpeed),projectileLength=Number(profile.projectileLength),projectileThickness=Number(profile.projectileThickness),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),patrolSpacing=Number(profile.patrolSpacing),patrolRadiusMin=Number(profile.patrolRadiusMin),patrolRadiusMax=Number(profile.patrolRadiusMax),patrolPauseMax=Number(profile.patrolPauseMax),healthBarOffset=Number(profile.healthBarOffset);
+  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),patrolSpacing=Number(profile.patrolSpacing),patrolRadiusMin=Number(profile.patrolRadiusMin),patrolRadiusMax=Number(profile.patrolRadiusMax),patrolPauseMax=Number(profile.patrolPauseMax),healthBarOffset=Number(profile.healthBarOffset);
   if(profile.archetypeId){actor.userData.actorArchetypeId=actorArchetype(profile.archetypeId,actor.userData.faction).id;if(actor.userData.faction==="player")actor.userData.companyId=deploymentGroupId(actor.userData.actorArchetypeId);}
   if(Number.isFinite(maxHp))actor.userData.maxHp=actor.userData.hp=THREE.MathUtils.clamp(maxHp,1,500);
   if(Number.isFinite(attack))actor.userData.attack=THREE.MathUtils.clamp(attack,.5,200);
-  if(Number.isFinite(projectileDamage))actor.userData.projectileDamage=THREE.MathUtils.clamp(projectileDamage,.5,200);
-  if(Number.isFinite(projectileSpeed))actor.userData.projectileSpeed=THREE.MathUtils.clamp(projectileSpeed,1,50);
-  if(Number.isFinite(projectileLength))actor.userData.projectileLength=THREE.MathUtils.clamp(projectileLength,.2,5);
-  if(Number.isFinite(projectileThickness))actor.userData.projectileThickness=THREE.MathUtils.clamp(projectileThickness,.02,.4);
   if(Number.isFinite(moveSpeed))actor.userData.moveSpeed=normalizeActorMoveSpeed(moveSpeed,actor.userData.actorArchetypeId,actor.userData.faction);
   if(Number.isFinite(acceleration))actor.userData.acceleration=THREE.MathUtils.clamp(acceleration,.5,ACTOR_ACCELERATION_INPUT_MAX);
   if(Number.isFinite(patrolSpeed))actor.userData.patrolSpeed=THREE.MathUtils.clamp(patrolSpeed,.25,ACTOR_SPEED_INPUT_MAX);
@@ -2713,7 +2704,7 @@ function makeUnit(faction="player",archetypeId=null) {
   const g=new THREE.Group(),archetype=actorBlueprintProfile(archetypeId,faction),modelAssetId=actorModelAssetId(archetype.id);
   setCharacterVisual(g,modelAssetId,()=>{const body=roundedBox(.42,1.22,.38,mats.warrior,.1);body.position.y=.03;return body});
   const {maxHp,attack,moveSpeed}=archetype,materialColor=faction==="enemy"?actorMaterialColour(archetype.id):null;
-  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,projectileDamage:archetype.projectileDamage??0,projectileSpeed:archetype.projectileSpeed??0,projectileLength:archetype.projectileLength??0,projectileThickness:archetype.projectileThickness??0,projectileCooldown:rand()*.35,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,patrolSpacing:archetype.patrolSpacing,patrolRadiusMin:archetype.patrolRadiusMin,patrolRadiusMax:archetype.patrolRadiusMax,patrolPauseMax:archetype.patrolPauseMax,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
+  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,patrolSpacing:archetype.patrolSpacing,patrolRadiusMin:archetype.patrolRadiusMin,patrolRadiusMax:archetype.patrolRadiusMax,patrolPauseMax:archetype.patrolPauseMax,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
   const tint=materialColor?new THREE.Color(materialColor).getHex():archetype.tint;if(Number.isInteger(tint))tintCharacter(g,tint);
   prepareDamageVisual(g);makeActorHealthWidget(g,false);addGroundContactOcclusion(g);makeEncounterRing(g);return g;
 }
@@ -3350,10 +3341,10 @@ function disposePlaytestParticle(particle){
 function resetPlaytestToSavedLevel(){
   if(!savedLevelState)return false;
   clearTacticalSelection();selectEditorObject(null);removeEditorCameraObject();clearCommandGrid();
-  for(const particle of [...particles,...projectiles])disposePlaytestParticle(particle);
+  for(const particle of particles)disposePlaytestParticle(particle);
   for(const marker of tombstones)battle.remove(marker);
   for(const object of new Set([...editorObjects,...followers,...enemyUnits]))battle.remove(object);
-  particles=[];projectiles=[];tombstones=[];followers=[];enemyUnits=[];editorObjects.length=0;editorFoliageObjects.clear();worldFloor=null;invalidateNavigation();
+  particles=[];tombstones=[];followers=[];enemyUnits=[];editorObjects.length=0;editorFoliageObjects.clear();worldFloor=null;invalidateNavigation();
   activeEncounter=null;enemyPackAnchor=null;enemyRetreat=null;defeatCinematic=null;celebrationWinnerFaction=null;nextWaveTimer=0;waveNumber=0;wasCombat=false;
   companyAnchors.clear();playerCompanies=[];companyLayoutDirty=true;selectedCompanyId=null;selectedCommander=null;commandHoverCell=null;
   campaign=makeCampaign();selectedRegion=2;deploymentReserves=configuredDeploymentReserves();deploymentArchetypeId=null;deploymentRequestedCount=0;deploymentPlacementReady=false;deploymentPreviewOccupancySignature="";deploymentStarted=false;
@@ -3421,60 +3412,6 @@ function updateEnemyPackAnchor(livingSoldiers,{combat,preparingForContact,dt}){
   enemyPackAnchor.position.y=GROUND_Y;
 }
 function nearestAlive(from,list){const origin=from.position??from;let best=null,bd=Infinity;for(const u of list){if(!u.userData.alive)continue;const d=origin.distanceToSquared(u.position);if(d<bd){bd=d;best=u}}return best}
-function isRangedSkirmisher(unit){return Boolean(unit?.userData?.projectileDamage>0&&unit.userData.projectileSpeed>0)}
-function assignRangedSkirmishTargets(units,enemies){
-  const targets=new Map();
-  for(const unit of units){
-    if(!isRangedSkirmisher(unit)||!unit.userData.alive)continue;
-    const current=unit.userData.rangedTarget;
-    const closest=nearestAlive(unit,enemies);
-    const currentDistance=current?.userData?.alive?unit.position.distanceToSquared(current.position):Infinity;
-    const closestDistance=closest?unit.position.distanceToSquared(closest.position):Infinity;
-    const target=currentDistance<=closestDistance+3.24?current:closest;
-    unit.userData.rangedTarget=target??null;
-    if(target)targets.set(unit,target);
-  }
-  return targets;
-}
-function assignRangedEnemyPursuers(skirmishers,enemies){
-  const enemyTargets=new Map(),claimedEnemies=new Set(),activeSkirmishers=new Set(skirmishers);
-  for(const enemy of enemies){
-    const target=enemy.userData.rangedPursuitTarget;
-    if(!target||activeSkirmishers.has(target)&&target.userData.alive)continue;
-    if(enemy.userData.lockedTarget===target)resetDuel(enemy);
-    enemy.userData.rangedPursuitTarget=null;
-    if(target?.userData?.rangedPursuer===enemy)target.userData.rangedPursuer=null;
-  }
-  for(const skirmisher of skirmishers){
-    const former=skirmisher.userData.lockedTarget;
-    if(former){resetDuel(skirmisher);if(former.userData.lockedTarget===skirmisher)resetDuel(former)}
-    let nearest=skirmisher.userData.rangedPursuer;
-    if(!nearest?.userData?.alive||nearest.userData.rangedPursuitTarget!==skirmisher||claimedEnemies.has(nearest))nearest=null;
-    if(!nearest){
-      let nearestDistance=Infinity;
-      for(const enemy of enemies){
-        if(!enemy.userData.alive||claimedEnemies.has(enemy)||enemy.userData.lockedTarget)continue;
-        const distance=skirmisher.position.distanceToSquared(enemy.position);
-        if(distance<nearestDistance){nearest=enemy;nearestDistance=distance}
-      }
-    }
-    if(!nearest){
-      let nearestDistance=Infinity;
-      for(const enemy of enemies){
-        if(!enemy.userData.alive||claimedEnemies.has(enemy))continue;
-        const distance=skirmisher.position.distanceToSquared(enemy.position);
-        if(distance<nearestDistance){nearest=enemy;nearestDistance=distance}
-      }
-      const formerTarget=nearest?.userData?.lockedTarget;
-      if(formerTarget?.userData?.lockedTarget===nearest)resetDuel(formerTarget);
-      if(nearest?.userData?.lockedTarget)resetDuel(nearest);
-    }
-    skirmisher.userData.rangedPursuer=nearest??null;
-    if(!nearest)continue;
-    nearest.userData.rangedPursuitTarget=skirmisher;lockDuel(nearest,skirmisher);claimedEnemies.add(nearest);enemyTargets.set(nearest,skirmisher);
-  }
-  return enemyTargets;
-}
 function assignCommanderTargets(commanders,opponents,preferCommander){
   const targets=new Map(),loads=opponents.map(()=>0);
   for(const commander of commanders){
@@ -3640,8 +3577,7 @@ function clearInvalidDuels(units){
       if(shouldClearStaleDuelState({hasTarget:false,duelPhase:unit.userData.duelPhase,duelRole:unit.userData.duelRole,duelTurnId:unit.userData.duelTurnId,lungeAxis:unit.userData.lungeAxis}))resetDuel(unit);
       continue;
     }
-    const rangedPursuit=unit.userData.rangedPursuitTarget===foe&&isRangedSkirmisher(foe);
-    if(foe&&!canMaintainSoldierDuel({unitAlive:unit.userData.alive,targetAlive:foe.userData.alive,mutualLock:foe.userData.lockedTarget===unit||rangedPursuit})){
+    if(foe&&!canMaintainSoldierDuel({unitAlive:unit.userData.alive,targetAlive:foe.userData.alive,mutualLock:foe.userData.lockedTarget===unit})){
       resetDuel(unit);unit.userData.seekingTarget=false;
     }
   }
@@ -3712,18 +3648,18 @@ function resolveNavigationObstacleCollisions(){
     const velocity=unit.userData.velocity;if(velocity?.x*correction.x<0)velocity.x=0;if(velocity?.z*correction.z<0)velocity.z=0;
   }
 }
-function dealDamage(attacker,victim,damage=attacker.userData.attack,attackAnimation=1){
+function dealDamage(attacker,victim){
   if(!attacker.userData.alive||!victim.userData.alive||attacker.userData.faction===victim.userData.faction)return false;
   const previousHealth=victim.userData.hp;
   attacker.userData.lastAttackTime=totalTime;
   victim.userData.lastDamageTime=totalTime;
-  victim.userData.hp-=damage;
+  victim.userData.hp-=attacker.userData.attack;
   victim.userData.sinceDamage=0;victim.userData.regenStartHealth=Math.max(0,victim.userData.hp);victim.userData.regenActive=false;
   showActorHealth(victim,previousHealth);
   const knockback=hitKnockback(attacker.position,victim.position,victim.userData.isMaster?1.35:2.25);
   victim.userData.velocity.add(new THREE.Vector3(knockback.x,0,knockback.z));
   if(rand()<.22)synthTone(125+rand()*70,.08,"triangle",.018);
-  attacker.userData.attackAnim=Math.max(attacker.userData.attackAnim??0,attackAnimation);victim.userData.damageAnim=1;victim.userData.hitPulse=1;
+  attacker.userData.attackAnim=1;victim.userData.damageAnim=1;victim.userData.hitPulse=1;
   if(victim===master&&!INDEPENDENT_SOLDIERS){
     masterHealth=Math.max(0,victim.userData.hp);sinceDamage=0;damagePulse=Math.min(1.65,damagePulse+.62);damageStacks=Math.min(6,damageStacks+1);
   }
@@ -3754,55 +3690,7 @@ function hit(attacker,victim,dt){
   attacker.userData.attackAnim=1;
   dealDamage(attacker,victim);
 }
-function disposeProjectile(projectile){
-  battle.remove(projectile);projectile.geometry?.dispose?.();
-  const materials=Array.isArray(projectile.material)?projectile.material:[projectile.material];for(const material of materials)material?.dispose?.();
-}
-function launchProjectile(attacker,target){
-  if(!attacker?.userData?.alive||!target?.userData?.alive)return null;
-  const length=THREE.MathUtils.clamp(Number(attacker.userData.projectileLength)||1.1,.2,5),thickness=THREE.MathUtils.clamp(Number(attacker.userData.projectileThickness)||.065,.02,.4),projectile=new THREE.Mesh(new THREE.PlaneGeometry(thickness,length),new THREE.MeshBasicMaterial({color:0xff1f64,side:THREE.DoubleSide,toneMapped:false}));
-  const forward=new THREE.Vector3(Math.sin(attacker.rotation.y),0,Math.cos(attacker.rotation.y)),origin=attacker.position.clone().add(new THREE.Vector3(0,.78,0)).addScaledVector(forward,.34+length*.08),targetPoint=target.position.clone().add(new THREE.Vector3(0,.78,0)),direction=targetPoint.sub(origin).setY(0);
-  if(direction.lengthSq()<.001)return null;
-  direction.normalize();const right=new THREE.Vector3(-direction.z,0,direction.x),orientation=new THREE.Matrix4().makeBasis(right,direction,new THREE.Vector3(0,1,0));
-  projectile.position.copy(origin).addScaledVector(direction,length*.5);projectile.quaternion.setFromRotationMatrix(orientation);projectile.renderOrder=4;
-  projectile.userData={attacker,target,direction:direction.clone(),damage:THREE.MathUtils.clamp(Number(attacker.userData.projectileDamage)||attacker.userData.attack,.5,200),speed:THREE.MathUtils.clamp(Number(attacker.userData.projectileSpeed)||13,1,50),length,thickness,travelled:0,maxDistance:14};attacker.userData.attackAnim=Math.max(attacker.userData.attackAnim??0,.12);projectiles.push(projectile);battle.add(projectile);return projectile;
-}
-function projectileSegmentHitsTarget(start,end,target,radius){
-  const segmentX=end.x-start.x,segmentZ=end.z-start.z,lengthSq=segmentX*segmentX+segmentZ*segmentZ;
-  if(lengthSq<=1e-8)return false;
-  const offsetX=target.position.x-start.x,offsetZ=target.position.z-start.z,t=Math.max(0,Math.min(1,(offsetX*segmentX+offsetZ*segmentZ)/lengthSq));
-  const dx=start.x+segmentX*t-target.position.x,dz=start.z+segmentZ*t-target.position.z;
-  return dx*dx+dz*dz<=radius*radius;
-}
-function updateProjectiles(dt){
-  for(let index=projectiles.length-1;index>=0;index--){
-    const projectile=projectiles[index],target=projectile.userData.target,attacker=projectile.userData.attacker;
-    if(!attacker?.userData?.alive){disposeProjectile(projectile);projectiles.splice(index,1);continue;}
-    const direction=projectile.userData.direction,remaining=projectile.userData.maxDistance-projectile.userData.travelled,step=Math.min(remaining,projectile.userData.speed*dt),start=projectile.position.clone(),end=start.clone().addScaledVector(direction,step);
-    const collisionStart=start.clone().addScaledVector(direction,-projectile.userData.length*.5),collisionEnd=end.clone().addScaledVector(direction,projectile.userData.length*.5),targetRadius=Math.max(.18,target?.userData?.collisionHalf?.x??0,target?.userData?.collisionHalf?.z??0)+projectile.userData.thickness*.5;
-    if(target?.userData?.alive&&projectileSegmentHitsTarget(collisionStart,collisionEnd,target,targetRadius)){dealDamage(projectile.userData.attacker,target,projectile.userData.damage,0);disposeProjectile(projectile);projectiles.splice(index,1);continue;}
-    projectile.position.copy(end);projectile.userData.travelled+=step;
-    if(projectile.userData.travelled>=projectile.userData.maxDistance){disposeProjectile(projectile);projectiles.splice(index,1);}
-  }
-}
-function updateProjectileDuel(unit,foe,dt){
-  const data=unit.userData,threat=data.rangedPursuer?.userData?.alive?data.rangedPursuer:foe,safeDistance=6.15,retreatDistance=4.9,fireDistance=8.4,distance=unit.position.distanceTo(foe.position),threatDistance=unit.position.distanceTo(threat.position),toThreat=threat.position.clone().sub(unit.position).setY(0),away=toThreat.lengthSq()>.001?toThreat.normalize().multiplyScalar(-1):new THREE.Vector3((unit.id&1)?1:-1,0,0);
-  data.rangedBurstShots??=0;data.rangedBurstLimit??=2+(unit.id&1);data.rangedRetreatTimer=Math.max(0,(data.rangedRetreatTimer??0)-dt);
-  data.projectileCooldown=Math.max(0,(data.projectileCooldown??0)-dt);
-  const facing=foe.position.clone().sub(unit.position).setY(0);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),18,dt);
-  const mustRetreat=threatDistance<retreatDistance||data.rangedRetreatTimer>0||data.rangedBurstShots>=data.rangedBurstLimit;
-  if(mustRetreat){
-    data.rangedRetreatTimer=Math.max(data.rangedRetreatTimer,threatDistance < retreatDistance ? .72 : 0);
-    const retreatDistanceNeeded=Math.max(.85,safeDistance-threatDistance+.5),desired=unit.position.clone().addScaledVector(away,retreatDistanceNeeded);desired.y=GROUND_Y;
-    if(threatDistance>=safeDistance&&data.rangedRetreatTimer<=0)data.rangedBurstShots=0;
-    return {desired,speed:3.35,acceleration:8.2};
-  }
-  if(distance>fireDistance){const pursuit=standOffPursuitPoint(unit.position,foe.position,safeDistance,.1);return {desired:new THREE.Vector3(pursuit.x,GROUND_Y,pursuit.z),speed:2.8,acceleration:6.8};}
-  if(data.projectileCooldown<=0){launchProjectile(unit,foe);data.projectileCooldown=.58;data.rangedBurstShots++;if(data.rangedBurstShots>=data.rangedBurstLimit)data.rangedRetreatTimer=.72;}
-  return {desired:unit.position.clone(),speed:0,acceleration:8.2};
-}
 function updateDuel(unit,foe,dt){
-  if(unit.userData.projectileDamage>0&&unit.userData.projectileSpeed>0)return updateProjectileDuel(unit,foe,dt);
   const data=unit.userData;
   data.duelPhase??=DUEL_PHASE.APPROACH;data.duelTimer??=0;data.attackSequence??=0;
   const previousPhase=data.duelPhase;
@@ -3949,7 +3837,7 @@ function updateDefeatCinematic(dt){
   const state=defeatCinematicState(defeatCinematic.elapsed);
   const visualDt=dt*state.timeScale;
   updatePlayerSoldierRegeneration(visualDt);updateSoldierDamageEffects(visualDt);updateActorCombatAnimations(visualDt);updateActorHealthWidgets(visualDt);
-  updateProjectiles(visualDt);updateParticles(visualDt);resolveDebrisCollisions();updateEncounterRings(false);updateSelectionVisuals();
+  updateParticles(visualDt);resolveDebrisCollisions();updateEncounterRings(false);updateSelectionVisuals();
   defeatCinematic.elapsed+=dt;
   if(!defeatCinematicState(defeatCinematic.elapsed).complete)return;
   const {hasNextWave,outcome}=defeatCinematic;defeatCinematic=null;activeEncounter=null;
@@ -4214,7 +4102,7 @@ function updateIndependentSoldier(u,{combat,enemyInSight,raidTarget,foe,waitingD
   if(foe?.userData?.alive){
     duelMotion=updateDuel(u,foe,dt);
     if(!u.userData.alive)return;
-    if(!(u.userData.projectileDamage>0&&u.userData.projectileSpeed>0)&&duelPathNeedsRelock(u,duelMotion.desired,foe,dt)){
+    if(duelPathNeedsRelock(u,duelMotion.desired,foe,dt)){
       avoidBlockedDuelAndReassign(u);foe=null;duelMotion=null;
     }else{
       desired=duelMotion.desired;
@@ -4240,7 +4128,7 @@ function updateIndependentSoldier(u,{combat,enemyInSight,raidTarget,foe,waitingD
     u.userData.manualMoving=false;u.userData.manualTarget=null;u.userData.manualFinalTarget=null;u.userData.peacefulPatrolGoal=null;ensureCompanyAnchor(u.userData.companyId).patrolGoal=null;
   }
   const faceTarget=foe?.position??waitingDuel?.center??null;
-  if(faceTarget&&(!foe?.userData?.alive||u.userData.projectileDamage>0||u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15))){const facing=faceTarget.clone().sub(u.position);if(facing.lengthSq()>.001)u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),12,dt)}
+  if(faceTarget&&(!foe?.userData?.alive||u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15))){const facing=faceTarget.clone().sub(u.position);if(facing.lengthSq()>.001)u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),12,dt)}
 }
 function activateFieldedPlayerCombat(){
   if(deploymentStarted||!livingPlayerUnits().some(unit=>unit.parent===battle))return false;
@@ -4321,14 +4209,13 @@ function updateBattle(dt){
     const commanderMovingIndependently=!!company?.commander?.userData.manualMoving;
     return !anchor.moving&&(anchor.deployTimer??0)<=0&&!commanderMovingIndependently;
   });
-  const combatAssignmentRoster=preserveLockedCombatants(livingPlayerSoldiers,commandableFollowers),rangedSkirmishers=commandableFollowers.filter(isRangedSkirmisher),meleeCombatAssignmentRoster=combatAssignmentRoster.filter(unit=>!isRangedSkirmisher(unit));
-  const canAssignRangedCombat=combat&&rangedSkirmishers.length&&livingEnemySoldiers.length,rangedAssignments=canAssignRangedCombat?assignRangedSkirmishTargets(rangedSkirmishers,livingEnemySoldiers):new Map(),rangedEnemyAssignments=assignRangedEnemyPursuers(canAssignRangedCombat?rangedSkirmishers:[],livingEnemySoldiers),meleeEnemyRoster=livingEnemySoldiers.filter(enemy=>!rangedEnemyAssignments.has(enemy));
-  const canAssignSoldierCombat=combat&&meleeCombatAssignmentRoster.length&&meleeEnemyRoster.length;
+  const combatAssignmentRoster=preserveLockedCombatants(livingPlayerSoldiers,commandableFollowers);
+  const canAssignSoldierCombat=combat&&combatAssignmentRoster.length&&livingEnemySoldiers.length;
   if(!canAssignSoldierCombat)for(const unit of [...livingPlayerSoldiers,...livingEnemySoldiers])unit.userData.waitingDuelTarget=null;
   const engagements=canAssignSoldierCombat
-    ?assignEngagements(meleeCombatAssignmentRoster,meleeEnemyRoster)
+    ?assignEngagements(combatAssignmentRoster,livingEnemySoldiers)
     :{aMap:new Map(),bMap:new Map(),aWaitMap:new Map(),bWaitMap:new Map()};
-  const playerAssignments=engagements.aMap,enemyAssignments=new Map([...engagements.bMap,...rangedEnemyAssignments]);
+  const playerAssignments=engagements.aMap,enemyAssignments=engagements.bMap;
   const playerWaitingAssignments=engagements.aWaitMap,enemyWaitingAssignments=engagements.bWaitMap;
   const activeSoldierDuels=livingPlayerSoldiers.some(u=>livingEnemySoldiers.includes(u.userData.lockedTarget));
   if(activeEncounter){
@@ -4369,7 +4256,7 @@ function updateBattle(dt){
     const localIndex=Math.max(0,company.soldiers.indexOf(u));
     const anchor=ensureCompanyAnchor(company.groupIndex),manualOrder=anchor.moving,companyDeploying=!manualOrder&&(anchor.deployTimer??0)>0;
     const committed=!!u.userData.lockedTarget?.userData.alive;
-    let foe=rangedAssignments.get(u)??playerAssignments.get(u)??(committed?u.userData.lockedTarget:null);
+    let foe=playerAssignments.get(u)??(committed?u.userData.lockedTarget:null);
     const waitingDuel=playerWaitingAssignments.get(u);
     const combatState=soldierCombatState({combat,formingBattleLine:companyDeploying,targetAlive:!!foe?.userData.alive,waitingSlot:!!waitingDuel});
     u.userData.mode=combatState===SOLDIER_COMBAT_STATE.DUEL?SERVANT_MODE.ATTACK:SERVANT_MODE.FOLLOW;
@@ -4426,7 +4313,7 @@ function updateBattle(dt){
     const acceleration=actorSteerAcceleration(u,duelMotion?.acceleration??(combatState===SOLDIER_COMBAT_STATE.NEUTRAL?8.2:u.userData.mode===SERVANT_MODE.ATTACK?5.7:reposition?7.2:4.2));
     const spacingSpeed=spacingActive&&!reposition&&!foe?1.05:speed;
     steerTowards(u,desired,combatState===SOLDIER_COMBAT_STATE.NEUTRAL?0:reposition||foe||spacingActive?spacingSpeed:0,acceleration,dt);
-    if(foe?.userData.alive&&(u.userData.projectileDamage>0||u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15))){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
+    if(foe?.userData.alive&&u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15)){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
     else if(waitingDuel){const facing=waitingDuel.center.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),10,dt)}
   });
   for(const company of companies){
@@ -4440,7 +4327,7 @@ function updateBattle(dt){
   }else{
     const raidTarget=activeRaidBuildings().length>0;
     for(const u of livingPlayerSoldiers){
-      const foe=rangedAssignments.get(u)??playerAssignments.get(u)??(u.userData.lockedTarget?.userData.alive?u.userData.lockedTarget:null);
+      const foe=playerAssignments.get(u)??(u.userData.lockedTarget?.userData.alive?u.userData.lockedTarget:null);
       const waitingDuel=playerWaitingAssignments.get(u);
       updateIndependentSoldier(u,{combat,enemyInSight:threatDetected,raidTarget,foe,waitingDuel,peacefulPatrol,patrolAllies:livingPlayerSoldiers,dt});
     }
@@ -4491,7 +4378,7 @@ function updateBattle(dt){
     let desired=enemyTravelTarget?.position.clone()??u.position.clone(),duelMotion=null;
     if(waitingDuel)desired=duelWaitingPoint(u,waitingDuel);
     if(foe&&u.userData.mode===SERVANT_MODE.ATTACK){
-      if(u.userData.rangedPursuitTarget!==foe)foe=reviewEnemyDuelTarget(u,foe,livingPlayerSoldiers);
+      foe=reviewEnemyDuelTarget(u,foe,livingPlayerSoldiers);
       duelMotion=updateDuel(u,foe,dt);
       if(!u.userData.alive)return;
       if(duelPathNeedsRelock(u,duelMotion.desired,foe,dt)){
@@ -4518,7 +4405,7 @@ function updateBattle(dt){
     const acceleration=actorSteerAcceleration(u,duelMotion?.acceleration??(combatState===SOLDIER_COMBAT_STATE.NEUTRAL?8.2:u.userData.mode===SERVANT_MODE.ATTACK?4.4:6.2));
     const moveScale=editorActorMoveScale(u);
     steerTowards(u,desired,speed*moveScale,acceleration*Math.sqrt(moveScale),dt);
-    if(foe?.userData.alive&&(u.userData.projectileDamage>0||u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15))){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
+    if(foe?.userData.alive&&u.position.distanceTo(foe.position)<=(foe.userData.isMaster?1.4:1.15)){const facing=foe.position.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),14,dt)}
     else if(waitingDuel){const facing=waitingDuel.center.clone().sub(u.position);u.rotation.y=smoothAngle(u.rotation.y,Math.atan2(facing.x,facing.z),10,dt)}
   });
   if(enemyRetreat){
@@ -4539,7 +4426,7 @@ function updateBattle(dt){
   }
   updatePlayerSoldierRegeneration(dt);
   updateSoldierDamageEffects(dt);updateActorCombatAnimations(dt);updateActorHealthWidgets(dt);updateRaidBuildingHealthWidgets(dt);decayDebugSignals(dt);
-  resolveBattle();updateProjectiles(dt);updateParticles(dt);updateSelectionVisuals();updateDeploymentEnemyOccupancy();
+  resolveBattle();updateParticles(dt);updateSelectionVisuals();updateDeploymentEnemyOccupancy();
 }
 
 function buildOverview(){
@@ -4977,7 +4864,6 @@ function updateEditorActorInspector(){
     input.value=Number.isFinite(value)?String(Math.round(value*100)/100):"0";input.disabled=!libraryProfile||(chRangeProperty&&archetype.faction!=="player");
   });
   $("editor-ch-patrol-range-settings")?.classList.toggle("hidden",!libraryProfile||archetype.faction!=="player");
-  $("editor-actor-projectile-settings")?.classList.toggle("hidden",!libraryProfile||!archetype.projectile);
   const materialInput=$("editor-actor-material"),enemyEditable=Boolean(libraryProfile&&archetype.faction==="enemy"),colour=actor?.userData.editorMaterialColor??actorMaterialColour(archetype.id)??`#${new THREE.Color(archetype.tint??COLORS.amber).getHexString()}`;
   if(materialInput){materialInput.value=colour;materialInput.disabled=!enemyEditable;}
   populateContentBrowserModelSelect($("editor-actor-model"),actor?.userData.modelAssetId??actorModelAssetId(archetype.id),CHARACTER_MODEL_ASSET_ID,Boolean(libraryProfile));
@@ -5144,7 +5030,7 @@ function applyEditorActorInput(input){
   const profile=selectedEditorActorProfile(),actor=profile?.actor??null;
   if(!profile)return;
   const property=input.dataset.actorProperty,value=Number(input.value),minimum=Number(input.min),maximum=Number(input.max);
-  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed","patrolSpacing","patrolRadiusMin","patrolRadiusMax","patrolPauseMax","projectileDamage","projectileSpeed","projectileLength","projectileThickness"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
+  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed","patrolSpacing","patrolRadiusMin","patrolRadiusMax","patrolPauseMax"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
   recordEditorUndo();const next=THREE.MathUtils.clamp(value,minimum,maximum);
   if(actor){
     actor.userData[property]=next;
@@ -5835,7 +5721,6 @@ function contentBrowserAssetSpecs(){
     {id:"character:ch",name:"CH1",type:"Actor",folderId:"characters/ch",preview:()=>characterAssetPreview("ch1")},
     {id:"character:ch2",name:"CH2",type:"Actor",folderId:"characters/ch",preview:()=>characterAssetPreview("ch2")},
     {id:"character:ch3",name:"CH Swordsman BP",type:"Actor",folderId:"characters/ch",preview:()=>characterAssetPreview("ch3")},
-    {id:"character:ch4",name:"CH3 Ranged BP",type:"Actor",folderId:"characters/ch",preview:()=>characterAssetPreview("ch4")},
     {id:"character:en",name:"EN1",type:"Actor",folderId:"characters/en",preview:()=>characterAssetPreview("en1")},
     {id:"character:en2",name:"EN2",type:"Actor",folderId:"characters/en",preview:()=>characterAssetPreview("en2")},
     {id:"character:en3",name:"EN 3",type:"Actor",folderId:"characters/en",preview:()=>characterAssetPreview("en3")},
@@ -6434,7 +6319,7 @@ function bindDeploymentButton(buttonId,archetypeId){
   button.addEventListener("pointerdown",event=>event.stopPropagation());
   button.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();toggleDeploymentMode(archetypeId)});
 }
-bindDeploymentButton("companies","ch1");bindDeploymentButton("companies-ch2","ch2");bindDeploymentButton("companies-ch3","ch3");bindDeploymentButton("companies-ch4","ch4");$("companies-close").onclick=closeCompanies;
+bindDeploymentButton("companies","ch1");bindDeploymentButton("companies-ch2","ch2");bindDeploymentButton("companies-ch3","ch3");$("companies-close").onclick=closeCompanies;
 $("divide-company").onclick=()=>{if(selectedCompanyId!==null&&divideCompany(selectedCompanyId)){rebuildSelectionVisuals();refreshCommandGrid()}};
 $("pause").onclick=()=>togglePause();
 $("settings").onclick=openSettings;$("exit").onclick=exitToTitle;
@@ -6525,7 +6410,7 @@ function updateHearts(){
     return heart;
   }));
 }
-function updateStats(){const count=livingPlayerUnits().length;$("army-count").textContent=count;$("army-button-count").textContent=deploymentReserves.ch1;$("army-button-count-ch2").textContent=deploymentReserves.ch2;$("army-button-count-ch3").textContent=deploymentReserves.ch3;$("army-button-count-ch4").textContent=deploymentReserves.ch4;$("territory-count").textContent=`${campaign.conquered.size}/7`;updateDeploymentControl()}
+function updateStats(){const count=livingPlayerUnits().length;$("army-count").textContent=count;$("army-button-count").textContent=deploymentReserves.ch1;$("army-button-count-ch2").textContent=deploymentReserves.ch2;$("army-button-count-ch3").textContent=deploymentReserves.ch3;$("territory-count").textContent=`${campaign.conquered.size}/7`;updateDeploymentControl()}
 function win(){mode="end";$("end-title").textContent=STR.victory;$("retry").textContent=STR.retry;$("end-screen").classList.remove("hidden");$("hud").classList.add("hidden")}
 function restartSavedLevel(){
   if(resetPlaytestToSavedLevel())saveLevelLayout();

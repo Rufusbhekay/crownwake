@@ -1297,7 +1297,7 @@ export function splitEnemyStats({ maxHp = 0, attack = 0 } = {}) {
   };
 }
 
-export function normalizePracticeConfig({ playerSoldiers, ch1Soldiers, ch2Soldiers, ch3Soldiers, ch4Soldiers, startingEnemies, waveCounts, waveDelay } = {}) {
+export function normalizePracticeConfig({ playerSoldiers, ch1Soldiers, ch2Soldiers, ch3Soldiers, startingEnemies, waveCounts, waveDelay } = {}) {
   const integer = (value, fallback, min, max) => {
     const parsed = Number(value);
     const safeValue = Number.isFinite(parsed) ? parsed : fallback;
@@ -1308,14 +1308,12 @@ export function normalizePracticeConfig({ playerSoldiers, ch1Soldiers, ch2Soldie
   const ch1 = integer(ch1Soldiers, legacyProvided ? Math.ceil(legacyTotal / 2) : 7, 0, 999);
   const ch2 = integer(ch2Soldiers, legacyProvided ? Math.floor(legacyTotal / 2) : 7, 0, 999);
   const ch3 = integer(ch3Soldiers, 5, 0, 999);
-  const ch4 = integer(ch4Soldiers, 5, 0, 999);
   const delay = Number(waveDelay);
   return {
     ch1Soldiers: ch1,
     ch2Soldiers: ch2,
     ch3Soldiers: ch3,
-    ch4Soldiers: ch4,
-    playerSoldiers: ch1 + ch2 + ch3 + ch4,
+    playerSoldiers: ch1 + ch2 + ch3,
     startingEnemies: integer(startingEnemies, OPENING_ENEMY_COUNT, 1, 24),
     waveCounts: Array.from({ length: 10 }, (_, index) => integer(waveCounts?.[index], DEFAULT_PRACTICE_WAVE_COUNTS[index], 0, 24)),
     waveDelay: Number.isFinite(delay) ? Math.min(60, Math.max(0, delay)) : DEFAULT_PRACTICE_WAVE_DELAY

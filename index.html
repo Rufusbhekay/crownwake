@@ -38,7 +38,7 @@
     </div>
     <button id="divide-company" class="divide-company hidden"></button>
     <div id="pause-state" class="hidden" aria-live="polite"></div>
-    <div id="objective-dock"><div id="objective"></div><div class="deployment-buttons" aria-label="Deploy CH groups"><button id="companies" type="button" class="army-button" data-deployment-archetype="ch1" aria-label="Deploy CH1 group" aria-pressed="false"><i class="soldier-cube ch1"></i><small>CH1</small><strong><span id="army-button-count">7</span></strong></button><button id="companies-ch2" type="button" class="army-button" data-deployment-archetype="ch2" aria-label="Deploy CH2 group" aria-pressed="false"><i class="soldier-cube ch2"></i><small>CH2</small><strong><span id="army-button-count-ch2">7</span></strong></button><button id="companies-ch3" type="button" class="army-button" data-deployment-archetype="ch3" aria-label="Deploy CH Swordsman group" aria-pressed="false"><svg class="soldier-sword" viewBox="0 0 24 28" aria-hidden="true"><path d="M13 2 16 6 10 20 7 19Z" fill="#e8ca77" stroke="#8e7138"/><path d="m5 17 9 4M8 20l-2 5" fill="none" stroke="#4b5359" stroke-width="3"/></svg><small>CH SWORD</small><strong><span id="army-button-count-ch3">5</span></strong></button><button id="companies-ch4" type="button" class="army-button" data-deployment-archetype="ch4" aria-label="Deploy CH3 ranged group" aria-pressed="false"><i class="soldier-projectile" aria-hidden="true"></i><small>CH3</small><strong><span id="army-button-count-ch4">5</span></strong></button></div></div>
+    <div id="objective-dock"><div id="objective"></div><div class="deployment-buttons" aria-label="Deploy CH groups"><button id="companies" type="button" class="army-button" data-deployment-archetype="ch1" aria-label="Deploy CH1 group" aria-pressed="false"><i class="soldier-cube ch1"></i><small>CH1</small><strong><span id="army-button-count">7</span></strong></button><button id="companies-ch2" type="button" class="army-button" data-deployment-archetype="ch2" aria-label="Deploy CH2 group" aria-pressed="false"><i class="soldier-cube ch2"></i><small>CH2</small><strong><span id="army-button-count-ch2">7</span></strong></button><button id="companies-ch3" type="button" class="army-button" data-deployment-archetype="ch3" aria-label="Deploy CH Swordsman group" aria-pressed="false"><svg class="soldier-sword" viewBox="0 0 24 28" aria-hidden="true"><path d="M13 2 16 6 10 20 7 19Z" fill="#e8ca77" stroke="#8e7138"/><path d="m5 17 9 4M8 20l-2 5" fill="none" stroke="#4b5359" stroke-width="3"/></svg><small>CH SWORD</small><strong><span id="army-button-count-ch3">5</span></strong></button></div></div>
     <div id="toast" aria-live="polite"></div>
     <div id="mobile-command"></div>
     <div id="map-panel" class="hidden">
@@ -72,7 +72,6 @@
           <label class="number-setting"><span>CH1 soldiers available</span><input id="starting-ch1-count" type="number" min="0" max="999" step="1" inputmode="numeric" value="7" aria-label="Starting CH1 soldiers"></label>
           <label class="number-setting"><span>CH2 soldiers available</span><input id="starting-ch2-count" type="number" min="0" max="999" step="1" inputmode="numeric" value="7" aria-label="Starting CH2 soldiers"></label>
           <label class="number-setting"><span>CH Swordsmen available</span><input id="starting-ch3-count" type="number" min="0" max="999" step="1" inputmode="numeric" value="5" aria-label="Starting CH Swordsmen"></label>
-          <label class="number-setting"><span>CH3 ranged soldiers available</span><input id="starting-ch4-count" type="number" min="0" max="999" step="1" inputmode="numeric" value="5" aria-label="Starting CH3 ranged soldiers"></label>
         </div>
         <div class="settings-section">
           <div class="settings-label"><span>GAME SPEED</span><strong id="speed-value">1Ã—</strong></div>
@@ -192,12 +191,6 @@
               <fieldset class="editor-actor-settings-group"><legend>COMBAT STATS</legend>
                 <label><span>HEALTH</span><input data-actor-property="maxHp" type="number" min="1" max="500" step="1" value="32"></label>
                 <label><span>ATTACK DAMAGE</span><input data-actor-property="attack" type="number" min="0.5" max="200" step="0.5" value="10"></label>
-              </fieldset>
-              <fieldset id="editor-actor-projectile-settings" class="editor-actor-settings-group hidden"><legend>PROJECTILE</legend>
-                <label><span>PROJECTILE DAMAGE</span><input data-actor-property="projectileDamage" type="number" min="0.5" max="200" step="0.5" value="9"></label>
-                <label><span>PROJECTILE SPEED</span><input data-actor-property="projectileSpeed" type="number" min="1" max="50" step="0.5" value="13"></label>
-                <label><span>PROJECTILE LENGTH</span><input data-actor-property="projectileLength" type="number" min="0.2" max="5" step="0.1" value="1.1"></label>
-                <label><span>PROJECTILE THICKNESS</span><input data-actor-property="projectileThickness" type="number" min="0.02" max="0.4" step="0.005" value="0.065"></label>
               </fieldset>
               <fieldset class="editor-actor-settings-group"><legend>MOVEMENT</legend>
                 <label><span>SPEED</span><input data-actor-property="moveSpeed" type="number" min="0.25" max="15" step="0.05" value="3.975" aria-label="Actor master movement speed"></label>

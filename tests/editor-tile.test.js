@@ -1036,7 +1036,7 @@ test("new EN duels can interrupt CH raids and return them afterward", () => {
   assert.match(source, /function reserveRaidBuildingAssignments\(units\)/);
   assert.match(source, /filter\(\(\{slot\}\)=>raidBuildingAttackSlotWalkable\(slot,unit\)\)/);
   assert.match(source, /reserveRaidBuildingAssignments\(livingPlayerSoldiers\);/);
-  assert.match(source, /const combatAssignmentRoster=preserveLockedCombatants\(livingPlayerSoldiers,commandableFollowers\),rangedSkirmishers=commandableFollowers\.filter\(isRangedSkirmisher\),meleeCombatAssignmentRoster=combatAssignmentRoster\.filter\(unit=>!isRangedSkirmisher\(unit\)\);/);
+  assert.match(source, /const combatAssignmentRoster=preserveLockedCombatants\(livingPlayerSoldiers,commandableFollowers\);/);
   assert.match(source, /clearBuildingAttackAssignments\(unit\);unit\.userData\.lockedTarget=foe/);
   assert.match(source, /clearBuildingAttackAssignments\(unit\);unit\.userData\.navigationPath=null/);
   assert.match(source, /updateRaidBuildingCombat\(livingPlayerSoldiers,dt\);/);

@@ -231,7 +231,7 @@ function normalizeImportedModelRecord(record){
 function normalizeActorBlueprintStats(settings){
   if(!settings||typeof settings!=="object")return {};
   const normalized={};
-  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15],["patrolSpacing",.1,5],["patrolRadiusMin",.5,30],["patrolRadiusMax",.5,30],["patrolPauseMax",0,2],["projectileDamage",.5,200],["projectileSpeed",1,50],["projectileLength",.2,5]]){
+  for(const [property,minimum,maximum] of [["maxHp",1,500],["attack",.5,200],["moveSpeed",.25,15],["acceleration",.5,30],["patrolSpeed",.25,15],["patrolSpacing",.1,5],["patrolRadiusMin",.5,30],["patrolRadiusMax",.5,30],["patrolPauseMax",0,2],["projectileDamage",.5,200],["projectileSpeed",1,50],["projectileLength",.2,5],["projectileThickness",.02,.4]]){
     const value=Number(settings[property]);if(Number.isFinite(value))normalized[property]=Math.min(maximum,Math.max(minimum,value));
   }
   if("patrolRadiusMin" in normalized||"patrolRadiusMax" in normalized){const minimum=normalized.patrolRadiusMin??3.2,maximum=normalized.patrolRadiusMax??3.2;normalized.patrolRadiusMin=Math.min(minimum,maximum);normalized.patrolRadiusMax=Math.max(minimum,maximum);}
@@ -1777,6 +1777,7 @@ function levelAssetRecord(object){
     projectileDamage:Number((object.userData.projectileDamage??0).toFixed(2)),
     projectileSpeed:Number((object.userData.projectileSpeed??0).toFixed(2)),
     projectileLength:Number((object.userData.projectileLength??0).toFixed(2)),
+    projectileThickness:Number((object.userData.projectileThickness??0).toFixed(3)),
     moveSpeed:Number(object.userData.moveSpeed.toFixed(2)),
     acceleration:Number(actorAcceleration(object).toFixed(2)),
     patrolSpeed:Number(actorPatrolSpeed(object).toFixed(2)),
@@ -2635,7 +2636,7 @@ const ACTOR_DEFAULT_ACCELERATION=5.4,ACTOR_SPEED_INPUT_MAX=15,ACTOR_ACCELERATION
 const ACTOR_ARCHETYPES=Object.freeze({
   ch1:Object.freeze({id:"ch1",label:"CH1",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
   ch3:Object.freeze({id:"ch3",label:"CH Swordsman",faction:"player",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
-  ch4:Object.freeze({id:"ch4",label:"CH3",faction:"player",maxHp:28,attack:9,projectile:true,projectileDamage:9,projectileSpeed:13,projectileLength:1.1,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
+  ch4:Object.freeze({id:"ch4",label:"CH3",faction:"player",maxHp:28,attack:9,projectile:true,projectileDamage:9,projectileSpeed:13,projectileLength:1.1,projectileThickness:.065,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:null}),
   en1:Object.freeze({id:"en1",label:"EN1",faction:"enemy",maxHp:32,attack:10,moveSpeed:2.65*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:2.65*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:COLORS.amber}),
   ch2:Object.freeze({id:"ch2",label:"CH2",faction:"player",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolRadiusMin:ACTOR_PATROL_RADIUS_DEFAULT,patrolRadiusMax:ACTOR_PATROL_RADIUS_DEFAULT,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0x171a1d}),
   en2:Object.freeze({id:"en2",label:"EN2",faction:"enemy",maxHp:38.4,attack:12,moveSpeed:3.18*ACTOR_SPEED_BOOST,acceleration:ACTOR_DEFAULT_ACCELERATION,patrolSpeed:3.18*ACTOR_SPEED_BOOST,patrolSpacing:INDEPENDENT_GROUP_PATROL_SEPARATION,patrolPauseMax:INDEPENDENT_GROUP_PATROL_PAUSE_MAX,tint:0xd84b55}),
@@ -2675,13 +2676,14 @@ function editorActorMoveScale(unit){
 }
 function applyEditorActorProfile(actor,profile){
   if(!actor?.userData||!profile)return;
-  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),projectileDamage=Number(profile.projectileDamage),projectileSpeed=Number(profile.projectileSpeed),projectileLength=Number(profile.projectileLength),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),patrolSpacing=Number(profile.patrolSpacing),patrolRadiusMin=Number(profile.patrolRadiusMin),patrolRadiusMax=Number(profile.patrolRadiusMax),patrolPauseMax=Number(profile.patrolPauseMax),healthBarOffset=Number(profile.healthBarOffset);
+  const maxHp=Number(profile.maxHp),attack=Number(profile.attack),projectileDamage=Number(profile.projectileDamage),projectileSpeed=Number(profile.projectileSpeed),projectileLength=Number(profile.projectileLength),projectileThickness=Number(profile.projectileThickness),moveSpeed=Number(profile.moveSpeed),acceleration=Number(profile.acceleration),patrolSpeed=Number(profile.patrolSpeed),patrolSpacing=Number(profile.patrolSpacing),patrolRadiusMin=Number(profile.patrolRadiusMin),patrolRadiusMax=Number(profile.patrolRadiusMax),patrolPauseMax=Number(profile.patrolPauseMax),healthBarOffset=Number(profile.healthBarOffset);
   if(profile.archetypeId){actor.userData.actorArchetypeId=actorArchetype(profile.archetypeId,actor.userData.faction).id;if(actor.userData.faction==="player")actor.userData.companyId=deploymentGroupId(actor.userData.actorArchetypeId);}
   if(Number.isFinite(maxHp))actor.userData.maxHp=actor.userData.hp=THREE.MathUtils.clamp(maxHp,1,500);
   if(Number.isFinite(attack))actor.userData.attack=THREE.MathUtils.clamp(attack,.5,200);
   if(Number.isFinite(projectileDamage))actor.userData.projectileDamage=THREE.MathUtils.clamp(projectileDamage,.5,200);
   if(Number.isFinite(projectileSpeed))actor.userData.projectileSpeed=THREE.MathUtils.clamp(projectileSpeed,1,50);
   if(Number.isFinite(projectileLength))actor.userData.projectileLength=THREE.MathUtils.clamp(projectileLength,.2,5);
+  if(Number.isFinite(projectileThickness))actor.userData.projectileThickness=THREE.MathUtils.clamp(projectileThickness,.02,.4);
   if(Number.isFinite(moveSpeed))actor.userData.moveSpeed=normalizeActorMoveSpeed(moveSpeed,actor.userData.actorArchetypeId,actor.userData.faction);
   if(Number.isFinite(acceleration))actor.userData.acceleration=THREE.MathUtils.clamp(acceleration,.5,ACTOR_ACCELERATION_INPUT_MAX);
   if(Number.isFinite(patrolSpeed))actor.userData.patrolSpeed=THREE.MathUtils.clamp(patrolSpeed,.25,ACTOR_SPEED_INPUT_MAX);
@@ -2711,7 +2713,7 @@ function makeUnit(faction="player",archetypeId=null) {
   const g=new THREE.Group(),archetype=actorBlueprintProfile(archetypeId,faction),modelAssetId=actorModelAssetId(archetype.id);
   setCharacterVisual(g,modelAssetId,()=>{const body=roundedBox(.42,1.22,.38,mats.warrior,.1);body.position.y=.03;return body});
   const {maxHp,attack,moveSpeed}=archetype,materialColor=faction==="enemy"?actorMaterialColour(archetype.id):null;
-  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,projectileDamage:archetype.projectileDamage??0,projectileSpeed:archetype.projectileSpeed??0,projectileLength:archetype.projectileLength??0,projectileCooldown:rand()*.35,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,patrolSpacing:archetype.patrolSpacing,patrolRadiusMin:archetype.patrolRadiusMin,patrolRadiusMax:archetype.patrolRadiusMax,patrolPauseMax:archetype.patrolPauseMax,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
+  g.userData={faction,actorArchetypeId:archetype.id,modelAssetId,progressBarAssetId:actorProgressBarAssetId(archetype.id),healthBarOffset:actorHealthBarOffset(archetype.id),hp:maxHp,maxHp,attack,projectileDamage:archetype.projectileDamage??0,projectileSpeed:archetype.projectileSpeed??0,projectileLength:archetype.projectileLength??0,projectileThickness:archetype.projectileThickness??0,projectileCooldown:rand()*.35,moveSpeed,acceleration:archetype.acceleration,patrolSpeed:archetype.patrolSpeed,patrolSpacing:archetype.patrolSpacing,patrolRadiusMin:archetype.patrolRadiusMin,patrolRadiusMax:archetype.patrolRadiusMax,patrolPauseMax:archetype.patrolPauseMax,splitsOnDeath:archetype.id==="en3",editorMaterialColor:materialColor??undefined,sinceDamage:99,regenStartHealth:maxHp,regenActive:false,cool:rand()*.5,alive:true,isMaster:false,unitCommander:false,companyId:faction==="player"?deploymentGroupId(archetype.id):0,collisionHalf:actorModelCollisionHalf(modelAssetId),velocity:new THREE.Vector3(),phase:rand()*10,mode:SERVANT_MODE.FOLLOW,followState:FOLLOW_AWARENESS.HOLDING,followTimer:0,followThreshold:.38+rand()*.72,responseDelay:.12+rand()*.68,trackingRate:1.8+rand()*2.4,hitPulse:0,attackAnim:0,damageAnim:0,celebrating:false,lastAttackTime:null,lastDamageTime:null,collisionContacts:0};
   const tint=materialColor?new THREE.Color(materialColor).getHex():archetype.tint;if(Number.isInteger(tint))tintCharacter(g,tint);
   prepareDamageVisual(g);makeActorHealthWidget(g,false);addGroundContactOcclusion(g);makeEncounterRing(g);return g;
 }
@@ -3434,6 +3436,26 @@ function assignRangedSkirmishTargets(units,enemies){
   }
   return targets;
 }
+function assignRangedDuos(skirmishers,enemies){
+  const enemyTargets=new Map(),claimedEnemies=new Set();
+  for(const skirmisher of skirmishers){
+    const foe=skirmisher.userData.lockedTarget;
+    if(!foe?.userData?.alive||foe.userData.lockedTarget!==skirmisher)continue;
+    claimedEnemies.add(foe);enemyTargets.set(foe,skirmisher);
+  }
+  for(const skirmisher of skirmishers){
+    if(skirmisher.userData.lockedTarget?.userData?.alive)continue;
+    let nearest=null,nearestDistance=Infinity;
+    for(const enemy of enemies){
+      if(!enemy.userData.alive||claimedEnemies.has(enemy)||enemy.userData.lockedTarget)continue;
+      const distance=skirmisher.position.distanceToSquared(enemy.position);
+      if(distance<nearestDistance){nearest=enemy;nearestDistance=distance}
+    }
+    if(!nearest)continue;
+    lockDuel(skirmisher,nearest);lockDuel(nearest,skirmisher);claimedEnemies.add(nearest);enemyTargets.set(nearest,skirmisher);
+  }
+  return enemyTargets;
+}
 function assignCommanderTargets(commanders,opponents,preferCommander){
   const targets=new Map(),loads=opponents.map(()=>0);
   for(const commander of commanders){
@@ -3670,7 +3692,7 @@ function resolveNavigationObstacleCollisions(){
     const velocity=unit.userData.velocity;if(velocity?.x*correction.x<0)velocity.x=0;if(velocity?.z*correction.z<0)velocity.z=0;
   }
 }
-function dealDamage(attacker,victim,damage=attacker.userData.attack){
+function dealDamage(attacker,victim,damage=attacker.userData.attack,attackAnimation=1){
   if(!attacker.userData.alive||!victim.userData.alive||attacker.userData.faction===victim.userData.faction)return false;
   const previousHealth=victim.userData.hp;
   attacker.userData.lastAttackTime=totalTime;
@@ -3681,7 +3703,7 @@ function dealDamage(attacker,victim,damage=attacker.userData.attack){
   const knockback=hitKnockback(attacker.position,victim.position,victim.userData.isMaster?1.35:2.25);
   victim.userData.velocity.add(new THREE.Vector3(knockback.x,0,knockback.z));
   if(rand()<.22)synthTone(125+rand()*70,.08,"triangle",.018);
-  attacker.userData.attackAnim=1;victim.userData.damageAnim=1;victim.userData.hitPulse=1;
+  attacker.userData.attackAnim=Math.max(attacker.userData.attackAnim??0,attackAnimation);victim.userData.damageAnim=1;victim.userData.hitPulse=1;
   if(victim===master&&!INDEPENDENT_SOLDIERS){
     masterHealth=Math.max(0,victim.userData.hp);sinceDamage=0;damagePulse=Math.min(1.65,damagePulse+.62);damageStacks=Math.min(6,damageStacks+1);
   }
@@ -3718,32 +3740,32 @@ function disposeProjectile(projectile){
 }
 function launchProjectile(attacker,target){
   if(!attacker?.userData?.alive||!target?.userData?.alive)return null;
-  const length=THREE.MathUtils.clamp(Number(attacker.userData.projectileLength)||1.1,.2,5),projectile=new THREE.Mesh(new THREE.BoxGeometry(.065,.065,1),new THREE.MeshStandardMaterial({color:0xf7f2df,roughness:.38,metalness:.12}));
+  const length=THREE.MathUtils.clamp(Number(attacker.userData.projectileLength)||1.1,.2,5),thickness=THREE.MathUtils.clamp(Number(attacker.userData.projectileThickness)||.065,.02,.4),projectile=new THREE.Mesh(new THREE.BoxGeometry(thickness,thickness,1),new THREE.MeshStandardMaterial({color:0xf7f2df,roughness:.38,metalness:.12}));
   const forward=new THREE.Vector3(Math.sin(attacker.rotation.y),0,Math.cos(attacker.rotation.y)),origin=attacker.position.clone().add(new THREE.Vector3(0,.78,0)).addScaledVector(forward,.34+length*.08),targetPoint=target.position.clone().add(new THREE.Vector3(0,.78,0)),direction=targetPoint.sub(origin).setY(0);
   if(direction.lengthSq()<.001)return null;
   direction.normalize();projectile.position.copy(origin).addScaledVector(direction,.34);projectile.scale.z=length;projectile.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),direction);projectile.castShadow=true;
-  projectile.userData={attacker,target,damage:THREE.MathUtils.clamp(Number(attacker.userData.projectileDamage)||attacker.userData.attack,.5,200),speed:THREE.MathUtils.clamp(Number(attacker.userData.projectileSpeed)||13,1,50),length,travelled:0,maxDistance:14};projectiles.push(projectile);battle.add(projectile);return projectile;
+  projectile.userData={attacker,target,damage:THREE.MathUtils.clamp(Number(attacker.userData.projectileDamage)||attacker.userData.attack,.5,200),speed:THREE.MathUtils.clamp(Number(attacker.userData.projectileSpeed)||13,1,50),length,travelled:0,maxDistance:14};attacker.userData.attackAnim=Math.max(attacker.userData.attackAnim??0,.12);projectiles.push(projectile);battle.add(projectile);return projectile;
 }
 function updateProjectiles(dt){
   for(let index=projectiles.length-1;index>=0;index--){
     const projectile=projectiles[index],target=projectile.userData.target,attacker=projectile.userData.attacker;
     if(!target?.userData?.alive||!attacker?.userData?.alive){disposeProjectile(projectile);projectiles.splice(index,1);continue;}
     const targetPoint=target.position.clone().add(new THREE.Vector3(0,.78,0)),direction=targetPoint.sub(projectile.position).setY(0),distance=direction.length();
-    if(distance<=Math.max(.14,projectile.userData.length*.5)){dealDamage(projectile.userData.attacker,target,projectile.userData.damage);disposeProjectile(projectile);projectiles.splice(index,1);continue;}
+    if(distance<=Math.max(.14,projectile.userData.length*.5)){dealDamage(projectile.userData.attacker,target,projectile.userData.damage,0);disposeProjectile(projectile);projectiles.splice(index,1);continue;}
     direction.multiplyScalar(1/distance);const step=Math.min(distance,projectile.userData.speed*dt);projectile.position.addScaledVector(direction,step);projectile.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),direction);projectile.userData.travelled+=step;
     if(projectile.userData.travelled>=projectile.userData.maxDistance){disposeProjectile(projectile);projectiles.splice(index,1);}
   }
 }
 function updateProjectileDuel(unit,foe,dt){
-  const data=unit.userData,safeDistance=6.15,retreatDistance=4.9,fireDistance=8.4,distance=unit.position.distanceTo(foe.position),toFoe=foe.position.clone().sub(unit.position).setY(0),away=toFoe.lengthSq()>.001?toFoe.normalize().multiplyScalar(-1):new THREE.Vector3((unit.id&1)?1:-1,0,0);
+  const data=unit.userData,threat=data.lockedTarget?.userData?.alive?data.lockedTarget:foe,safeDistance=6.15,retreatDistance=4.9,fireDistance=8.4,distance=unit.position.distanceTo(foe.position),threatDistance=unit.position.distanceTo(threat.position),toThreat=threat.position.clone().sub(unit.position).setY(0),away=toThreat.lengthSq()>.001?toThreat.normalize().multiplyScalar(-1):new THREE.Vector3((unit.id&1)?1:-1,0,0);
   data.rangedBurstShots??=0;data.rangedBurstLimit??=2+(unit.id&1);data.rangedRetreatTimer=Math.max(0,(data.rangedRetreatTimer??0)-dt);
   data.projectileCooldown=Math.max(0,(data.projectileCooldown??0)-dt);
   const facing=foe.position.clone().sub(unit.position).setY(0);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),18,dt);
-  const mustRetreat=distance<retreatDistance||data.rangedRetreatTimer>0||data.rangedBurstShots>=data.rangedBurstLimit;
+  const mustRetreat=threatDistance<retreatDistance||data.rangedRetreatTimer>0||data.rangedBurstShots>=data.rangedBurstLimit;
   if(mustRetreat){
-    data.rangedRetreatTimer=Math.max(data.rangedRetreatTimer,distance < retreatDistance ? .72 : 0);
-    const retreatDistanceNeeded=Math.max(.85,safeDistance-distance+.5),desired=unit.position.clone().addScaledVector(away,retreatDistanceNeeded);desired.y=GROUND_Y;
-    if(distance>=safeDistance&&data.rangedRetreatTimer<=0)data.rangedBurstShots=0;
+    data.rangedRetreatTimer=Math.max(data.rangedRetreatTimer,threatDistance < retreatDistance ? .72 : 0);
+    const retreatDistanceNeeded=Math.max(.85,safeDistance-threatDistance+.5),desired=unit.position.clone().addScaledVector(away,retreatDistanceNeeded);desired.y=GROUND_Y;
+    if(threatDistance>=safeDistance&&data.rangedRetreatTimer<=0)data.rangedBurstShots=0;
     return {desired,speed:3.35,acceleration:8.2};
   }
   if(distance>fireDistance){const pursuit=standOffPursuitPoint(unit.position,foe.position,safeDistance,.1);return {desired:new THREE.Vector3(pursuit.x,GROUND_Y,pursuit.z),speed:2.8,acceleration:6.8};}
@@ -4163,7 +4185,7 @@ function updateIndependentSoldier(u,{combat,enemyInSight,raidTarget,foe,waitingD
   if(foe?.userData?.alive){
     duelMotion=updateDuel(u,foe,dt);
     if(!u.userData.alive)return;
-    if(duelPathNeedsRelock(u,duelMotion.desired,foe,dt)){
+    if(!(u.userData.projectileDamage>0&&u.userData.projectileSpeed>0)&&duelPathNeedsRelock(u,duelMotion.desired,foe,dt)){
       avoidBlockedDuelAndReassign(u);foe=null;duelMotion=null;
     }else{
       desired=duelMotion.desired;
@@ -4258,10 +4280,6 @@ function updateBattle(dt){
       }
     }
   }
-  for(const unit of livingPlayerSoldiers){
-    if(!isRangedSkirmisher(unit)||!unit.userData.lockedTarget)continue;
-    const foe=unit.userData.lockedTarget;resetDuel(unit);if(foe?.userData?.lockedTarget===unit)resetDuel(foe);
-  }
   clearInvalidDuels([master,...followers,...livingEnemies]);
   if(shouldReleaseCombatCommitment(combat,livingEnemies.length))releasePlayerCombatCommitment();
   if(deploymentStarted)reserveRaidBuildingAssignments(livingPlayerSoldiers);
@@ -4280,7 +4298,8 @@ function updateBattle(dt){
   const engagements=canAssignSoldierCombat
     ?assignEngagements(meleeCombatAssignmentRoster,livingEnemySoldiers)
     :{aMap:new Map(),bMap:new Map(),aWaitMap:new Map(),bWaitMap:new Map()};
-  const playerAssignments=engagements.aMap,enemyAssignments=engagements.bMap,rangedAssignments=canAssignRangedCombat?assignRangedSkirmishTargets(rangedSkirmishers,livingEnemySoldiers):new Map();
+  const rangedAssignments=canAssignRangedCombat?assignRangedSkirmishTargets(rangedSkirmishers,livingEnemySoldiers):new Map(),rangedDuoEnemyAssignments=canAssignRangedCombat?assignRangedDuos(rangedSkirmishers,livingEnemySoldiers):new Map();
+  const playerAssignments=engagements.aMap,enemyAssignments=new Map([...engagements.bMap,...rangedDuoEnemyAssignments]);
   const playerWaitingAssignments=engagements.aWaitMap,enemyWaitingAssignments=engagements.bWaitMap;
   const activeSoldierDuels=livingPlayerSoldiers.some(u=>livingEnemySoldiers.includes(u.userData.lockedTarget));
   if(activeEncounter){
@@ -5096,7 +5115,7 @@ function applyEditorActorInput(input){
   const profile=selectedEditorActorProfile(),actor=profile?.actor??null;
   if(!profile)return;
   const property=input.dataset.actorProperty,value=Number(input.value),minimum=Number(input.min),maximum=Number(input.max);
-  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed","patrolSpacing","patrolRadiusMin","patrolRadiusMax","patrolPauseMax","projectileDamage","projectileSpeed","projectileLength"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
+  if(!["maxHp","attack","moveSpeed","acceleration","patrolSpeed","patrolSpacing","patrolRadiusMin","patrolRadiusMax","patrolPauseMax","projectileDamage","projectileSpeed","projectileLength","projectileThickness"].includes(property)||!Number.isFinite(value)){updateEditorActorInspector();return}
   recordEditorUndo();const next=THREE.MathUtils.clamp(value,minimum,maximum);
   if(actor){
     actor.userData[property]=next;

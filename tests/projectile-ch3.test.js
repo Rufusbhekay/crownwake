@@ -11,10 +11,12 @@ test("CH3 is a separate ranged deployment with editable projectile settings", ()
   assert.match(game, /projectileDamage/);
   assert.match(game, /projectileSpeed/);
   assert.match(game, /projectileLength/);
+  assert.match(game, /projectileThickness/);
   assert.match(index, /id="companies-ch4"[^>]*data-deployment-archetype="ch4"/);
   assert.match(index, /data-actor-property="projectileDamage"/);
   assert.match(index, /data-actor-property="projectileSpeed"/);
   assert.match(index, /data-actor-property="projectileLength"/);
+  assert.match(index, /data-actor-property="projectileThickness"/);
 });
 
 test("CH3 fires from its front, keeps its own target, and uses skirmisher distance", () => {
@@ -22,13 +24,18 @@ test("CH3 fires from its front, keeps its own target, and uses skirmisher distan
   assert.match(game, /new THREE\.BoxGeometry\(/);
   assert.match(game, /Math\.sin\(attacker\.rotation\.y\)/);
   assert.match(game, /function assignRangedSkirmishTargets\(/);
+  assert.match(game, /function assignRangedDuos\(/);
+  assert.match(game, /lockDuel\(skirmisher,nearest\);lockDuel\(nearest,skirmisher\)/);
   assert.match(game, /rangedSkirmishers=commandableFollowers\.filter\(isRangedSkirmisher\)/);
   assert.match(game, /meleeCombatAssignmentRoster=combatAssignmentRoster\.filter\(unit=>!isRangedSkirmisher\(unit\)\)/);
   assert.match(game, /rangedAssignments\.get\(u\)\?\?playerAssignments\.get\(u\)/);
-  assert.match(game, /if\(!isRangedSkirmisher\(unit\)\|\|!unit\.userData\.lockedTarget\)continue/);
+  assert.match(game, /rangedDuoEnemyAssignments=canAssignRangedCombat\?assignRangedDuos\(rangedSkirmishers,livingEnemySoldiers\):new Map\(\)/);
   assert.match(game, /safeDistance=6\.15,retreatDistance=4\.9,fireDistance=8\.4/);
   assert.match(game, /rangedBurstLimit\?\?=2/);
+  assert.match(game, /projectileThickness\)\|\|\.065/);
+  assert.match(game, /attacker\.userData\.attackAnim=Math\.max\(attacker\.userData\.attackAnim\?\?0,\.12\)/);
+  assert.match(game, /dealDamage\(projectile\.userData\.attacker,target,projectile\.userData\.damage,0\)/);
   assert.match(game, /function updateProjectiles\(dt\)/);
-  assert.match(game, /dealDamage\(projectile\.userData\.attacker,target,projectile\.userData\.damage\)/);
+  assert.match(game, /dealDamage\(projectile\.userData\.attacker,target,projectile\.userData\.damage,0\)/);
   assert.match(game, /if\(unit\.userData\.projectileDamage>0&&unit\.userData\.projectileSpeed>0\)return updateProjectileDuel\(unit,foe,dt\)/);
 });

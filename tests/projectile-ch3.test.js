@@ -17,9 +17,17 @@ test("CH3 is a separate ranged deployment with editable projectile settings", ()
   assert.match(index, /data-actor-property="projectileLength"/);
 });
 
-test("CH3 fires a visible long projectile which applies its own configured damage", () => {
+test("CH3 fires from its front, keeps its own target, and uses skirmisher distance", () => {
   assert.match(game, /function launchProjectile\(/);
   assert.match(game, /new THREE\.BoxGeometry\(/);
+  assert.match(game, /Math\.sin\(attacker\.rotation\.y\)/);
+  assert.match(game, /function assignRangedSkirmishTargets\(/);
+  assert.match(game, /rangedSkirmishers=commandableFollowers\.filter\(isRangedSkirmisher\)/);
+  assert.match(game, /meleeCombatAssignmentRoster=combatAssignmentRoster\.filter\(unit=>!isRangedSkirmisher\(unit\)\)/);
+  assert.match(game, /rangedAssignments\.get\(u\)\?\?playerAssignments\.get\(u\)/);
+  assert.match(game, /if\(!isRangedSkirmisher\(unit\)\|\|!unit\.userData\.lockedTarget\)continue/);
+  assert.match(game, /safeDistance=6\.15,retreatDistance=4\.9,fireDistance=8\.4/);
+  assert.match(game, /rangedBurstLimit\?\?=2/);
   assert.match(game, /function updateProjectiles\(dt\)/);
   assert.match(game, /dealDamage\(projectile\.userData\.attacker,target,projectile\.userData\.damage\)/);
   assert.match(game, /if\(unit\.userData\.projectileDamage>0&&unit\.userData\.projectileSpeed>0\)return updateProjectileDuel\(unit,foe,dt\)/);

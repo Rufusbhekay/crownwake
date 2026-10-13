@@ -3419,6 +3419,21 @@ function updateEnemyPackAnchor(livingSoldiers,{combat,preparingForContact,dt}){
   enemyPackAnchor.position.y=GROUND_Y;
 }
 function nearestAlive(from,list){const origin=from.position??from;let best=null,bd=Infinity;for(const u of list){if(!u.userData.alive)continue;const d=origin.distanceToSquared(u.position);if(d<bd){bd=d;best=u}}return best}
+function isRangedSkirmisher(unit){return Boolean(unit?.userData?.projectileDamage>0&&unit.userData.projectileSpeed>0)}
+function assignRangedSkirmishTargets(units,enemies){
+  const targets=new Map();
+  for(const unit of units){
+    if(!isRangedSkirmisher(unit)||!unit.userData.alive)continue;
+    const current=unit.userData.rangedTarget;
+    const closest=nearestAlive(unit,enemies);
+    const currentDistance=current?.userData?.alive?unit.position.distanceToSquared(current.position):Infinity;
+    const closestDistance=closest?unit.position.distanceToSquared(closest.position):Infinity;
+    const target=currentDistance<=closestDistance+3.24?current:closest;
+    unit.userData.rangedTarget=target??null;
+    if(target)targets.set(unit,target);
+  }
+  return targets;
+}
 function assignCommanderTargets(commanders,opponents,preferCommander){
   const targets=new Map(),loads=opponents.map(()=>0);
   for(const commander of commanders){
@@ -3704,7 +3719,7 @@ function disposeProjectile(projectile){
 function launchProjectile(attacker,target){
   if(!attacker?.userData?.alive||!target?.userData?.alive)return null;
   const length=THREE.MathUtils.clamp(Number(attacker.userData.projectileLength)||1.1,.2,5),projectile=new THREE.Mesh(new THREE.BoxGeometry(.065,.065,1),new THREE.MeshStandardMaterial({color:0xf7f2df,roughness:.38,metalness:.12}));
-  const origin=attacker.position.clone().add(new THREE.Vector3(0,.78,0)),targetPoint=target.position.clone().add(new THREE.Vector3(0,.78,0)),direction=targetPoint.sub(origin).setY(0);
+  const forward=new THREE.Vector3(Math.sin(attacker.rotation.y),0,Math.cos(attacker.rotation.y)),origin=attacker.position.clone().add(new THREE.Vector3(0,.78,0)).addScaledVector(forward,.34+length*.08),targetPoint=target.position.clone().add(new THREE.Vector3(0,.78,0)),direction=targetPoint.sub(origin).setY(0);
   if(direction.lengthSq()<.001)return null;
   direction.normalize();projectile.position.copy(origin).addScaledVector(direction,.34);projectile.scale.z=length;projectile.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),direction);projectile.castShadow=true;
   projectile.userData={attacker,target,damage:THREE.MathUtils.clamp(Number(attacker.userData.projectileDamage)||attacker.userData.attack,.5,200),speed:THREE.MathUtils.clamp(Number(attacker.userData.projectileSpeed)||13,1,50),length,travelled:0,maxDistance:14};projectiles.push(projectile);battle.add(projectile);return projectile;
@@ -3720,10 +3735,20 @@ function updateProjectiles(dt){
   }
 }
 function updateProjectileDuel(unit,foe,dt){
-  const data=unit.userData,range=5.15,pursuit=standOffPursuitPoint(unit.position,foe.position,range,.1),distance=unit.position.distanceTo(foe.position),desired=new THREE.Vector3(pursuit.x,GROUND_Y,pursuit.z);
+  const data=unit.userData,safeDistance=6.15,retreatDistance=4.9,fireDistance=8.4,distance=unit.position.distanceTo(foe.position),toFoe=foe.position.clone().sub(unit.position).setY(0),away=toFoe.lengthSq()>.001?toFoe.normalize().multiplyScalar(-1):new THREE.Vector3((unit.id&1)?1:-1,0,0);
+  data.rangedBurstShots??=0;data.rangedBurstLimit??=2+(unit.id&1);data.rangedRetreatTimer=Math.max(0,(data.rangedRetreatTimer??0)-dt);
   data.projectileCooldown=Math.max(0,(data.projectileCooldown??0)-dt);
-  if(distance<=8&&data.projectileCooldown<=0){launchProjectile(unit,foe);data.projectileCooldown=.82;}
-  return {desired,speed:2.5,acceleration:6.4};
+  const facing=foe.position.clone().sub(unit.position).setY(0);if(facing.lengthSq()>.001)unit.rotation.y=smoothAngle(unit.rotation.y,Math.atan2(facing.x,facing.z),18,dt);
+  const mustRetreat=distance<retreatDistance||data.rangedRetreatTimer>0||data.rangedBurstShots>=data.rangedBurstLimit;
+  if(mustRetreat){
+    data.rangedRetreatTimer=Math.max(data.rangedRetreatTimer,distance < retreatDistance ? .72 : 0);
+    const retreatDistanceNeeded=Math.max(.85,safeDistance-distance+.5),desired=unit.position.clone().addScaledVector(away,retreatDistanceNeeded);desired.y=GROUND_Y;
+    if(distance>=safeDistance&&data.rangedRetreatTimer<=0)data.rangedBurstShots=0;
+    return {desired,speed:3.35,acceleration:8.2};
+  }
+  if(distance>fireDistance){const pursuit=standOffPursuitPoint(unit.position,foe.position,safeDistance,.1);return {desired:new THREE.Vector3(pursuit.x,GROUND_Y,pursuit.z),speed:2.8,acceleration:6.8};}
+  if(data.projectileCooldown<=0){launchProjectile(unit,foe);data.projectileCooldown=.58;data.rangedBurstShots++;if(data.rangedBurstShots>=data.rangedBurstLimit)data.rangedRetreatTimer=.72;}
+  return {desired:unit.position.clone(),speed:0,acceleration:8.2};
 }
 function updateDuel(unit,foe,dt){
   if(unit.userData.projectileDamage>0&&unit.userData.projectileSpeed>0)return updateProjectileDuel(unit,foe,dt);
@@ -4233,6 +4258,10 @@ function updateBattle(dt){
       }
     }
   }
+  for(const unit of livingPlayerSoldiers){
+    if(!isRangedSkirmisher(unit)||!unit.userData.lockedTarget)continue;
+    const foe=unit.userData.lockedTarget;resetDuel(unit);if(foe?.userData?.lockedTarget===unit)resetDuel(foe);
+  }
   clearInvalidDuels([master,...followers,...livingEnemies]);
   if(shouldReleaseCombatCommitment(combat,livingEnemies.length))releasePlayerCombatCommitment();
   if(deploymentStarted)reserveRaidBuildingAssignments(livingPlayerSoldiers);
@@ -4245,13 +4274,13 @@ function updateBattle(dt){
     const commanderMovingIndependently=!!company?.commander?.userData.manualMoving;
     return !anchor.moving&&(anchor.deployTimer??0)<=0&&!commanderMovingIndependently;
   });
-  const combatAssignmentRoster=preserveLockedCombatants(livingPlayerSoldiers,commandableFollowers);
-  const canAssignSoldierCombat=combat&&combatAssignmentRoster.length&&livingEnemySoldiers.length;
+  const combatAssignmentRoster=preserveLockedCombatants(livingPlayerSoldiers,commandableFollowers),rangedSkirmishers=commandableFollowers.filter(isRangedSkirmisher),meleeCombatAssignmentRoster=combatAssignmentRoster.filter(unit=>!isRangedSkirmisher(unit));
+  const canAssignSoldierCombat=combat&&meleeCombatAssignmentRoster.length&&livingEnemySoldiers.length,canAssignRangedCombat=combat&&rangedSkirmishers.length&&livingEnemySoldiers.length;
   if(!canAssignSoldierCombat)for(const unit of [...livingPlayerSoldiers,...livingEnemySoldiers])unit.userData.waitingDuelTarget=null;
   const engagements=canAssignSoldierCombat
-    ?assignEngagements(combatAssignmentRoster,livingEnemySoldiers)
+    ?assignEngagements(meleeCombatAssignmentRoster,livingEnemySoldiers)
     :{aMap:new Map(),bMap:new Map(),aWaitMap:new Map(),bWaitMap:new Map()};
-  const playerAssignments=engagements.aMap,enemyAssignments=engagements.bMap;
+  const playerAssignments=engagements.aMap,enemyAssignments=engagements.bMap,rangedAssignments=canAssignRangedCombat?assignRangedSkirmishTargets(rangedSkirmishers,livingEnemySoldiers):new Map();
   const playerWaitingAssignments=engagements.aWaitMap,enemyWaitingAssignments=engagements.bWaitMap;
   const activeSoldierDuels=livingPlayerSoldiers.some(u=>livingEnemySoldiers.includes(u.userData.lockedTarget));
   if(activeEncounter){
@@ -4292,7 +4321,7 @@ function updateBattle(dt){
     const localIndex=Math.max(0,company.soldiers.indexOf(u));
     const anchor=ensureCompanyAnchor(company.groupIndex),manualOrder=anchor.moving,companyDeploying=!manualOrder&&(anchor.deployTimer??0)>0;
     const committed=!!u.userData.lockedTarget?.userData.alive;
-    let foe=playerAssignments.get(u)??(committed?u.userData.lockedTarget:null);
+    let foe=rangedAssignments.get(u)??playerAssignments.get(u)??(committed?u.userData.lockedTarget:null);
     const waitingDuel=playerWaitingAssignments.get(u);
     const combatState=soldierCombatState({combat,formingBattleLine:companyDeploying,targetAlive:!!foe?.userData.alive,waitingSlot:!!waitingDuel});
     u.userData.mode=combatState===SOLDIER_COMBAT_STATE.DUEL?SERVANT_MODE.ATTACK:SERVANT_MODE.FOLLOW;
@@ -4363,7 +4392,7 @@ function updateBattle(dt){
   }else{
     const raidTarget=activeRaidBuildings().length>0;
     for(const u of livingPlayerSoldiers){
-      const foe=playerAssignments.get(u)??(u.userData.lockedTarget?.userData.alive?u.userData.lockedTarget:null);
+      const foe=rangedAssignments.get(u)??playerAssignments.get(u)??(u.userData.lockedTarget?.userData.alive?u.userData.lockedTarget:null);
       const waitingDuel=playerWaitingAssignments.get(u);
       updateIndependentSoldier(u,{combat,enemyInSight:threatDetected,raidTarget,foe,waitingDuel,peacefulPatrol,patrolAllies:livingPlayerSoldiers,dt});
     }

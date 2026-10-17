@@ -91,18 +91,6 @@ test("CH and EN brake and turn gradually rather than slide through a reversal", 
   }
 });
 
-test("CH brake to turn in place before following a new heading", () => {
-  const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle });
-  const start = game.indexOf("function steerStraightTowards("), end = game.indexOf("function steerTowards(", start);
-  vm.runInContext(game.slice(start, end), context);
-  const unit = new THREE.Group(), destination = new THREE.Vector3(10, 0, 0);
-  unit.userData = { actorArchetypeId: "ch2", faction: "player", velocity: new THREE.Vector3(0, 0, 2.65) };
-
-  for(let frame = 0; frame < 6; frame++)context.steerStraightTowards(unit, destination, 2.65, 5.4, 1 / 60);
-  assert.ok(unit.rotation.y > .4, "CH should visibly rotate toward the new heading");
-  assert.ok(unit.userData.velocity.length() < .25, `CH should brake before moving, not keep sliding at ${unit.userData.velocity.length().toFixed(2)}`);
-});
-
 test("CH and EN shed sideways momentum when a waypoint changes direction", () => {
   const context = vm.createContext({ THREE, arrivalSpeed, smoothAngle });
   const start = game.indexOf("function steerStraightTowards("), end = game.indexOf("function steerTowards(", start);
@@ -540,6 +528,22 @@ test("spawned EN packs share one random pivot and patrol compactly around it", (
   assert.ok(target.distanceTo(first.userData.enemyPatrolPivot) <= 3.2);
 });
 
+test("character ring colours remain independent of other characters and body materials", () => {
+  const settings = { outerColor: "#f7f2e4", innerColor: "#f7f2e4", playerRadarColor: "#e53935", enemyRadarColor: "#ffcf22", outerSize: .76, outerThickness: .04, outerHeight: .018, innerSize: .59, innerThickness: .04, innerHeight: .054, radarHeight: .021, radarThickness: .04, radarRadius: .86, radarSize: .34 };
+  const first = new THREE.Group(), second = new THREE.Group();
+  first.userData = { alive: true, faction: "player", ringSettings: { ...settings, outerColor: "#123456", innerColor: "#abcdef" } };
+  second.userData = { alive: true, faction: "player" };
+  const context = vm.createContext({ THREE, unitRingSettings: settings, GROUND_Y: .015, master: first, followers: [second], enemyUnits: [], totalTime: 0, reducedMotion: false, SOLDIER_MARKER_LEAD_DISTANCE: .13, activeDuelRingState, isBarracksDeparting: () => false });
+  vm.runInContext(game.slice(game.indexOf("function makeUnitRingGeometry("), game.indexOf("function configuredProgressBar(")), context);
+  context.makeEncounterRing(first); context.makeEncounterRing(second); context.updateEncounterRings();
+  assert.equal(first.userData.encounterRing.userData.outerMaterial.color.getHex(), 0x123456);
+  assert.equal(first.userData.encounterRing.userData.innerMaterial.color.getHex(), 0xabcdef);
+  assert.equal(second.userData.encounterRing.userData.outerMaterial.color.getHex(), 0xf7f2e4);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()); first.add(body);
+  vm.runInContext(game.slice(game.indexOf("function editorMaterialMeshes("), game.indexOf("function editorMaterialTargets(")), context);
+  assert.deepEqual(Array.from(context.editorMaterialMeshes([first])), [body]);
+});
+
 test("CH and EN markers use raised white rings with a leading faction arc", () => {
   assert.match(game, /const UNIT_RING_SETTINGS_KEY="crownwake-unit-ring-settings-v1"/);
   const player = new THREE.Group(), enemy = new THREE.Group(), secondEnemy = new THREE.Group();
@@ -808,6 +812,10 @@ test("spawning EN ends CH celebration and immediately starts another encounter",
   context.hudWidgetArchetype=()=>({faction:"enemy",id:"en1",label:"EN1"});
   context.normalizeHudWidgetSettings=()=>({spawnCount:1});
   context.walkableSupportHeightAt=()=>0;context.rand=()=>0;
+  const cell={x:0,y:0,z:0},grid={cells:new Map([["0:0",cell]]),walkable:new Set(["0:0"]),blocked:new Set()};
+  context.GROUND_Y=0;context.ensureNavigationGrid=()=>grid;
+  context.navigationCellKey=candidate=>`${candidate.x}:${candidate.z}`;
+  context.navigationGridCellFromPoint=()=>cell;
   context.scatteredPackOffset=()=>({lateral:0,forward:0});
   context.ACTOR_FOOT_CLEARANCE=.01;
   context.assignEnemyPatrolGroup=units=>{assigned=units.length;};

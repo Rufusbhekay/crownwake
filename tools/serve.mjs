@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +21,7 @@ const mimeTypes = new Map([
   [".webp", "image/webp"]
 ]);
 const GENERATED_MODEL_MAX_BYTES = 50 * 1024 * 1024;
+const PROJECT_LEVEL_MAX_BYTES = 5 * 1024 * 1024;
 const GLB_MAGIC = 0x46546c67;
 
 function option(argumentsList, name, fallback) {
@@ -47,13 +48,13 @@ function requestError(status, message) {
   return error;
 }
 
-async function readRequestBody(request, limit) {
+async function readRequestBody(request, limit, tooLargeMessage = "Request body is too large.") {
   let size = 0;
   const chunks = [];
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > limit) throw requestError(413, "GLB files must be 50 MB or smaller.");
+    if (size > limit) throw requestError(413, tooLargeMessage);
     chunks.push(buffer);
   }
   return Buffer.concat(chunks);
@@ -90,10 +91,50 @@ async function saveGeneratedModel(root, name, buffer) {
 }
 
 async function saveGeneratedModelRequest(request, response, root) {
-  const buffer = await readRequestBody(request, GENERATED_MODEL_MAX_BYTES);
+  const buffer = await readRequestBody(request, GENERATED_MODEL_MAX_BYTES, "GLB files must be 50 MB or smaller.");
   if (buffer.length < 12 || buffer.readUInt32LE(0) !== GLB_MAGIC) throw requestError(400, "The generated model is not a valid GLB file.");
   const fileName = await saveGeneratedModel(root, request.headers["x-crownwake-model-name"], buffer);
   sendJson(response, 201, { fileName, path: `Models/${fileName}` });
+}
+
+function isProjectLevelLayout(layout) {
+  return Boolean(layout) && typeof layout === "object" && Number.isInteger(layout.version) && layout.version >= 1 && Array.isArray(layout.assets);
+}
+
+function projectLevelPath(root) {
+  const levelsDirectory = resolve(root, "levels");
+  const filePath = resolve(levelsDirectory, "current-level.json");
+  if (!filePath.startsWith(levelsDirectory + sep)) throw requestError(400, "Invalid level path.");
+  return { levelsDirectory, filePath };
+}
+
+async function loadProjectLevelRequest(response, root) {
+  const { filePath } = projectLevelPath(root);
+  try {
+    const layout = JSON.parse(await readFile(filePath, "utf8"));
+    if (!isProjectLevelLayout(layout)) throw requestError(500, "Saved project level is invalid.");
+    sendJson(response, 200, layout);
+  } catch (error) {
+    if (error?.code === "ENOENT") sendJson(response, 404, { error: "No shared project level has been published yet." });
+    else throw error;
+  }
+}
+
+async function saveProjectLevelRequest(request, response, root) {
+  const buffer = await readRequestBody(request, PROJECT_LEVEL_MAX_BYTES, "Level snapshots must be 5 MB or smaller.");
+  let layout;
+  try {
+    layout = JSON.parse(buffer.toString("utf8"));
+  } catch {
+    throw requestError(400, "Level snapshot must be valid JSON.");
+  }
+  if (!isProjectLevelLayout(layout)) throw requestError(400, "Level snapshot must include a version and assets array.");
+  const { levelsDirectory, filePath } = projectLevelPath(root);
+  await mkdir(levelsDirectory, { recursive: true });
+  const temporaryPath = `${filePath}.tmp`;
+  await writeFile(temporaryPath, JSON.stringify(layout, null, 2) + "\n", "utf8");
+  await rename(temporaryPath, filePath);
+  sendJson(response, 201, { ok: true });
 }
 
 async function serveStaticFile(request, response, url, root) {
@@ -114,12 +155,25 @@ export function createCrownwakeServer({ root = projectRoot } = {}) {
   return createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", "http://" + (request.headers.host ?? "127.0.0.1"));
-      if (url.pathname === "/api/models") {
+      const routePath = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
+      if (routePath === "/api/models") {
         if (request.method !== "POST") {
           sendJson(response, 405, { error: "Method not allowed." });
           return;
         }
         await saveGeneratedModelRequest(request, response, root);
+        return;
+      }
+      if (routePath === "/api/level") {
+        if (request.method === "GET") {
+          await loadProjectLevelRequest(response, root);
+          return;
+        }
+        if (request.method === "PUT") {
+          await saveProjectLevelRequest(request, response, root);
+          return;
+        }
+        sendJson(response, 405, { error: "Method not allowed." });
         return;
       }
       await serveStaticFile(request, response, url, root);

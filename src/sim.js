@@ -1005,6 +1005,26 @@ export function shouldRegroupPlayerGroup({
 export const SOLDIER_HEALTH_WIDGET_DURATION = 3.2;
 export const SOLDIER_REGEN_DELAY = 1.2;
 export const SOLDIER_REGEN_DURATION = 10;
+export const SOLDIER_DUO_REGEN_DELAY = 3;
+
+export function soldierCanRegenerateAfterDuel({
+  faction,
+  health,
+  maxHealth,
+  paired = false,
+  duoDefeatedAt,
+  now,
+  delay = SOLDIER_DUO_REGEN_DELAY
+} = {}) {
+  const safeHealth = Math.max(0, health ?? 0);
+  const safeMax = Math.max(0, maxHealth ?? 0);
+  return faction === "player"
+    && !paired
+    && safeHealth < safeMax
+    && Number.isFinite(duoDefeatedAt)
+    && Number.isFinite(now)
+    && now - duoDefeatedAt >= delay;
+}
 
 export function soldierRegenHealth({
   health,

@@ -3,25 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#adc4c7">
+  <meta name="theme-color" content="#101a24">
   <link rel="icon" href="./assets/favicon.png">
-  <title>Crownwake</title>
+  <title>Horde Base</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <canvas id="game" aria-label="Crownwake 3D game"></canvas>
+  <div id="fps-counter" aria-label="Frames per second">FPS --</div>
+  <canvas id="game" aria-label="Horde Base 3D game"></canvas>
   <div id="placed-hud-layer" aria-label="Placed level HUD controls"></div>
   <section id="title-screen" class="screen">
-    <div class="title-mark"><span></span><i></i><span></span></div>
-    <p class="kicker">A TINY TALE OF CONQUEST</p>
-    <h1 id="title"></h1>
-    <p id="subtitle" class="subtitle"></p>
-    <button id="begin" class="primary"></button>
-    <p id="how-to" class="hint"></p>
+    <div class="title-menu-panel">
+      <div class="horde-crest" aria-hidden="true"><span></span><i></i><span></span></div>
+      <p class="title-menu-kicker">TACTICAL HORDE STRATEGY</p>
+      <h1>HORDE<br>BASE</h1>
+      <p class="title-menu-subtitle">Build the horde. Hold the ground.</p>
+      <nav class="title-menu-actions" aria-label="Main menu">
+        <button id="begin" class="title-menu-button title-menu-primary" type="button">NEW GAME</button>
+        <button id="continue-game" class="title-menu-button" type="button">CONTINUE</button>
+        <button id="my-horde" class="title-menu-button" type="button">MY HORDE</button>
+        <button id="title-settings" class="title-menu-button" type="button">SETTINGS</button>
+        <button id="exit-game" class="title-menu-button title-menu-exit" type="button">EXIT GAME</button>
+      </nav>
+      <p id="title-menu-status" class="title-menu-status" aria-live="polite"></p>
+    </div>
+    <p class="title-menu-caption">COMMAND · DEPLOY · SURVIVE</p>
   </section>
   <section id="hud" class="hidden">
     <div class="topbar">
-      <div class="brand">CROWNWAKE</div>
+      <div class="brand">HORDE BASE</div>
       <div class="stats">
         <div><small id="army-label"></small><strong id="army-count">5</strong></div>
         <div><small id="territory-label"></small><strong id="territory-count">1/7</strong></div>
@@ -62,7 +72,7 @@
     </div>
     <div id="settings-panel" class="hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <section class="settings-card">
-        <p class="kicker">CROWNWAKE</p>
+        <p class="kicker">HORDE BASE</p>
         <h2 id="settings-title">SETTINGS</h2>
         <div class="settings-row"><span>HUD</span><button id="hud-toggle" class="quiet">HUD ON</button></div>
         <div class="settings-row"><span>AUDIO</span><button id="settings-audio" class="quiet">SOUND ON</button></div>
@@ -120,6 +130,7 @@
         <div class="editor-topbar-actions">
           <button id="editor-maximize" type="button" aria-pressed="false" title="Maximize viewport (Tab)">VIEWPORT</button>
           <button id="editor-save" type="button" title="Save level (Ctrl+S)">SAVE</button>
+          <button id="editor-publish" type="button" title="Save this level as the shared project snapshot">PUBLISH LEVEL</button>
         </div>
       </header>
       <nav id="editor-tool-rail" class="editor-tool-rail" aria-label="Editor contexts">
@@ -205,7 +216,7 @@
               </fieldset>
               <fieldset class="editor-actor-settings-group"><legend>APPEARANCE</legend>
                 <label><span>MODEL</span><select id="editor-actor-model" aria-label="Actor model"></select></label>
-                <label class="editor-actor-material"><span>MATERIAL COLOUR</span><input id="editor-actor-material" type="color" value="#f2a40c" aria-label="Enemy actor material colour"></label>
+                <label class="editor-actor-material"><span>MATERIAL COLOUR</span><input id="editor-actor-material" type="color" value="#f2a40c" aria-label="Actor material colour"></label>
               </fieldset>
               <fieldset class="editor-actor-settings-group"><legend>HEALTH DISPLAY</legend>
                 <label><span>PROGRESS BAR</span><select id="editor-actor-progress-bar" aria-label="Actor progress bar"></select></label>
@@ -213,7 +224,7 @@
               </fieldset>
               <fieldset id="editor-actor-ring-controls" class="editor-actor-ring-controls">
                 <legend>RING CONTROLS</legend>
-                <p>Shared live marker style for every CH and EN.</p>
+                <p>Ring settings apply to the selected character.</p>
                 <div class="editor-ring-groups">
                   <section><h4>OUTER RING</h4><label class="editor-ring-colour"><span>COLOUR</span><input id="editor-ring-outer-color" type="color" value="#f7f2e4" aria-label="Outer ring colour"></label><label class="editor-ring-colour"><span>CH ATTACK</span><input id="editor-ring-ch-outer-attack-color" type="color" value="#e32646" aria-label="CH outer ring attack colour"></label><label class="editor-ring-colour"><span>EN ATTACK</span><input id="editor-ring-en-outer-attack-color" type="color" value="#ffbf24" aria-label="EN outer ring attack colour"></label><label><span>SIZE</span><input id="editor-ring-outer-size" type="number" min="0.3" max="5" step="0.01" inputmode="decimal" aria-label="Outer ring size"></label><label><span>THICKNESS</span><input id="editor-ring-outer-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Outer ring thickness"></label><label><span>HEIGHT</span><input id="editor-ring-outer-height" type="number" min="0" max="0.2" step="0.005" inputmode="decimal" aria-label="Outer ring height"></label></section>
                   <section><h4>INNER RING</h4><label class="editor-ring-colour"><span>COLOUR</span><input id="editor-ring-inner-color" type="color" value="#f7f2e4" aria-label="Inner ring colour"></label><label class="editor-ring-colour"><span>CH ATTACK</span><input id="editor-ring-ch-inner-attack-color" type="color" value="#e32646" aria-label="CH inner ring attack colour"></label><label class="editor-ring-colour"><span>EN ATTACK</span><input id="editor-ring-en-inner-attack-color" type="color" value="#ffbf24" aria-label="EN inner ring attack colour"></label><label><span>SIZE</span><input id="editor-ring-inner-size" type="number" min="0.1" max="5" step="0.01" inputmode="decimal" aria-label="Inner ring size"></label><label><span>THICKNESS</span><input id="editor-ring-inner-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Inner ring thickness"></label><label><span>HEIGHT</span><input id="editor-ring-inner-height" type="number" min="0" max="0.35" step="0.005" inputmode="decimal" aria-label="Inner ring height"></label></section>
@@ -231,8 +242,9 @@
               <label><span>BLOCK X</span><input id="editor-hud-layout-x" type="number" min="0" max="100" step="1" value="50" aria-label="HUD block horizontal position"></label>
               <label><span>BLOCK Y</span><input id="editor-hud-layout-y" type="number" min="0" max="100" step="1" value="10" aria-label="HUD block vertical position"></label>
               <label id="editor-hud-text-setting"><span>TEXT</span><input id="editor-hud-text" type="text" maxlength="80" value="BREAK THE RIVAL CROWN" aria-label="HUD text"></label>
+              <label id="editor-hud-owner-setting"><span>SPAWNS</span><select id="editor-hud-owner" aria-label="Character this HUD deploys"></select></label>
               <label id="editor-hud-spawn-count-setting"><span>UNITS TO SPAWN</span><input id="editor-hud-spawn-count" type="number" min="1" max="99" step="1" value="5" aria-label="Units to spawn or deploy per HUD click"></label>
-              <p>Drag this block around the editor grid, or set its block position here. CH deploys this batch from its matching reserve; EN spawns this configured amount at its world proxy.</p>
+              <p id="editor-hud-help">Choose the character and amount this HUD deploys, then select a tile during play.</p>
             </div>
           </details>
           <details id="inspector-building-section" class="hidden" open>
@@ -393,7 +405,7 @@
           <button id="content-browser-add" type="button" title="Create folder">+ ADD</button>
           <button id="content-browser-import" type="button" title="Import GLB model">IMPORT</button>
           <button id="content-browser-new-model" type="button" title="Create a model from the selected asset's current size" disabled>NEW MODEL</button>
-          <button id="content-browser-duplicate" type="button" title="Duplicate selected blueprint" aria-label="Duplicate selected blueprint" disabled>&#10697;</button>
+          <button id="content-browser-duplicate" type="button" title="Duplicate selected asset" aria-label="Duplicate selected asset" disabled>&#10697;</button>
           <button id="content-browser-delete" class="content-browser-delete hidden" type="button" title="Delete selected Content Browser item" aria-label="Delete selected Content Browser item" disabled>&#10005;</button>
           <button id="content-browser-filter" type="button" title="Show all assets">ALL</button>
           <button id="content-browser-view" type="button" aria-pressed="false" title="Toggle asset view">&#9638;</button>

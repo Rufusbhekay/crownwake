@@ -1,11 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import vm from "node:vm";
 import * as THREE from "three";
 import { levelCameraFrame } from "../src/sim.js";
 
 const source = readFileSync(new URL("../game.js", import.meta.url), "utf8");
+const indexSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+
+test("Chunky Square Pillar is a permanent model asset with embedded materials", () => {
+  assert.equal(existsSync(new URL("../Models/Chunky_Square_Pillar.glb", import.meta.url)), true);
+  assert.match(source, /BUNDLED_IMPORTED_MODELS/);
+  assert.match(source, /id:"imported-model:chunky-square-pillar"/);
+  assert.match(source, /sourcePath:"Models\/Chunky_Square_Pillar\.glb"/);
+  assert.match(source, /function importedModelsWithBundles\(records\)/);
+  assert.match(source, /importedModels:importedModelsWithBundles\(saved\.importedModels\)/);
+});
 
 test("World Tools restores its last workspace after returning from playtest", () => {
   const calls = [];
@@ -184,6 +194,25 @@ test("browser refresh keeps the authored EN snapshot rather than live combat act
   assert.match(source, /addEventListener\("pagehide",\(\)=>.*persistSavedLevelLayout\(\)/);
 });
 
+test("project level snapshots accept valid shared layouts and reject malformed data", () => {
+  const start = source.indexOf("function normalizeProjectLevelLayout(");
+  const end = source.indexOf("\nfunction ", start + 1);
+  assert.notEqual(start, -1, "project level layouts must be normalized before replacing local work");
+
+  const context = vm.createContext({
+    LEGACY_LEVEL_LAYOUT_VERSION: 1,
+    LEVEL_LAYOUT_VERSION: 6,
+    levelCameraFrame: camera => camera?.x === 3 ? { x: 3, z: 4, scale: 1 } : null
+  });
+  vm.runInContext(source.slice(start, end), context);
+
+  const valid = { version: 6, assets: [{ type: "tile-spawner", x: 2, z: 3 }], camera: { x: 3, z: 4, scale: 1 }, hudLayoutSeeded: true, hudTextSeeded: true };
+  const normalized = vm.runInContext("normalizeProjectLevelLayout(globalThis.layout)", vm.createContext({ ...context, layout: valid }));
+  assert.deepEqual(JSON.parse(JSON.stringify(normalized)), valid);
+  assert.equal(vm.runInContext("normalizeProjectLevelLayout({ version: 6, assets: null })", context), null);
+  assert.equal(vm.runInContext("normalizeProjectLevelLayout({ version: 99, assets: [] })", context), null);
+});
+
 test("restoring a saved level includes an EN placed after earlier scenery", () => {
   const start = source.indexOf("function restoreLevelLayout()");
   const end = source.indexOf("\nfunction ", start + 1);
@@ -300,4 +329,23 @@ test("actor deletion confirmation identifies the selected actor", () => {
 
   assert.equal(title.textContent, "DELETE EN 3?");
   assert.equal(copy.textContent, "Remove this EN 3 actor from the level?");
+});
+
+test("selecting an editor asset exits Environment details", () => {
+  assert.match(source, /if\(editorSelection&&editorEnvironmentOpen\)toggleEditorEnvironmentPopover\(false\);/);
+});
+
+test("CH HUD blueprints expose their owning character in Details", () => {
+  assert.match(source, /hudBlueprints:/);
+  assert.match(source, /function selectedHudWidgetProfile\(\)/);
+  assert.match(source, /function applyEditorHudWidgetSettings\(\)/);
+  assert.match(source, /editorSelectedObjects\.size===0&&contentBrowserSelection\.size===1/);
+  assert.match(source, /contentBrowserState\.hudBlueprints\[profile\.asset\.id\]=settings/);
+  assert.match(indexSource, /id="editor-hud-owner"/);
+});
+
+test("CH actor material colours are editable like EN colours", () => {
+  assert.match(source, /ACTOR_PROGRESS_BAR_ARCHETYPE_IDS\.includes\(archetypeId\)/);
+  assert.match(source, /const materialColor=actor\.userData\.editorMaterialColor\?\?actorMaterialColour\(archetype\.id\)/);
+  assert.match(source, /if\(!profile\|\|!input\)return;/);
 });

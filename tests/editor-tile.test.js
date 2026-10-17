@@ -9,6 +9,7 @@ import { BASE_MATERIAL_PRESETS, applyBaseMaterial } from "../src/base-materials.
 
 const source = readFileSync(new URL("../game.js", import.meta.url), "utf8");
 const indexSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const stylesSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const gltfExporterSource = readFileSync(new URL("../vendor/exporters/GLTFExporter.js", import.meta.url), "utf8");
 
 function tileGeometryHarness() {
@@ -542,6 +543,48 @@ test("Town Hall and Barracks blueprints use Content Browser models and duplicate
   assert.match(source, /if\(type==="barracks"\)record\.barracksSpawnInterval=/);
   assert.match(source, /function updateBarracksSpawners\(dt\)/);
   assert.match(source, /function contentBrowserDuplicateSelectedBlueprint\(\)/);
+});
+
+test("Content Browser duplicate creates editable CH and CH HUD blueprints", () => {
+  assert.match(source, /function contentBrowserCanDuplicateAsset\(asset\)/);
+  assert.match(source, /asset\?\.actorArchetypeId\|\|asset\?\.hudDefaultArchetypeId/);
+  assert.match(source, /blueprintKind:"actor",actorArchetypeId:asset\.actorArchetypeId/);
+  assert.match(source, /blueprintKind:"hud",hudDefaultArchetypeId:asset\.hudDefaultArchetypeId/);
+  assert.match(source, /actorBlueprintCopy:true/);
+  assert.match(source, /contentBrowserState\.hudBlueprints\[id\]=/);
+});
+
+test("copied CH and HUD blueprints receive sequential names", () => {
+  assert.match(source, /function nextActorCopyName\(archetypeId\)/);
+  assert.match(source, /return `\$\{prefix\}\$\{highest\+1\}`/);
+  assert.match(source, /function nextHudCopyName\(asset\)/);
+  assert.match(source, /return `\$\{prefix\}\$\{highest\+1\} HUD`/);
+  assert.match(source, /name:nextActorCopyName\(asset\.actorArchetypeId\)/);
+  assert.match(source, /name:nextHudCopyName\(asset\)/);
+  assert.match(source, /function migrateLegacyCopyNames\(\)/);
+});
+
+test("copied CH HUDs maintain independent deployment reserves", () => {
+  assert.match(source, /function deploymentReserveKey\(spawnAssetId,archetypeId\)/);
+  assert.match(source, /sourceId\.startsWith\("blueprint:actor:copy-"\)\?sourceId:archetypeId/);
+  assert.match(source, /const reserve=deploymentReserveFor\(spawnSource\)/);
+  assert.match(source, /deploymentReserves\[reserveKey\]=deploymentReserveAfterDeploy\(reserve,count\)/);
+  assert.match(source, /deploymentSpawnAssetId===spawnSource\.id/);
+});
+
+test("copied character previews use their saved material colour", () => {
+  assert.match(source, /function characterAssetPreview\(archetypeId,materialColor=null\)/);
+  assert.match(source, /classList\.add\("custom-colour"\)/);
+  assert.match(source, /characterAssetPreview\(archetype\.id,copy\.materialColor\)/);
+  assert.match(stylesSource, /\.character-asset-preview\.custom-colour i/);
+});
+
+test("HUD spawn choices include copied character assets", () => {
+  assert.match(source, /function hudSpawnSources\(archetypeId\)/);
+  assert.match(source, /copy\.blueprintKind==="actor"/);
+  assert.match(source, /hudSpawnAssetId/);
+  assert.match(source, /hudSpawnSources\(archetype\.id\)/);
+  assert.match(source, /applyHudSpawnAsset\(unit,spawnAssetId\)/);
 });
 
 test("Content Browser imports persistent GLB models with a material fallback slot", () => {
@@ -1262,7 +1305,7 @@ test("CH deployment uses separate icons and deploys the selected HUD batch as on
   assert.match(indexSource, /id="starting-ch2-count"/);
   assert.match(deployment, /count=Math\.min\(reserve,deploymentRequestedCount\|\|reserve\)/);
   assert.match(deployment, /makeUnit\("player",deploymentArchetypeId\)/);
-  assert.match(deployment, /unit\.userData\.companyId=deploymentGroupId\(deploymentArchetypeId\)/);
+  assert.match(deployment, /unit\.userData\.companyId=deploymentGroupId\(deploymentArchetypeId,spawnSource\.id\)/);
   assert.match(deployment, /activatePlacedCharacterEncounter\(\{engageImmediately:true\}\)/);
   assert.match(source, /forceSoldierEngagement/);
   assert.match(source, /forcedSoldierEngagement\|\|approachState!=="travel"/);
@@ -1270,11 +1313,32 @@ test("CH deployment uses separate icons and deploys the selected HUD batch as on
   assert.doesNotMatch(source, /function updateDeploymentWindow\(/);
 });
 
+test("horde movement shows only the hovered tile and pulses selection", () => {
+  assert.match(source, /renderer\.outline\.visible=mode!=="command"/);
+  assert.match(source, /function updateDeploymentPreviewHover\(renderer\)/);
+  assert.match(source, /const glow=\.5\+\.5\*Math\.sin\(interfaceTime\*7\)/);
+  assert.match(source, /updateCommandGridGlow\(\);updateSelectionVisuals\(\)/);
+});
+
+test("CH and EN deployment display only the hovered tile during play", () => {
+  assert.match(source, /deploymentPreviewRenderer\.outline\.visible=mode==="editor"/);
+  assert.match(source, /deploymentPreviewRenderer\.enemyFill\.visible=mode==="editor"/);
+  assert.match(source, /else toggleEnemyDeployment\(widget\)/);
+  assert.match(source, /if\(enemyDeploymentWidget\)deployHudEnemies\(p\);else deploySoldier\(p\)/);
+  assert.match(source, /spawnHudEnemies\(widget,cell\)/);
+});
+
+test("the FPS counter updates outside debug mode", () => {
+  assert.match(indexSource, /id="fps-counter"/);
+  assert.match(stylesSource, /#fps-counter\{position:fixed;top:8px;left:8px/);
+  assert.match(source, /if\(now-fpsAt>500\)\{fps=.*\$\("fps-counter"\)\.textContent=/);
+});
+
 test("CH and EN HUD Blueprints are placeable, persistent level controls", () => {
   assert.match(source, /\{id:"hud",name:"HUD",parentId:CONTENT_BROWSER_ROOT_ID\}/);
   assert.match(source, /\{id:"hud\/ch",name:"CH",parentId:"hud"\}/);
   assert.match(source, /\{id:"hud\/en",name:"EN",parentId:"hud"\}/);
-  assert.match(source, /HUD_ARCHETYPE_IDS\.map\(archetypeId=>\{const archetype=ACTOR_ARCHETYPES\[archetypeId\];return \{id:hudAssetId\(archetypeId\),name:`\$\{archetype\.label\} HUD`,type:"HUD",folderId:`hud\/\$\{archetype\.faction==="player"\?"ch":"en"\}`/);
+  assert.match(source, /HUD_ARCHETYPE_IDS\.map\(defaultArchetypeId=>\{const assetId=hudAssetId\(defaultArchetypeId\),settings=hudBlueprintSettings\(assetId,defaultArchetypeId\)/);
   assert.match(source, /function addEditorHudWidget\(/);
   assert.match(source, /if\(blueprint\?\.hudArchetypeId\)/);
   assert.match(source, /record\.type==="hud-widget"/);
@@ -1287,11 +1351,12 @@ test("CH HUDs expose and use the same configurable spawn count as EN HUDs", () =
   const toggleEnd = source.indexOf("function updateDeploymentEnemyOccupancy(", toggleStart);
   const toggle = source.slice(toggleStart, toggleEnd);
   assert.match(indexSource, /<span>UNITS TO SPAWN<\/span>/);
-  assert.match(source, /spawnSetting\.classList\.toggle\("hidden",!enabled\|\|isText\)/);
-  assert.match(source, /spawnInput\.disabled=!enabled\|\|isText/);
-  assert.match(source, /toggleDeploymentMode\(archetype\.id,widget\.userData\.hudSpawnCount\)/);
-  assert.match(source, /amount=player\?Math\.min\(deploymentReserves\[archetype\.id\]\?\?0,widget\.userData\.hudSpawnCount\)/);
-  assert.match(toggle, /function toggleDeploymentMode\(archetypeId,requestedCount=null\)/);
+  assert.match(indexSource, /id="editor-hud-owner"/);
+  assert.match(source, /spawnSetting\.classList\.toggle\("hidden",!supportsSpawn\)/);
+  assert.match(source, /spawnInput\.disabled=!supportsSpawn/);
+  assert.match(source, /toggleDeploymentMode\(spawnSource\.archetypeId,widget\.userData\.hudSpawnCount,spawnSource\.id\)/);
+  assert.match(source, /amount=player\?Math\.min\(deploymentReserveFor\(spawnSource\),widget\.userData\.hudSpawnCount\)/);
+  assert.match(toggle, /function toggleDeploymentMode\(archetypeId,requestedCount=null,spawnAssetId=null\)/);
   assert.match(toggle, /deploymentRequestedCount=count/);
 });
 
@@ -1384,6 +1449,7 @@ function previewHarness() {
     mode: "editor",
     selected: true,
     deploymentPlacementReady: false,
+    deploymentPreviewRenderer: { outline: { visible: true }, enemyFill: { visible: true } },
     commandGrid: { visible: true, children: [] },
     clearCommandGrid() { context.commandGrid.children = []; },
     tileBlueprintSelected() { return context.selected; },
@@ -1411,9 +1477,12 @@ test("deployment grid returns for other editor selections and gameplay deploymen
   context.selected = false;
   context.refreshCommandGrid();
   assert.equal(context.commandGrid.visible, true);
+  assert.equal(context.deploymentPreviewRenderer.outline.visible, true);
   context.selected = true;
   context.mode = "playing";
   context.deploymentPlacementReady = true;
   context.refreshCommandGrid();
   assert.equal(context.commandGrid.visible, true);
+  assert.equal(context.deploymentPreviewRenderer.outline.visible, false);
+  assert.equal(context.deploymentPreviewRenderer.enemyFill.visible, false);
 });

@@ -1301,8 +1301,7 @@ test("CH deployment uses separate icons and deploys the selected HUD batch as on
   const deployment = source.slice(start, end);
   assert.match(indexSource, /id="companies"[^>]*data-deployment-archetype="ch1"/);
   assert.match(indexSource, /id="companies-ch2"[^>]*data-deployment-archetype="ch2"/);
-  assert.match(indexSource, /id="starting-ch1-count"/);
-  assert.match(indexSource, /id="starting-ch2-count"/);
+  assert.doesNotMatch(indexSource, /id="starting-ch[123]-count"/);
   assert.match(deployment, /count=Math\.min\(reserve,deploymentRequestedCount\|\|reserve\)/);
   assert.match(deployment, /makeUnit\("player",deploymentArchetypeId\)/);
   assert.match(deployment, /unit\.userData\.companyId=deploymentGroupId\(deploymentArchetypeId,spawnSource\.id\)/);

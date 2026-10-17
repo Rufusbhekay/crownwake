@@ -194,7 +194,6 @@ function deploymentReserveTotal(){return playerHudDeploymentSources().reduce((to
 function configuredDeploymentReserves(config=PRACTICE_CONFIG){return Object.fromEntries(PLAYER_DEPLOYMENT_ARCHETYPES.map(id=>[id,config[`${id}Soldiers`]]))}
 let selectedCompanyId=null,selectedCommander=null,commandHoverCell=null,wasCombat=false,deploymentReserves=configuredDeploymentReserves(),deploymentArchetypeId=null,deploymentSpawnAssetId=null,deploymentRequestedCount=0,deploymentPlacementReady=false,deploymentStarted=false,deploymentPreviewOccupancySignature="";
 let enemyDeploymentWidget=null;
-let pendingStartingChCounts=configuredDeploymentReserves(),settingsStartingChDirty=false;
 const companyAnchors=new Map(),selectionVisuals=[];
 const editorCameraFocus=new THREE.Vector3(),editorKeys=new Set(),editorObjects=[],editorSelectedObjects=new Set(),editorFoliageObjects=new Set(),editorFoliagePaintSelection=new Set(),hudWidgetElements=new Map();
 const NAVIGATION_CELL_SIZE=1,NAVIGATION_AGENT_CLEARANCE=.36,NAVIGATION_WAYPOINT_REACHED=.22,NAVIGATION_GOAL_REPATH_DISTANCE=.72,NAVIGATION_YIELD_DURATION=.72,BARRACKS_ENEMY_DUEL_RADIUS=8,BARRACKS_ENEMY_ANCHOR_DISTANCE=1.45,BARRACKS_ENEMY_ANCHOR_SLOT_COUNT=8,BARRACKS_ENEMY_PATROL_MIN_DISTANCE=3.2,BARRACKS_ENEMY_PATROL_SEPARATION=2.1,EN_PATROL_ANCHOR_RADIUS=2.6,PEACEFUL_PATROL_MIN_DISTANCE=3.2,PEACEFUL_PATROL_SEPARATION=2.1,PEACEFUL_PATROL_SPEED=1.35,PEACEFUL_PATROL_DURATION=4.5,INDEPENDENT_GROUP_COLUMN_GAP=.68,INDEPENDENT_GROUP_PATROL_SEPARATION=.72,INDEPENDENT_GROUP_PATROL_RADIUS=3.2,INDEPENDENT_GROUP_PATROL_MIN_DISTANCE=.65,INDEPENDENT_GROUP_PATROL_DURATION=4,INDEPENDENT_GROUP_PATROL_PAUSE_MAX=.65,CH_PATROL_COHESION_RADIUS=2.4,INDEPENDENT_GROUP_ARRIVAL_DISTANCE=.16,BARRACKS_ENEMY_EXIT_DURATION=1.15,BARRACKS_ENEMY_DOORWAY_PROGRESS=.68,BARRACKS_ENEMY_SPAWN_INSIDE_MARKER="CROWNWAKE_EN_SPAWN_INSIDE",BARRACKS_ENEMY_SPAWN_EXIT_MARKER="CROWNWAKE_EN_SPAWN_EXIT",NAVIGATION_BLOCKING_TYPES=new Set(["primitive-cube","town-hall","barracks","archer-tower","forest-fence","imported-model"]),NAVIGATION_EDITOR_STATE_KEY="crownwake-navigation-overlay-v1";
@@ -6495,20 +6494,6 @@ function setAudio(enabled){
   try{localStorage.setItem(AUDIO_PREFERENCE_KEY,String(audioOn))}catch{}
   $("settings-audio").textContent=audioOn?"SOUND ON":"SOUND OFF";
 }
-function previewStartingChCount(archetypeId,value){
-  if(!PLAYER_DEPLOYMENT_ARCHETYPES.includes(archetypeId))return;
-  const parsed=Number(value);if(!Number.isFinite(parsed))return;
-  pendingStartingChCounts={...pendingStartingChCounts,[archetypeId]:Math.min(999,Math.max(0,Math.floor(parsed)))};
-  settingsStartingChDirty=PLAYER_DEPLOYMENT_ARCHETYPES.some(id=>pendingStartingChCounts[id]!==PRACTICE_CONFIG[`${id}Soldiers`]);
-  $("settings-apply").classList.toggle("hidden",!settingsStartingChDirty);
-}
-function setStartingChCounts(){
-  const next=normalizePracticeConfig({...PRACTICE_CONFIG,...Object.fromEntries(PLAYER_DEPLOYMENT_ARCHETYPES.map(id=>[`${id}Soldiers`,pendingStartingChCounts[id]]))});
-  Object.assign(PRACTICE_CONFIG,next);pendingStartingChCounts=configuredDeploymentReserves(next);settingsStartingChDirty=false;
-  try{localStorage.setItem(PRACTICE_CONFIG_KEY,JSON.stringify({...PRACTICE_CONFIG,deploymentRosterVersion:2}))}catch{}
-  deploymentReserves=configuredDeploymentReserves(next);deploymentArchetypeId=null;deploymentRequestedCount=0;deploymentPlacementReady=false;deploymentStarted=false;enemyDeploymentWidget=null;commandHoverCell=null;clearTacticalSelection();refreshCommandGrid();
-  for(const id of PLAYER_DEPLOYMENT_ARCHETYPES)$(`starting-${id}-count`).value=String(next[`${id}Soldiers`]);$("settings-apply").classList.add("hidden");updateStats();
-}
 function syncRingVisibilityButtons(){
   document.querySelectorAll('[data-ring-visibility]').forEach(button=>{
     const settings=button.closest('#editor-actor-ring-controls')?selectedActorRingSettings():unitRingSettings,visible=settings[button.dataset.ringVisibility]!==false;
@@ -6550,12 +6535,10 @@ function renderSettings(){
   $("speed").value=String(GAME_SPEED_STEPS.indexOf(gameSpeed));$("speed-value").textContent=`${gameSpeed}Ã—`;
   setAudio(audioOn);
   $("hud-toggle").textContent=hudCompact?"SHOW HUD":"HIDE HUD";
-  if(!settingsStartingChDirty)for(const id of PLAYER_DEPLOYMENT_ARCHETYPES)$(`starting-${id}-count`).value=String(PRACTICE_CONFIG[`${id}Soldiers`]);
-  $("settings-apply").classList.toggle("hidden",!settingsStartingChDirty);
 }
 function openSettings(){
   if(!["playing","paused"].includes(mode))return;
-  settingsReturnMode=mode;mode="settings";resetPlaytestToSavedLevel();disarmDeployment();clearTacticalSelection();pendingStartingChCounts=configuredDeploymentReserves();settingsStartingChDirty=false;renderSettings();$("settings-panel").classList.remove("hidden");
+  settingsReturnMode=mode;mode="settings";resetPlaytestToSavedLevel();disarmDeployment();clearTacticalSelection();renderSettings();$("settings-panel").classList.remove("hidden");
 }
 function closeSettings(){
   if(mode!=="settings")return;$("settings-panel").classList.add("hidden");mode=settingsReturnMode;
@@ -6663,11 +6646,9 @@ $("content-browser-resizer").onpointerdown=beginContentBrowserResize;
 $("world-outliner-search").addEventListener("input",event=>{editorOutlinerQuery=event.currentTarget.value;renderWorldOutliner()});
 $("hud-toggle").onclick=()=>{hudCompact=!hudCompact;$("hud").classList.toggle("hud-compact",hudCompact);renderSettings()};
 $("speed").oninput=e=>{gameSpeed=GAME_SPEED_STEPS[Number(e.currentTarget.value)]??1;$("speed-value").textContent=`${gameSpeed}Ã—`};
-for(const id of PLAYER_DEPLOYMENT_ARCHETYPES)$(`starting-${id}-count`).oninput=e=>previewStartingChCount(id,e.currentTarget.value);
 for(const id of ["editor-ring-outer-color","editor-ring-outer-size","editor-ring-outer-thickness","editor-ring-outer-height","editor-ring-inner-color","editor-ring-inner-size","editor-ring-inner-thickness","editor-ring-inner-height","editor-ring-ch-radar-color","editor-ring-en-radar-color","editor-ring-radar-height","editor-ring-radar-thickness","editor-ring-radar-radius","editor-ring-radar-size"])$(id).oninput=updateEditorActorRingControls;
 for(const [,id] of UNIT_RING_ATTACK_COLOR_INPUTS)$(`editor-ring-${id}`).oninput=updateEditorActorRingControls;
 installRingVisibilityButtons();
-$("settings-apply").onclick=setStartingChCounts;
 $("settings-cancel").onclick=closeSettings;$("settings-exit").onclick=exitToTitle;
 if(debugButton)debugButton.onclick=()=>toggleDebugMonitor();
 

@@ -88,35 +88,6 @@
           <input id="speed" type="range" min="0" max="5" step="1" value="2" aria-label="Game speed">
           <div class="speed-labels"><span>0.5</span><span>0.75</span><span>1</span><span>1.25</span><span>1.5</span><span>2</span></div>
         </div>
-        <div class="settings-section unit-ring-settings">
-          <div class="settings-label"><span>UNIT RINGS</span><small>LIVE CH + EN MARKERS</small></div>
-          <p class="settings-help">Changes apply immediately and are saved on this device.</p>
-          <div class="ring-settings-grid">
-            <fieldset class="ring-settings-group"><legend>OUTER RING</legend>
-              <label class="ring-colour-setting"><span>Colour</span><input id="ring-outer-color" type="color" value="#f7f2e4" aria-label="Outer ring colour"></label>
-              <div class="radar-colours"><label class="ring-colour-setting"><span>CH attack</span><input id="ring-ch-outer-attack-color" type="color" value="#e32646" aria-label="CH outer ring attack colour"></label><label class="ring-colour-setting"><span>EN attack</span><input id="ring-en-outer-attack-color" type="color" value="#ffbf24" aria-label="EN outer ring attack colour"></label></div>
-              <label class="ring-number-setting"><span>Size</span><input id="ring-outer-size" type="number" min="0.3" max="5" step="0.01" inputmode="decimal" aria-label="Outer ring size"></label>
-              <label class="ring-number-setting"><span>Thickness</span><input id="ring-outer-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Outer ring thickness"></label>
-              <label class="ring-number-setting"><span>Height</span><input id="ring-outer-height" type="number" min="0" max="0.2" step="0.005" inputmode="decimal" aria-label="Outer ring height"></label>
-            </fieldset>
-            <fieldset class="ring-settings-group"><legend>INNER RING</legend>
-              <label class="ring-colour-setting"><span>Colour</span><input id="ring-inner-color" type="color" value="#f7f2e4" aria-label="Inner ring colour"></label>
-              <div class="radar-colours"><label class="ring-colour-setting"><span>CH attack</span><input id="ring-ch-inner-attack-color" type="color" value="#e32646" aria-label="CH inner ring attack colour"></label><label class="ring-colour-setting"><span>EN attack</span><input id="ring-en-inner-attack-color" type="color" value="#ffbf24" aria-label="EN inner ring attack colour"></label></div>
-              <label class="ring-number-setting"><span>Size</span><input id="ring-inner-size" type="number" min="0.1" max="5" step="0.01" inputmode="decimal" aria-label="Inner ring size"></label>
-              <label class="ring-number-setting"><span>Thickness</span><input id="ring-inner-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Inner ring thickness"></label>
-              <label class="ring-number-setting"><span>Height</span><input id="ring-inner-height" type="number" min="0" max="0.35" step="0.005" inputmode="decimal" aria-label="Inner ring height"></label>
-            </fieldset>
-          </div>
-          <fieldset class="ring-settings-group radar-settings"><legend>FRONT RADAR</legend>
-            <div class="radar-colours"><label class="ring-colour-setting"><span>CH colour</span><input id="ring-ch-radar-color" type="color" value="#e53935" aria-label="CH front radar colour"></label><label class="ring-colour-setting"><span>EN colour</span><input id="ring-en-radar-color" type="color" value="#ffcf22" aria-label="EN front radar colour"></label></div>
-            <div class="radar-colours"><label class="ring-colour-setting"><span>CH attack</span><input id="ring-ch-radar-attack-color" type="color" value="#ffffff" aria-label="CH front radar attack colour"></label><label class="ring-colour-setting"><span>EN attack</span><input id="ring-en-radar-attack-color" type="color" value="#ffffff" aria-label="EN front radar attack colour"></label></div>
-            <label class="ring-number-setting"><span>Height</span><input id="ring-radar-height" type="number" min="0" max="0.2" step="0.005" inputmode="decimal" aria-label="Front radar height"></label>
-            <label class="ring-number-setting"><span>Thickness</span><input id="ring-radar-thickness" type="number" min="0.012" max="2" step="0.005" inputmode="decimal" aria-label="Front radar thickness"></label>
-            <label class="ring-number-setting"><span>Radius</span><input id="ring-radar-radius" type="number" min="0.1" max="8" step="0.01" inputmode="decimal" aria-label="Front radar radius"></label>
-            <label class="radar-size-setting"><span>Size <strong id="ring-radar-size-value">34%</strong></span><input id="ring-radar-size" type="range" min="5" max="100" step="1" value="34" aria-label="Front radar size"></label>
-            <small>100% is a semi-circle.</small>
-          </fieldset>
-        </div>
         <div class="settings-footer">
           <button id="settings-apply" class="quiet settings-apply hidden">APPLY</button>
           <button id="settings-exit" class="quiet exit-button">EXIT</button>

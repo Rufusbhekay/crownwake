@@ -13,7 +13,7 @@ gltf.scene.animations = gltf.animations;
 const game = await readFile(new URL("../game.js", import.meta.url), "utf8");
 const index = await readFile(new URL("../index.html", import.meta.url), "utf8");
 
-test("CH and EN Blueprints expose shared ring controls in Actor Details", () => {
+test("CH and EN Blueprints expose ring controls in Actor Details, not the settings menu", () => {
   assert.match(index, /id="editor-actor-ring-controls"/);
   assert.match(index, /id="editor-ring-outer-size"/);
   assert.match(index, /id="editor-ring-radar-thickness"/);
@@ -24,7 +24,7 @@ test("CH and EN Blueprints expose shared ring controls in Actor Details", () => 
   assert.match(game, /renderEditorActorRingControls\(Boolean\(libraryProfile\)\)/);
   assert.match(game, /updateEditorActorRingControls/);
   for (const suffix of ["ch-outer-attack-color", "en-outer-attack-color", "ch-inner-attack-color", "en-inner-attack-color", "ch-radar-attack-color", "en-radar-attack-color"]) {
-    assert.match(index, new RegExp(`id="ring-${suffix}"`));
+    assert.doesNotMatch(index, new RegExp(`id="ring-${suffix}"`));
     assert.match(index, new RegExp(`id="editor-ring-${suffix}"`));
   }
 });

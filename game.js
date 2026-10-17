@@ -6517,16 +6517,13 @@ function syncRingVisibilityButtons(){
   });
 }
 function installRingVisibilityButtons(){
-  for(const [selector,headings] of [['.unit-ring-settings',['legend']],['#editor-actor-ring-controls',['h4']]]){
+  for(const [selector,headings] of [['#editor-actor-ring-controls',['h4']]]){
     document.querySelectorAll(`${selector} ${headings[0]}`).forEach((heading,index)=>{
       const property=['outerVisible','innerVisible','radarVisible'][index];if(!property)return;
       const button=document.createElement('button');button.type='button';button.className='ring-visibility-toggle';button.dataset.ringVisibility=property;
       button.setAttribute('aria-label',`${heading.textContent.trim()} visibility`);
       button.onclick=()=>{
-        if(button.closest('#editor-actor-ring-controls')){const profile=selectedEditorActorProfile();if(!profile)return;recordEditorUndo();const settings={...selectedActorRingSettings(profile)};settings[property]=settings[property]===false;setSelectedActorRingSettings(profile,settings);renderEditorActorRingControls(true);return;}
-        unitRingSettings[property]=unitRingSettings[property]===false;
-        try{localStorage.setItem(UNIT_RING_SETTINGS_KEY,JSON.stringify(unitRingSettings))}catch{}
-        syncRingVisibilityButtons();applyUnitRingSettings();
+        const profile=selectedEditorActorProfile();if(!profile)return;recordEditorUndo();const settings={...selectedActorRingSettings(profile)};settings[property]=settings[property]===false;setSelectedActorRingSettings(profile,settings);renderEditorActorRingControls(true);
       };
       heading.append(button);
     });
@@ -6536,13 +6533,6 @@ function installRingVisibilityButtons(){
 const UNIT_RING_ATTACK_COLOR_INPUTS=Object.freeze([["playerOuterAttackColor","ch-outer-attack-color"],["enemyOuterAttackColor","en-outer-attack-color"],["playerInnerAttackColor","ch-inner-attack-color"],["enemyInnerAttackColor","en-inner-attack-color"],["playerRadarAttackColor","ch-radar-attack-color"],["enemyRadarAttackColor","en-radar-attack-color"]]);
 function renderRingAttackColors(prefix,settings=unitRingSettings){for(const [setting,id] of UNIT_RING_ATTACK_COLOR_INPUTS)$(`${prefix}-${id}`).value=settings[setting]}
 function readRingAttackColors(prefix){return Object.fromEntries(UNIT_RING_ATTACK_COLOR_INPUTS.map(([setting,id])=>[setting,$(`${prefix}-${id}`).value]))}
-function renderUnitRingSettings(){
-  syncRingVisibilityButtons();
-  renderRingAttackColors("ring");
-  $("ring-outer-color").value=unitRingSettings.outerColor;$("ring-outer-size").value=String(unitRingSettings.outerSize);$("ring-outer-thickness").value=String(unitRingSettings.outerThickness);$("ring-outer-height").value=String(unitRingSettings.outerHeight);
-  $("ring-inner-color").value=unitRingSettings.innerColor;$("ring-inner-size").value=String(unitRingSettings.innerSize);$("ring-inner-thickness").value=String(unitRingSettings.innerThickness);$("ring-inner-height").value=String(unitRingSettings.innerHeight);
-  $("ring-ch-radar-color").value=unitRingSettings.playerRadarColor;$("ring-en-radar-color").value=unitRingSettings.enemyRadarColor;$("ring-radar-height").value=String(unitRingSettings.radarHeight);$("ring-radar-thickness").value=String(unitRingSettings.radarThickness);$("ring-radar-radius").value=String(unitRingSettings.radarRadius);$("ring-radar-size").value=String(Math.round(unitRingSettings.radarSize*100));$("ring-radar-size-value").textContent=`${Math.round(unitRingSettings.radarSize*100)}%`;
-}
 function renderEditorActorRingControls(enabled){
   syncRingVisibilityButtons();
   const controls=$("editor-actor-ring-controls");if(!controls)return;controls.disabled=!enabled;
@@ -6550,12 +6540,6 @@ function renderEditorActorRingControls(enabled){
   $("editor-ring-outer-color").value=settings.outerColor;$("editor-ring-outer-size").value=String(settings.outerSize);$("editor-ring-outer-thickness").value=String(settings.outerThickness);$("editor-ring-outer-height").value=String(settings.outerHeight);
   $("editor-ring-inner-color").value=settings.innerColor;$("editor-ring-inner-size").value=String(settings.innerSize);$("editor-ring-inner-thickness").value=String(settings.innerThickness);$("editor-ring-inner-height").value=String(settings.innerHeight);
   $("editor-ring-ch-radar-color").value=settings.playerRadarColor;$("editor-ring-en-radar-color").value=settings.enemyRadarColor;$("editor-ring-radar-height").value=String(settings.radarHeight);$("editor-ring-radar-thickness").value=String(settings.radarThickness);$("editor-ring-radar-radius").value=String(settings.radarRadius);$("editor-ring-radar-size").value=String(Math.round(settings.radarSize*100));$("editor-ring-radar-size-value").textContent=`${Math.round(settings.radarSize*100)}%`;
-}
-function applyUnitRingSettings(){for(const unit of [master,...followers,...enemyUnits])if(unit?.userData?.encounterRing)refreshEncounterRing(unit.userData.encounterRing);rebuildSelectionVisuals();updateEncounterRings()}
-function updateUnitRingSettings(){
-  unitRingSettings=normalizeUnitRingSettings({...unitRingSettings,...readRingAttackColors("ring"),outerColor:$("ring-outer-color").value,outerSize:$("ring-outer-size").value,outerThickness:$("ring-outer-thickness").value,outerHeight:$("ring-outer-height").value,innerColor:$("ring-inner-color").value,innerSize:$("ring-inner-size").value,innerThickness:$("ring-inner-thickness").value,innerHeight:$("ring-inner-height").value,playerRadarColor:$("ring-ch-radar-color").value,enemyRadarColor:$("ring-en-radar-color").value,radarHeight:$("ring-radar-height").value,radarThickness:$("ring-radar-thickness").value,radarRadius:$("ring-radar-radius").value,radarSize:Number($("ring-radar-size").value)/100});
-  try{localStorage.setItem(UNIT_RING_SETTINGS_KEY,JSON.stringify(unitRingSettings))}catch{}
-  renderUnitRingSettings();applyUnitRingSettings();
 }
 function updateEditorActorRingControls(){
   const profile=selectedEditorActorProfile();if(!profile)return;
@@ -6567,7 +6551,6 @@ function renderSettings(){
   setAudio(audioOn);
   $("hud-toggle").textContent=hudCompact?"SHOW HUD":"HIDE HUD";
   if(!settingsStartingChDirty)for(const id of PLAYER_DEPLOYMENT_ARCHETYPES)$(`starting-${id}-count`).value=String(PRACTICE_CONFIG[`${id}Soldiers`]);
-  renderUnitRingSettings();
   $("settings-apply").classList.toggle("hidden",!settingsStartingChDirty);
 }
 function openSettings(){
@@ -6681,9 +6664,8 @@ $("world-outliner-search").addEventListener("input",event=>{editorOutlinerQuery=
 $("hud-toggle").onclick=()=>{hudCompact=!hudCompact;$("hud").classList.toggle("hud-compact",hudCompact);renderSettings()};
 $("speed").oninput=e=>{gameSpeed=GAME_SPEED_STEPS[Number(e.currentTarget.value)]??1;$("speed-value").textContent=`${gameSpeed}Ã—`};
 for(const id of PLAYER_DEPLOYMENT_ARCHETYPES)$(`starting-${id}-count`).oninput=e=>previewStartingChCount(id,e.currentTarget.value);
-for(const id of ["ring-outer-color","ring-outer-size","ring-outer-thickness","ring-outer-height","ring-inner-color","ring-inner-size","ring-inner-thickness","ring-inner-height","ring-ch-radar-color","ring-en-radar-color","ring-radar-height","ring-radar-thickness","ring-radar-radius","ring-radar-size"])$(id).oninput=updateUnitRingSettings;
 for(const id of ["editor-ring-outer-color","editor-ring-outer-size","editor-ring-outer-thickness","editor-ring-outer-height","editor-ring-inner-color","editor-ring-inner-size","editor-ring-inner-thickness","editor-ring-inner-height","editor-ring-ch-radar-color","editor-ring-en-radar-color","editor-ring-radar-height","editor-ring-radar-thickness","editor-ring-radar-radius","editor-ring-radar-size"])$(id).oninput=updateEditorActorRingControls;
-for(const [,id] of UNIT_RING_ATTACK_COLOR_INPUTS){$(`ring-${id}`).oninput=updateUnitRingSettings;$(`editor-ring-${id}`).oninput=updateEditorActorRingControls;}
+for(const [,id] of UNIT_RING_ATTACK_COLOR_INPUTS)$(`editor-ring-${id}`).oninput=updateEditorActorRingControls;
 installRingVisibilityButtons();
 $("settings-apply").onclick=setStartingChCounts;
 $("settings-cancel").onclick=closeSettings;$("settings-exit").onclick=exitToTitle;
